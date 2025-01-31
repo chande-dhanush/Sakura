@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="winter">
+<head>
+    <meta charset="UTF-8">
+    
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.tailwindcss.com"></script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sakura</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Paytone+One&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="flex flex-col items-center h-svh bg-purple-400 bg-opacity-70">
+        <div class="text-center py-4 w-full">
+            <h1 class="text-4xl font-extrabold paytone-one-regular text-white ">   Sakura   <div class="avatar"><div class=" w-14 rounded-full">
+                <img alt="Tailwind CSS chat bubble component" src="sakura.png" />
+                </div></div>
+                </h1>
+        </div>
+    </br>
+        <div id="chat-container"
+            class="max-w-4xl rounded-t-md w-full mx-6 py-4 px-3 noto-sans-normal overflow-scroll h-full bg-opacity-70 bg-pink-200">
+            <div class="chat chat-start">
+                <div class="chat-image avatar">
+                    <div class="w-10 rounded-full">
+                      <img alt="Tailwind CSS chat bubble component" src="sakura.png" />
+                      </div></div>
+                <div class="chat-header text-white">
+                    Sakura
+                </div>
+                <div class="chat-bubble bg-purple-900 text-white">Hello!! </div>
+            </div>
+        </div>
+        <div style="display: none;" id="thinking-indicator" class="max-w-4xl mx-6 px-3 text-sm w-full">
+            <div class="flex space-x-2 animate-pulse pl-2">
+                <div class="w-3 h-3 bg-pink-700 rounded-full"></div>
+                <div class="w-3 h-3 bg-pink-800 rounded-full"></div>
+                <div class="w-3 h-3 bg-pink-900 rounded-full"></div>
+            </div></div>
+        <div class="flex w-full max-w-4xl rounded-b-md mx-6 py-2 px-3 mb-2">
+            <textarea id="chatmsg"
+                class="resize-none textarea w-full bg-pink-800 text-white placeholder:text-white rounded-md p-2 noto-sans-normal max-h-12 disabled:opacity-50 disabled:bg-purple-800"
+                placeholder="Type your message here"></textarea>
+            <button class="bg-pink-800 text-white rounded-md px-4 py-2 ml-2 hover:bg-green-700 disabled:opacity-50"
+                id="sendbtn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"
+                    class="h-6 w-6 fill-pink-200"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+                    <path
+                        d="M201.4 137.4c12.5-12.5 32.8-12.5 45.3 0l160 160c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L224 205.3 86.6 342.6c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l160-160z" />
+                </svg></button>
+            <button class="bg-pink-800 text-white rounded-md px-4 py-2 ml-2 hover:bg-green-700 disabled:opacity-50"
+                id="sdbtn"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 fill-blue-200"
+                    viewBox="0 0 512 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+                    <path
+                        d="M448 80c8.8 0 16 7.2 16 16V415.8l-5-6.5-136-176c-4.5-5.9-11.6-9.3-19-9.3s-14.4 3.4-19 9.3L202 340.7l-30.5-42.7C167 291.7 159.8 288 152 288s-15 3.7-19.5 10.1l-80 112L48 416.3l0-.3V96c0-8.8 7.2-16 16-16H448zM64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm80 192a48 48 0 1 0 0-96 48 48 0 1 0 0 96z" />
+                </svg></button>
+        </div>
+    </div>
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>
