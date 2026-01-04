@@ -1,0 +1,57 @@
+# Sakura V10 Docker Ignore
+# ========================
+
+# Virtual environments
+PA/
+venv/
+.venv/
+env/
+
+# Node modules (frontend not needed for backend docker)
+node_modules/
+frontend/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Build artifacts
+target/
+dist/
+build/
+*.egg-info/
+
+# Secrets (should be passed via env vars)
+.env
+token.json
+credentials.json
+*.key
+
+# Logs and cache
+logs/
+*.log
+.cache
+.spotify_cache/
+__pycache__/
+*.py[cod]
+
+# Data stores (should be mounted as volumes)
+data/chroma_store/
+data/faiss_store/
+data/world_graph.json
+data/wake_templates/
+
+# System
+Thumbs.db
+.DS_Store
+*.wav
+*.mp3
+
+# Documentation (not needed in image)
+*.md
+Notes/
+Memory Manim Scripts/

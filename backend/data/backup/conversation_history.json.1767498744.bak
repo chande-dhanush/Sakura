@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "What can you do?"
+  },
+  {
+    "role": "assistant",
+    "content": "I can help with a few things:\n\n- Email: read and send\n- Calendar: view and schedule\n- Music: play, pause, skip, adjust volume\n- Search: web, Wikipedia, news, papers\n- Notes: create, read, append\n- Files: open, read, write\n- System: check battery, CPU, take screenshots\n- Utilities: weather, timer, currency, math, dictionary, location\n\nJust let me know what you need."
+  }
+]

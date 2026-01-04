@@ -1,0 +1,61 @@
+# ============ Secrets ============
+.env
+token.json
+credentials.json
+*.key
+
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environments
+PA/
+venv/
+.venv/
+env/
+
+# ============ Data & Logs ============
+data/chroma_store/
+data/faiss_store/
+logs/
+*.log
+*.db
+*.sqlite
+
+# Keep data directory structure
+!data/.gitkeep
+
+# ============ Cache ============
+.cache
+.spotify_cache/
+node_modules/
+
+# ============ IDE ============
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ============ System ============
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ============ Build ============
+dist/
+build/
+*.egg-info/
+target/
+
+# ============ Presentation (non-essential) ============
+Heart Manim Scripts/
+Memory Manim Scripts/
+Notes/
+
+# ============ Tauri ============
+frontend/src-tauri/target/
+
+# ============ Artifacts ============
+.gemini/

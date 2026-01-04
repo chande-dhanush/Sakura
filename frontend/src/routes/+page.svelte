@@ -1,0 +1,279 @@
+<script>
+    import { onMount, tick } from 'svelte';
+    import { invoke } from '@tauri-apps/api/core';
+    import { listen } from '@tauri-apps/api/event';
+    import { getCurrentWindow } from '@tauri-apps/api/window';
+    import Omnibox from '$lib/components/Omnibox.svelte';
+    import Timeline from '$lib/components/Timeline.svelte';
+    import WorldGraphPill from '$lib/components/WorldGraphPill.svelte';
+    import { messages, moodColors, refreshState, connectionError, clearChat, loadHistory } from '$lib/stores/chat.js';
+    
+    let showMenu = false;
+    let historyLoading = false;
+    let isQuickSearch = false; // Spotlight mode
+    
+    onMount(async () => {
+        console.log('[Main] Window mounted, loading history...');
+        try {
+            await refreshState();
+            console.log('[Main] State refreshed');
+            await loadHistory();
+            console.log('[Main] History load complete. Messages in store:', $messages.length);
+            
+            // Listen for Quick Search Trigger (Shift+S global)
+            await listen('quick_search_trigger', async () => {
+                console.log('⚡ Quick Search Mode Triggered');
+                isQuickSearch = true;
+                // Ensure focus
+                const appWindow = getCurrentWindow();
+                await appWindow.setFocus();
+            });
+
+            // Listen for Full Mode Trigger (Shift+F default)
+            await listen('full_mode_trigger', async () => {
+                console.log('🔄 Full Mode Triggered');
+                isQuickSearch = false;
+                const appWindow = getCurrentWindow();
+                await appWindow.setFocus();
+            });
+            
+        } catch (e) {
+            console.error('[Main] Init error:', e);
+        }
+    });
+    
+    async function handleReloadHistory() {
+        console.log('[Main] Manual history reload triggered');
+        historyLoading = true;
+        showMenu = false;
+        try {
+            await loadHistory();
+            console.log('[Main] Reloaded. Messages:', $messages.length);
+        } finally {
+            historyLoading = false;
+        }
+    }
+    
+    function handleClearChat() {
+        clearChat();
+        showMenu = false;
+    }
+
+    function closeMenu() {
+        showMenu = false;
+    }
+    
+    async function hideWindow() {
+        await invoke('hide_main_window');
+        // Reset quick search mode when hidden
+        isQuickSearch = false; 
+    }
+
+    function handleKeydown(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            if (showMenu) {
+                showMenu = false;
+            } else {
+                hideWindow();
+            }
+            return;
+        }
+    }
+    function handleBlur() {
+        if (isQuickSearch) {
+            console.log('[Main] Window lost focus in Quick Search mode - hiding');
+            hideWindow();
+        }
+    }
+</script>
+
+<svelte:window on:keydown={handleKeydown} on:blur={handleBlur} />
+
+<!-- Overlay for menu -->
+{#if showMenu}
+    <div 
+        class="overlay" 
+        on:click={closeMenu} 
+        on:keydown={(e) => e.key === 'Escape' && closeMenu()}
+        role="button" 
+        tabindex="-1"
+    ></div>
+{/if}
+
+<main class="app" 
+      class:quick-search={isQuickSearch}
+      style="--bg: {$moodColors.bg}; --primary: {$moodColors.primary}; --glow: {$moodColors.glow}">
+    
+    {#if !isQuickSearch}
+        <!-- Title Bar - DRAGGABLE -->
+        <div class="titlebar" data-tauri-drag-region role="toolbar">
+            <span class="title">🌸 Sakura</span>
+            <div class="controls">
+                <button class="control menu-btn" on:click={() => showMenu = !showMenu} title="Menu">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
+                        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                        <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button class="control" on:click={hideWindow} title="Minimize (ESC)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Dropdown Menu -->
+            {#if showMenu}
+                <div class="menu">
+                    <button on:click={handleReloadHistory} disabled={historyLoading}>
+                        <span class="menu-icon">🔄</span> {historyLoading ? 'Loading...' : 'Reload History'}
+                    </button>
+                    <button on:click={handleClearChat}>
+                        <span class="menu-icon">🗑️</span> Clear Chat
+                    </button>
+                    <button on:click={() => { showMenu = false; }}>
+                        <span class="menu-icon">⚙️</span> Settings
+                    </button>
+                    <div class="menu-divider"></div>
+                    <div class="menu-shortcuts">
+                        <span><kbd>ESC</kbd> Hide Window</span>
+                        <span><kbd>Shift+S</kbd> Quick Search</span>
+                    </div>
+                </div>
+            {/if}
+        </div>
+        
+        <!-- Error Banner -->
+        {#if $connectionError}
+            <div class="error-banner">
+                <span>⚠️ {$connectionError}</span>
+                <button on:click={() => connectionError.set(null)} title="Dismiss">×</button>
+            </div>
+        {/if}
+        
+        <!-- World Graph Status Pill -->
+        <WorldGraphPill />
+        
+        <!-- Chat Timeline -->
+        <div class="timeline-container">
+            <Timeline />
+        </div>
+    {/if}
+    
+    <!-- Input Area -->
+    <div class="input-area">
+        <Omnibox isQuickSearch={isQuickSearch} /> <!-- Pass Mode -->
+    </div>
+</main>
+
+<style>
+    /* ===== GLOBAL RESET ===== */
+    :global(*) {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    
+    :global(body) {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+        background: transparent;
+        color: #fff;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+    }
+    
+    /* ... Scrollbar styles omitted for brevity ... */
+    :global(::-webkit-scrollbar) { width: 6px; }
+    :global(::-webkit-scrollbar-track) { background: transparent; }
+    :global(::-webkit-scrollbar-thumb) { background: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+    :global(::-webkit-scrollbar-thumb:hover) { background: rgba(255, 255, 255, 0.3); }
+    
+    /* ===== OVERLAY ===== */
+    .overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: transparent; z-index: 99;
+    }
+    
+    /* ===== DRAG REGION ===== */
+    [data-tauri-drag-region] { -webkit-app-region: drag; app-region: drag; cursor: grab; user-select: none; }
+    [data-tauri-drag-region] button, [data-tauri-drag-region] input { -webkit-app-region: no-drag; app-region: no-drag; cursor: pointer; }
+    
+    /* ===== MAIN APP ===== */
+    .app {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 
+            0 20px 60px rgba(0, 0, 0, 0.5),
+            0 0 1px rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    /* QUICK SEARCH MODE */
+    .app.quick-search {
+        background: rgba(25, 25, 35, 0.95);
+        border-radius: 16px;
+        border: 1px solid rgba(136, 136, 255, 0.3);
+        justify-content: center; /* Center Omnibox vertically */
+        box-shadow: 
+            0 20px 80px rgba(0, 0, 0, 0.6),
+            0 0 0 1px rgba(136, 136, 255, 0.2),
+            0 0 40px rgba(136, 136, 255, 0.15);
+    }
+    
+    .app.quick-search .input-area {
+        background: transparent;
+        border: none;
+        padding: 0 24px; /* More padding for cleaner look */
+    }
+    
+    /* ===== TITLE BAR & REST ===== */
+    .titlebar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 14px; min-height: 44px;
+        background: linear-gradient(180deg, rgba(30, 30, 40, 0.5), rgba(20, 20, 30, 0.3));
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        user-select: none; position: relative; border-radius: 12px 12px 0 0; pointer-events: auto;
+    }
+    
+    .title { font-size: 14px; font-weight: 500; color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); pointer-events: none; }
+    
+    .controls { display: flex; gap: 4px; }
+    .control { 
+        width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; 
+        color: rgba(255, 255, 255, 0.5); cursor: pointer; display: flex; align-items: center; 
+        justify-content: center; transition: all 0.15s; 
+    }
+    .control:hover { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.8); }
+    
+    /* MENU Styles (Simplified for brevity, assume unchanged logic) */
+    .menu { position: absolute; top: 100%; right: 10px; min-width: 180px; background: rgba(25, 25, 35, 0.98); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 6px; z-index: 100; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); backdrop-filter: blur(20px); }
+    .menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: none; border-radius: 6px; background: transparent; color: rgba(255, 255, 255, 0.85); font-size: 13px; cursor: pointer; transition: all 0.15s; text-align: left; }
+    .menu button:hover { background: rgba(255, 255, 255, 0.08); }
+    .menu-icon { font-size: 14px; }
+    .menu-divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 6px 0; }
+    .menu-shortcuts { padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .menu-shortcuts span { font-size: 11px; color: rgba(255, 255, 255, 0.4); display: flex; align-items: center; gap: 8px; }
+    .menu-shortcuts kbd { background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 4px; font-family: inherit; font-size: 10px; }
+    
+    /* Error Banner */
+    .error-banner { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: rgba(255, 68, 68, 0.15); border-bottom: 1px solid rgba(255, 68, 68, 0.3); color: #ff8888; font-size: 12px; }
+    .error-banner button { background: transparent; border: none; color: #ff8888; font-size: 16px; cursor: pointer; padding: 0 4px; }
+    
+    .timeline-container { 
+        flex: 1; 
+        overflow: hidden; /* Let Timeline component handle scrolling */
+        display: flex; 
+        flex-direction: column;
+        padding: 0; /* Remove padding here, let Timeline handle it */
+    }
+    
+    .input-area { padding: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.2); }
+</style>

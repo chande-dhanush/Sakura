@@ -1,0 +1,103 @@
+{
+  "version": "v7",
+  "current_turn": 34,
+  "current_session": "40fe58aa-2761-4a9e-be35-246b74c1fee9",
+  "entities": {
+    "user:self": {
+      "id": "user:self",
+      "type": "user",
+      "name": "Dhanush",
+      "attributes": {
+        "age": 22,
+        "birthday": "29 October",
+        "location": "Bangalore, India",
+        "interests": [
+          "AI",
+          "Anime",
+          "Travelling"
+        ]
+      },
+      "lifecycle": "promoted",
+      "source": "system",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-01-04T09:12:35.584617",
+      "last_referenced": "2026-01-04T09:12:35.584617",
+      "reference_count": 0,
+      "confidence": 1.0,
+      "not_claims": [
+        "NOT the actor Dhanush",
+        "NOT a public figure"
+      ],
+      "summary": "Dhanush, 22, from Bangalore, India. Interests: AI, Anime, Travelling."
+    },
+    "pref:communication": {
+      "id": "pref:communication",
+      "type": "preference",
+      "name": "Communication Preferences",
+      "attributes": {
+        "style": "practical, direct",
+        "enjoys": "being roasted",
+        "prefers": "minimal responses"
+      },
+      "lifecycle": "promoted",
+      "source": "system",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-01-04T09:12:35.584617",
+      "last_referenced": "2026-01-04T09:12:35.584617",
+      "reference_count": 0,
+      "confidence": 1.0,
+      "not_claims": [],
+      "summary": "Prefers practical, direct replies. Enjoys being teased."
+    }
+  },
+  "actions": [
+    {
+      "id": "episode:7-14",
+      "turn": 14,
+      "timestamp": "2026-01-03T19:32:35.718098",
+      "action_type": "episode",
+      "tool": null,
+      "args": {},
+      "result": null,
+      "success": true,
+      "focus_entity": null,
+      "entities_involved": [],
+      "depends_on": null,
+      "user_intent": "casual",
+      "user_satisfaction": null,
+      "significance": 0.5,
+      "key_facts": [],
+      "summary": "[EPISODE] get_weather(city=what's the) \u2713; web_search(query=yeah lol, can u cross verify, and tell me what's the current temperature in bangalore?) \u2713; get_weather(city=hey, what's the) \u2713; get_weather() \u2713; gmail_read_email() \u2713",
+      "session_id": "454fe376-b2be-4c1c-81e5-005dd9ff4123"
+    },
+    {
+      "id": "action:t-33",
+      "turn": 33,
+      "timestamp": "2026-01-04T09:22:48.518821",
+      "action_type": "tool",
+      "tool": "web_search",
+      "args": {
+        "query": "it up?"
+      },
+      "result": "\u274c Search failed: No module named 'tavily'",
+      "success": true,
+      "focus_entity": "entity:query:it_up?",
+      "entities_involved": [
+        "entity:query:it_up?"
+      ],
+      "depends_on": null,
+      "user_intent": "casual",
+      "user_satisfaction": null,
+      "significance": 0.5,
+      "key_facts": [],
+      "summary": "web_search(query=it up?) \u2713",
+      "session_id": "40fe58aa-2761-4a9e-be35-246b74c1fee9"
+    }
+  ]
+}
