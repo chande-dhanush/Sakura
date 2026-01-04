@@ -1,0 +1,30 @@
+[project]
+name = "sakura-assistant"
+version = "10.0.0"
+description = "Enterprise-grade AI Personal Assistant"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["sakura_assistant/tests"]
+python_files = "test_*.py"
+addopts = "-v --tb=short -W ignore::DeprecationWarning"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.coverage.run]
+source = ["sakura_assistant"]
+omit = [
+    "*/__pycache__/*",
+    "*/tests/*",
+    "*/.venv/*",
+    "*/PA/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

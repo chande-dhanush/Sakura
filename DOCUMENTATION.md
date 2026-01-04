@@ -137,7 +137,7 @@ The assistant now uses a **Thinking Loop** for complex queries.
 
 **Problem:** ReAct loop stuffed context with huge tool outputs, pushing user context out.
 
-**Solution:** `_prune_tool_output()` in `llm.py`:
+**Solution:** `ToolExecutor.prune_output()` in `executor.py` (Refactored from `llm.py`):
 - Detects JSON → prunes large keys (`html`, `body`, `content`)
 - Keeps JSON syntax valid
 - Text → truncates at word/sentence boundaries
@@ -149,6 +149,26 @@ The assistant now uses a **Thinking Loop** for complex queries.
 # After (valid JSON):
 {"html_body": "[15000 chars - use retrieve_document_context()]"}
 ```
+
+---
+
+## 🛡️ Enterprise Hardening (V10)
+
+### 1. Security
+- **Simple Auth:** `X-Auth` header enforcement on `/chat`.
+- **Eval Removal:** Replaced unsafe `eval()` with `sympy.sympify()` + whitelist.
+- **Sandboxing:** Whitelisted directories for file operations.
+
+### 2. SOLID Architecture
+Refactored the Monolithic `llm.py` into specialized modules:
+- `router.py`: Intent classification (Direct/Plan/Chat).
+- `executor.py`: Tool execution and output management.
+- `responder.py`: Response generation and guardrails.
+- `container.py`: Dependency Injection for LLM configuration.
+
+### 3. Observability
+- **Structured Logging:** JSON logs via `structlog`.
+- **Metrics:** Prometheus endpoint for request/LLM tracking.
 
 ### 2. Multi-Action Router (Compound Requests)
 

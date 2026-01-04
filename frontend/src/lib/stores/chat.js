@@ -5,6 +5,8 @@
 import { writable, derived, get } from 'svelte/store';
 
 const BACKEND_URL = 'http://localhost:8000';
+// V10 Enterprise Auth Header (Default credentials)
+const AUTH_HEADER = { 'X-Auth': 'sakura:sakura123' };
 
 // Stores
 export const messages = writable([]);
@@ -42,7 +44,10 @@ export async function sendMessage(query, options = {}) {
     try {
         const response = await fetch(`${BACKEND_URL}/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                ...AUTH_HEADER 
+            },
             body: JSON.stringify({
                 query,
                 tts_enabled: options.tts_enabled || false
@@ -200,7 +205,10 @@ function formatError(message) {
  */
 export async function stopGeneration() {
     try {
-        await fetch(`${BACKEND_URL}/stop`, { method: 'POST' });
+        await fetch(`${BACKEND_URL}/stop`, { 
+            method: 'POST',
+            headers: AUTH_HEADER
+        });
     } catch (e) {
         // Ignore
     }
@@ -211,7 +219,9 @@ export async function stopGeneration() {
  */
 export async function refreshState() {
     try {
-        const response = await fetch(`${BACKEND_URL}/state`);
+        const response = await fetch(`${BACKEND_URL}/state`, {
+            headers: AUTH_HEADER
+        });
         if (response.ok) {
             const state = await response.json();
             mood.set(state.mood || 'neutral');
@@ -243,7 +253,9 @@ export function clearChat() {
 export async function loadHistory() {
     console.log('[Chat] Loading history from backend...');
     try {
-        const response = await fetch(`${BACKEND_URL}/history`);
+        const response = await fetch(`${BACKEND_URL}/history`, {
+            headers: AUTH_HEADER
+        });
         console.log('[Chat] History response status:', response.status);
 
         if (response.ok) {

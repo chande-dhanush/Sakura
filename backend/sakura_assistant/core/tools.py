@@ -73,14 +73,50 @@ def execute_actions(actions: List[Dict[str, Any]]) -> str:
 # These were in the original tools.py, mapping to existing or new tools.
 @tool
 def quick_math(expression: str) -> str:
-    """Calculate math expression."""
-    import math
+    """Calculate math expression safely using sympy.
+    
+    Security: Uses sympify with local_dict whitelist to prevent code execution.
+    Only mathematical functions are allowed.
+    """
     try:
-        # Safe eval
-        safe_dict = {k: getattr(math, k) for k in dir(math) if not k.startswith('_')}
-        safe_dict['abs'] = abs
-        safe_dict['round'] = round
-        return str(eval(expression, {"__builtins__": {}}, safe_dict))
+        import sympy
+        from sympy import (
+            sin, cos, tan, sqrt, log, exp, pi, E, 
+            Abs, floor, ceiling, factorial
+        )
+        
+        # Whitelist of allowed functions - NO __import__, eval, exec, open etc.
+        ALLOWED_FUNCTIONS = {
+            'sin': sin, 'cos': cos, 'tan': tan,
+            'sqrt': sqrt, 'log': log, 'ln': log, 'exp': exp,
+            'abs': Abs, 'floor': floor, 'ceil': ceiling,
+            'factorial': factorial,
+            'pi': pi, 'e': E,
+        }
+        
+        # Block dangerous patterns before parsing
+        dangerous_patterns = ['__', 'import', 'eval', 'exec', 'open', 'file', 
+                              'input', 'compile', 'globals', 'locals', 'getattr',
+                              'setattr', 'delattr', 'vars', 'dir', 'type', 'class']
+        expr_lower = expression.lower()
+        for pattern in dangerous_patterns:
+            if pattern in expr_lower:
+                return f"Error: '{pattern}' is not allowed in expressions"
+        
+        # Use sympify with strict local_dict - no global namespace access
+        result = sympy.sympify(expression, locals=ALLOWED_FUNCTIONS, evaluate=True)
+        
+        # Force numeric evaluation
+        numeric_result = sympy.N(result)
+        
+        # Convert to Python number
+        try:
+            float_val = float(numeric_result)
+            if float_val == int(float_val):
+                return str(int(float_val))
+            return str(float_val)
+        except (ValueError, TypeError):
+            return str(numeric_result)
     except Exception as e:
         return f"Error: {e}"
 

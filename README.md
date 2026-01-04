@@ -10,8 +10,10 @@
 
 - **💬 Smart Chat** - Powered by Groq LLMs with tiered architecture
 - **🔧 Tool Use** - 47+ tools (Spotify, Gmail, Calendar, Web Search, Notes, etc.)
+- **🛡️ Enterprise Security** - Simple Auth, Path Sandboxing, Safe Math Parsing
 - **🎙️ Voice** - Wake word detection + TTS with Kokoro
 - **🖼️ Vision** - Image analysis via OpenRouter
+- **📊 Observability** - Structured logging & Prometheus metrics
 - **🌐 Quick Search** - `Alt+S` for instant omnibox-style search
 - **📍 Bubble Widget** - Always-on floating widget
 
@@ -103,8 +105,14 @@ Templates are saved to `backend/data/wake_templates/`.
 
 ---
 
-## 🔐 API Keys
+## 🔐 API Keys & Security
 
+### Authentication
+Sakura V10 now enforces simple authentication for the API.
+1. Open `backend/server.py` and set your credentials (default: `sakura / sakura123`).
+2. The frontend automatically handles headers.
+
+### Environment Variables
 Create `.env` in the project root:
 
 ```env

@@ -5,14 +5,6 @@ from .common import log_api_call
 
 # --- Imports ---
 try:
-    from langchain_tavily import TavilySearch
-except ImportError:
-    try:
-        from langchain_community.tools.tavily_search import TavilySearchResults
-    except ImportError:
-        pass
-
-try:
     import pywhatkit
 except ImportError:
     pywhatkit = None

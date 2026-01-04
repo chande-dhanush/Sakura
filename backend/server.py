@@ -24,6 +24,36 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+import hashlib
+import warnings
+
+# Initialize structured logging
+try:
+    from sakura_assistant.utils.logging import configure_logging, get_logger
+    configure_logging(json_output=False)  # Human-readable for basic run
+    log = get_logger("backend")
+except ImportError:
+    import logging
+    log = logging.getLogger("backend")
+    log.setLevel(logging.INFO)
+
+# =============================================================================
+# SIMPLE AUTH - Change these credentials!
+# =============================================================================
+AUTH_USER = "sakura"
+AUTH_PASS = "sakura123"  # Change this to your preferred password
+
+def verify_auth(request: Request) -> bool:
+    """
+    Verify X-Auth header matches credentials.
+    
+    Expected header format: X-Auth: username:password
+    No bypass possible - all endpoints except /health require auth.
+    """
+    auth_header = request.headers.get("X-Auth", "")
+    expected = f"{AUTH_USER}:{AUTH_PASS}"
+    # Use constant-time comparison to prevent timing attacks
+    return hashlib.sha256(auth_header.encode()).hexdigest() == hashlib.sha256(expected.encode()).hexdigest()
 
 # Lazy import to avoid loading models at import time
 assistant = None
@@ -114,6 +144,10 @@ async def chat(request: Request):
     """
     global current_task, generation_cancelled
     generation_cancelled = False
+    
+    # Auth check - no bypass
+    if not verify_auth(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
     
     try:
         data = await request.json()

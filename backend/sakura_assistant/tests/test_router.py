@@ -1,41 +1,133 @@
+"""
+Test Suite: Router Module
+=========================
+Tests for the IntentRouter class.
+"""
+import unittest
 import sys
 import os
-sys.path.append(os.getcwd())
-# from core.relevance_mapper import get_tool_relevance
-import pytest
+
+# Add parent to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def test_router_no_match():
-    # Simple greetings or chats should have 0 confidence
-    res = get_tool_relevance("hello there")
-    assert res['tool'] is None
-    assert res['confidence'] < 0.5
+class TestIntentRouter(unittest.TestCase):
+    """Test IntentRouter functionality."""
+    
+    @classmethod
+    def setUpClass(cls):
+        """Import the router."""
+        from sakura_assistant.core.router import IntentRouter, RouteResult
+        cls.IntentRouter = IntentRouter
+        cls.RouteResult = RouteResult
+    
+    def test_route_result_needs_tools(self):
+        """Test RouteResult.needs_tools property."""
+        direct = self.RouteResult("DIRECT", "spotify_control")
+        plan = self.RouteResult("PLAN", "web_search")
+        chat = self.RouteResult("CHAT")
+        
+        self.assertTrue(direct.needs_tools)
+        self.assertTrue(plan.needs_tools)
+        self.assertFalse(chat.needs_tools)
+    
+    def test_route_result_needs_planning(self):
+        """Test RouteResult.needs_planning property."""
+        direct = self.RouteResult("DIRECT")
+        plan = self.RouteResult("PLAN")
+        chat = self.RouteResult("CHAT")
+        
+        self.assertFalse(direct.needs_planning)
+        self.assertTrue(plan.needs_planning)
+        self.assertFalse(chat.needs_planning)
+    
+    def test_is_action_command_music(self):
+        """Test action command detection for music."""
+        # Create router with mock LLM (won't be called for action commands)
+        router = self.IntentRouter(llm=None)
+        
+        self.assertTrue(router._is_action_command("play music"))
+        self.assertTrue(router._is_action_command("pause"))
+        self.assertTrue(router._is_action_command("skip to next"))
+        self.assertTrue(router._is_action_command("queue this song"))
+    
+    def test_is_action_command_apps(self):
+        """Test action command detection for apps."""
+        router = self.IntentRouter(llm=None)
+        
+        self.assertTrue(router._is_action_command("open chrome"))
+        self.assertTrue(router._is_action_command("launch spotify"))
+        self.assertTrue(router._is_action_command("start notepad"))
+    
+    def test_is_action_command_search(self):
+        """Test action command detection for search."""
+        router = self.IntentRouter(llm=None)
+        
+        self.assertTrue(router._is_action_command("search for python tutorials"))
+        self.assertTrue(router._is_action_command("find restaurants nearby"))
+        self.assertTrue(router._is_action_command("google best laptops"))
+    
+    def test_is_action_command_negative(self):
+        """Test that chat messages are not action commands."""
+        router = self.IntentRouter(llm=None)
+        
+        self.assertFalse(router._is_action_command("hello"))
+        self.assertFalse(router._is_action_command("what is the meaning of life"))
+        self.assertFalse(router._is_action_command("can you explain quantum physics"))
+        self.assertFalse(router._is_action_command("I like playing games"))
+    
+    def test_guess_tool_hint(self):
+        """Test tool hint guessing."""
+        router = self.IntentRouter(llm=None)
+        
+        self.assertEqual(router._guess_tool_hint("play some music"), "spotify_control")
+        self.assertEqual(router._guess_tool_hint("check the weather"), "get_weather")
+        self.assertEqual(router._guess_tool_hint("set a timer for 5 min"), "set_timer")
+        self.assertEqual(router._guess_tool_hint("search for news"), "web_search")
+    
+    def test_parse_response_json(self):
+        """Test JSON response parsing."""
+        router = self.IntentRouter(llm=None)
+        
+        # Valid JSON
+        classification, hint = router._parse_response('{"classification": "DIRECT", "tool_hint": "get_weather"}')
+        self.assertEqual(classification, "DIRECT")
+        self.assertEqual(hint, "get_weather")
+        
+        # With markdown code block
+        classification, hint = router._parse_response('```json\n{"classification": "PLAN", "tool_hint": null}\n```')
+        self.assertEqual(classification, "PLAN")
+        self.assertIsNone(hint)
+    
+    def test_parse_response_fallback(self):
+        """Test fallback parsing for non-JSON responses."""
+        router = self.IntentRouter(llm=None)
+        
+        # Old format fallback
+        classification, hint = router._parse_response("This is a COMPLEX query")
+        self.assertEqual(classification, "PLAN")
+        
+        classification, hint = router._parse_response("This is SIMPLE")
+        self.assertEqual(classification, "CHAT")
+        
+        # Invalid format
+        classification, hint = router._parse_response("random text")
+        self.assertEqual(classification, "CHAT")  # Default
 
-def test_router_explanation_is_not_note():
-    # "Explain X" should NOT trigger a note tool
-    res = get_tool_relevance("Explain quantum physics to me")
-    assert res['tool'] is None
-    assert res['confidence'] < 0.5
-    assert "Pure explanation" in res['reason']
 
-def test_router_note_explicit():
-    # "Make a note" MUST trigger note tool
-    res = get_tool_relevance("Make a note about the meeting")
-    assert res['tool'] == "note_create"
-    assert res['confidence'] > 0.8
+class TestRouterIntegration(unittest.TestCase):
+    """Integration tests for router with mocked LLM."""
+    
+    def test_route_action_command_no_llm(self):
+        """Action commands should not need LLM call."""
+        from sakura_assistant.core.router import IntentRouter
+        
+        router = IntentRouter(llm=None)  # No LLM
+        result = router.route("play some music")
+        
+        self.assertEqual(result.classification, "DIRECT")
+        self.assertEqual(result.tool_hint, "spotify_control")
 
-def test_router_explanation_with_save():
-    # "Explain X and save it" SHOULD trigger note tool
-    res = get_tool_relevance("Explain how cars work and save the note")
-    assert res['tool'] == "note_create"
-    assert res['confidence'] > 0.6
 
-def test_router_spotify():
-    res = get_tool_relevance("Play some jazz music")
-    assert res['tool'] == "spotify_control"
-    assert res['confidence'] > 0.9
-
-def test_router_vision():
-    res = get_tool_relevance("What is on my screen right now?")
-    assert res['tool'] == "read_screen"
-    assert res['confidence'] > 0.9
+if __name__ == "__main__":
+    unittest.main()

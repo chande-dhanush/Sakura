@@ -17,9 +17,15 @@ def log_api_result(tool_name: str, result: str):
 def _validate_path(path: str) -> str:
     """
     Enforce sandbox restrictions.
-    Allowed: Project Root, Notes Dir.
+    
+    Allowed directories:
+    - Project Root and Notes Dir
+    - User's Documents, Desktop, Downloads
+    
     Blocked: System files, Parent directory traversal (..).
     """
+    from pathlib import Path
+    
     # Fix import path for config (3 levels up: core/tools_libs -> core -> sakura_assistant -> config)
     try:
         from ...config import get_project_root, get_note_root
@@ -27,20 +33,31 @@ def _validate_path(path: str) -> str:
         # Fallback if running relative
         from sakura_assistant.config import get_project_root, get_note_root
     
-    # Normalize
-    abs_path = os.path.abspath(path)
-    project_root = os.path.abspath(get_project_root())
-    note_root = os.path.abspath(get_note_root())
+    # Normalize path
+    abs_path = Path(path).resolve()
+    
+    # Define allowed directories
+    ALLOWED_PATHS = [
+        Path(get_project_root()).resolve(),
+        Path(get_note_root()).resolve(),
+        Path.home() / "Documents",
+        Path.home() / "Desktop",
+        Path.home() / "Downloads",
+    ]
     
     # 1. Check for directory traversal
     if ".." in path:
          raise ValueError(f"❌ Security Violation: Directory traversal detected in '{path}'")
-         
-    # 2. Check prefix (Allow Project Root OR Notes Root)
-    if not abs_path.startswith(project_root) and not abs_path.startswith(note_root):
-        raise ValueError(f"❌ Security Violation: Access to '{path}' denied (Outside Sandbox).")
-        
-    return abs_path
+    
+    # 2. Check if path is within any allowed directory
+    for allowed in ALLOWED_PATHS:
+        try:
+            abs_path.relative_to(allowed)
+            return str(abs_path)
+        except ValueError:
+            continue
+    
+    raise ValueError(f"❌ Security Violation: Access to '{path}' denied (Outside Sandbox).")
 
 def retry_with_auth(func):
     """Decorator to retry Google API calls with re-auth if needed."""
