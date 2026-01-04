@@ -40,8 +40,11 @@ except ImportError:
 # =============================================================================
 # SIMPLE AUTH - Change these credentials!
 # =============================================================================
-AUTH_USER = "sakura"
-AUTH_PASS = "sakura123"  # Change this to your preferred password
+# =============================================================================
+# SIMPLE AUTH - Securely loaded from ENV
+# =============================================================================
+AUTH_USER = os.getenv("AUTH_USER", "sakura")  # Default only for dev
+AUTH_PASS = os.getenv("AUTH_PASS", "sakura123")  # Default only for dev
 
 def verify_auth(request: Request) -> bool:
     """

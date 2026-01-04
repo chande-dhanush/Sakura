@@ -47,6 +47,14 @@ cd ..\frontend
 npm run tauri dev
 ```
 
+### 👤 Customization
+You can make Sakura your own! To change the user profile (Name, Role, Interests) or the Assistant's Personality:
+
+1.  Open `backend/sakura_assistant/config.py`.
+2.  Edit the `USER_DETAILS` block to reflect **YOU**.
+3.  Edit the `SYSTEM_PERSONALITY` block to change how Sakura talks.
+4.  Restart the backend server for changes to take effect.
+
 ### Manual Setup (All Platforms)
 ```bash
 # 1. Clone repo

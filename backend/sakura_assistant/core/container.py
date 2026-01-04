@@ -109,8 +109,8 @@ class Container:
         if not self.groq_api_key:
             return self.get_backup_llm()
         
-        # Import here to avoid circular dependency
-        from .llm import ReliableLLM
+        # Import from new wrapper module
+        from .model_wrapper import ReliableLLM
         
         primary = ChatGroq(
             model=model,

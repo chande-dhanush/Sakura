@@ -65,11 +65,8 @@ def get_model_status() -> Dict[str, Any]:
 
 def get_rate_limit_status() -> Dict[str, Any]:
     """Get rate limit and circuit breaker status."""
-    try:
-        from .rate_limiter import get_rate_limit_stats
-        return get_rate_limit_stats()
-    except:
-        return {}
+    # V10: Rate limiting is handled per-request in AgentState
+    return {"status": "managed_by_agent_state"}
 
 def get_all_metrics() -> Dict[str, Any]:
     """Aggregate all metrics."""

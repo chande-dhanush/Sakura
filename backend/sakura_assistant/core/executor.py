@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
 from langchain_core.messages import ToolMessage
+from .planner import Planner
 
 
 @dataclass
@@ -44,6 +45,10 @@ class ToolExecutor:
         self.tools = tools
         self.tool_map = {t.name: t for t in tools}
         self.summarizer_llm = summarizer_llm
+        if summarizer_llm:
+            self.planner = Planner(summarizer_llm)
+        else:
+            self.planner = None
     
     def execute_single(self, tool_name: str, args: Dict) -> Tuple[str, bool]:
         """
@@ -60,6 +65,59 @@ class ToolExecutor:
             return str(result), True
         except Exception as e:
             return f"Error: {e}", False
+
+    def execute(self, user_input: str, route_result: Any, graph_context: str, state: Any = None) -> ExecutionResult:
+        """
+        Main execution entry point. Runs the ReAct loop.
+        """
+        print(f"🔄 [Executor] Starting ReAct loop for: {user_input[:50]}...")
+        
+        all_tool_messages = []
+        all_outputs = []
+        final_tool_used = "None"
+        
+        # Max iterations for the loop (Plan -> Act -> Observe -> Plan)
+        MAX_REACT_STEPS = 5
+        
+        for i in range(MAX_REACT_STEPS):
+            print(f"🔄 [Executor] Iteration {i+1}/{MAX_REACT_STEPS}")
+            
+            # 1. PLAN
+            if not self.planner:
+                return ExecutionResult("Error: No planner configured", [], "Error", None, False)
+                
+            plan_result = self.planner.plan(
+                user_input=user_input,
+                context=graph_context,
+                tool_history=all_tool_messages,
+                intent_mode=route_result.classification if hasattr(route_result, 'classification') else "action"
+            )
+            
+            steps = plan_result.get("plan", [])
+            if not steps:
+                print("⏹️ [Executor] Checkmate - No more steps needed.")
+                break
+                
+            # 2. EXECUTE
+            exec_res = self.execute_plan(steps, state=state)
+            
+            # 3. OBSERVE (Accumulate history)
+            all_tool_messages.extend(exec_res.tool_messages)
+            if exec_res.outputs:
+                all_outputs.append(exec_res.outputs)
+            
+            final_tool_used = exec_res.tool_used
+            
+            # Logic to stop if "final answer" tools are used or if explicitly done?
+            # Planner logic handles this (returns empty plan if satisfied)
+            
+        return ExecutionResult(
+            outputs="\n".join(all_outputs),
+            tool_messages=all_tool_messages,
+            tool_used=final_tool_used,
+            last_result=None,
+            success=True
+        )
     
     def execute_plan(self, steps: List[Dict], state=None, 
                      max_iterations: int = 5,

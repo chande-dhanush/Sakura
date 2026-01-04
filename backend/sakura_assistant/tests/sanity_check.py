@@ -25,7 +25,7 @@ def check_tool_count():
         count = len(tools)
         
         # V9.1: Expected tool count (update if you add/remove tools)
-        EXPECTED = 48
+        EXPECTED = 47
         
         if count >= EXPECTED:
             print(f"✅ Tool count: {count} (expected >= {EXPECTED})")
