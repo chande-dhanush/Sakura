@@ -141,26 +141,41 @@ class ReliableLLM:
                     from langchain_core.messages import AIMessage
                     import uuid
                     
-                    # Pattern: <function=name{json_args}></function> or just <function=name{json_args}>
-                    # Match carefully, extracting name (group 1) and args (group 2)
+                    # V10: Handle BOTH formats:
+                    # Format 1: <function=name{json_args}>
+                    # Format 2: <function=name(kwarg="value", ...)>
+                    
+                    # Try JSON format first
                     match = re.search(r"<function=(\w+)(\{.*?\})(?:</function>)?", err_str)
                     
                     if match:
                         tool_name = match.group(1)
                         args_str = match.group(2)
-                        print(f"   Parsed: {tool_name} args={args_str[:50]}...")
-                        
                         args = json.loads(args_str)
-                        call_id = f"call_{uuid.uuid4().hex[:8]}"
-                        
-                        return AIMessage(
-                            content="",
-                            tool_calls=[{
-                                "name": tool_name,
-                                "args": args,
-                                "id": call_id
-                            }]
-                        )
+                    else:
+                        # Try Python kwargs format: <function=name(key="value")>
+                        match = re.search(r"<function=(\w+)\(([^)]+)\)", err_str)
+                        if match:
+                            tool_name = match.group(1)
+                            kwargs_str = match.group(2)
+                            # Parse kwargs like: query="git change origin"
+                            args = {}
+                            for pair in re.findall(r'(\w+)=["\']([^"\']*)["\']', kwargs_str):
+                                args[pair[0]] = pair[1]
+                        else:
+                            raise ValueError("Could not parse tool call format")
+                    
+                    print(f"   Parsed: {tool_name} args={args}")
+                    call_id = f"call_{uuid.uuid4().hex[:8]}"
+                    
+                    return AIMessage(
+                        content="",
+                        tool_calls=[{
+                            "name": tool_name,
+                            "args": args,
+                            "id": call_id
+                        }]
+                    )
                 except Exception as parse_err:
                     print(f"❌ Recovery failed: {parse_err}")
 
