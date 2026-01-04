@@ -726,54 +726,42 @@ Sakura V10/
 
 ---
 
-## 🚀 Quick Start
+## 📦 Deployment & Lifecycle (New in V10)
+V10 allows standard cross-platform deployment without Docker, preserving native desktop automation capabilities.
 
-### Option 1: Docker (Recommended)
+### 1. Automated Setup (Recommended)
+This installs Python, Node.js, System Libraries (`ffmpeg`, `tesseract`), and creates the venv.
 
-```bash
-# Clone and configure
-git clone https://github.com/your-repo/sakura-v10.git
-cd sakura-v10
-cp .env.example .env
-# Edit .env with your API keys
+| OS | Command | Action |
+|----|---------|--------|
+| **Windows** | `.\setup.ps1` | Full install + Venv setup |
+| **Linux/Mac** | `./setup.sh` | Uses `apt`/`brew` for sys deps |
 
-# Run backend
-docker-compose up -d
+### 2. Startup Management (Autostart)
+Configure Sakura to run silently in the background on login.
 
-# Run frontend (development)
-cd frontend && npm install && npm run dev
-```
+| OS | Toggle Script | Mechanism |
+|----|---------------|-----------|
+| **Windows** | `.\toggle_startup.ps1` | Start Menu Shortcut → `run_background.vbs` |
+| **Linux** | `./toggle_startup.sh` | `~/.config/autostart/sakura.desktop` |
 
-Open http://localhost:1420 in your browser.
+### 3. Background Execution (Manual)
+Run the backend silently without an open terminal window.
 
-### Option 2: Local Development
+- **Windows**: `run_background.vbs` (Visual Basic wrapper)
+- **Linux/Mac**: `run_background.sh` (nohup wrapper)
 
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-python server.py
+### 4. Uninstallation (Clean Wipe)
+Removes all generated artifacts (`PA/` venv, `node_modules`, `data/`, `target/`).
+Preserves source code and `.env`.
 
-# Optional: Enable Voice (requires local run)
-# 1. Record your wake word
-python tools/record_wakeword.py
-# 2. Run with voice engine
-python server.py --voice
+- **Windows**: `.\uninstall.ps1`
+- **Linux/Mac**: `./uninstall.sh`
 
-# Frontend (separate terminal)
-cd frontend
-npm install
-npm run dev # or 'npm run tauri dev' for desktop window
+### Docker Support (Headless)
+For server-only deployments (no desktop automation), use `docker-compose up`.
+**Note**: `open_app` and `read_screen` tools will be disabled in Docker mode.
 
-```
-
-### Hotkeys
-
-| Key | Action |
-|-----|--------|
-| **Shift+S** | **Quick Search** | Opens centered input bar (Global) |
-| **Shift+F** | **Full Mode** | Expands to full window (Reset) |
-| **ESC** | Minimize to previous mode |
 
 ---
 

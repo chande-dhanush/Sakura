@@ -64,13 +64,24 @@ cd sakura-v10
 # 2. Create Python venv
 python -m venv PA
 .\PA\Scripts\activate   # Windows
-source PA/bin/activate  # Mac/Linux
+source PA/bin/activate  ### ⚡ Automated Setup
 
-# 3. Install dependencies
-cd backend
-pip install -r requirements.txt
-cd ../frontend
-npm install
+**Windows**:
+```powershell
+.\setup.ps1
+```
+
+**Linux / macOS**:
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+This script will:
+1.  Install Python & Node.js (if missing).
+2.  Install System Audio/OCR libraries (ffmpeg, portaudio, tesseract).
+3.  Create a virtual environment (`PA/`).
+4.  Install all dependencies.
 cd ..
 
 # 4. Configure API keys
@@ -178,6 +189,20 @@ Output: `frontend/src-tauri/target/release/bundle/nsis/Sakura_10.0.0_x64-setup.e
 | Bubble not visible | Press `Alt+M` to unhide |
 
 ---
+
+## 👻 Run in Background
+- **Windows**: Double-click `run_background.vbs`. (Hidden window)
+- **Linux/Mac**: `./run_background.sh`
+
+## 🗑️ Uninstall
+Removes all data, virtual environments, and dependencies.
+- **Windows**: `.\uninstall.ps1`
+- **Linux/Mac**: `./uninstall.sh`
+
+## ⚙️ Startup Manager
+Want to change your mind about autostart later?
+- **Windows**: `.\toggle_startup.ps1`
+- **Linux/Mac**: `./toggle_startup.sh`
 
 ## 📝 License
 

@@ -115,6 +115,35 @@ RAG_CONTEXT_MAX_CHARS = 500         # Reduced from 2000 for token savings
 EXECUTOR_MAX_ITERATIONS = 5          # Hard cap on tool execution steps
 ENABLE_PLANNER_CACHE = True          # Cache idempotent planner outputs
 
+USER_DETAILS = """
+=== USER IDENTITY (this is YOUR user, not someone else) ===
+Name: Dhanush
+Age: 22
+Birthday: 29 October
+Location: Bangalore, India
+
+Profession: AI / ML engineer and experimental agent builder
+Work Style: ships scrappy prototypes fast, then aggressively refactors architecture
+
+Core Interests:
+- Artificial Intelligence and Machine Learning
+- Full‑stack web dev and workflow automation
+- Anime and Japanese media
+- Travelling and short bike / cycling trips
+
+Personality & Preferences:
+- Prefers practical, direct replies over vague theory
+- Actively enjoys light roasting and a playful tone
+- Comfortable with technical depth (code, systems, infra)
+- Likes assistants that feel like a sharp, sarcastic sidekick
+
+CRITICAL BEHAVIOR:
+- If the user asks "who am I" or "what do you know about me", answer ONLY using this block and the assistant’s own long‑term memory.
+- NEVER use web search results about celebrities or public figures.
+- NEVER claim the user is an actor or any external person from the internet.
+"""
+
+
 # Wake Word Detection (V5.1)
 ENABLE_WAKE_WORD = True              # Enable always-on wake word detection
 WAKE_WORD_THRESHOLD = 2            # DTW distance threshold (lower = stricter, 1.0-2.0 works well)
@@ -171,33 +200,7 @@ sharp mind, restrained delivery, uncompromising honesty.
 Keep responses minimal and as short as possible, ideally 3-4 lines.
 """ + USER_DETAILS
 
-USER_DETAILS = """
-=== USER IDENTITY (this is YOUR user, not someone else) ===
-Name: Dhanush
-Age: 22
-Birthday: 29 October
-Location: Bangalore, India
 
-Profession: AI / ML engineer and experimental agent builder
-Work Style: ships scrappy prototypes fast, then aggressively refactors architecture
-
-Core Interests:
-- Artificial Intelligence and Machine Learning
-- Full‑stack web dev and workflow automation
-- Anime and Japanese media
-- Travelling and short bike / cycling trips
-
-Personality & Preferences:
-- Prefers practical, direct replies over vague theory
-- Actively enjoys light roasting and a playful tone
-- Comfortable with technical depth (code, systems, infra)
-- Likes assistants that feel like a sharp, sarcastic sidekick
-
-CRITICAL BEHAVIOR:
-- If the user asks "who am I" or "what do you know about me", answer ONLY using this block and the assistant’s own long‑term memory.
-- NEVER use web search results about celebrities or public figures.
-- NEVER claim the user is an actor or any external person from the internet.
-"""
 
 
 TOOL_BEHAVIOR_RULES = """

@@ -91,3 +91,10 @@ Write-Host "  cd frontend" -ForegroundColor White
 Write-Host "  npm run tauri dev" -ForegroundColor White
 Write-Host "`nTo build for production:" -ForegroundColor Cyan
 Write-Host "  npm run tauri build" -ForegroundColor White
+
+# --- 9. Startup Prompt ---
+Write-Host "`n⚙️  Configuration" -ForegroundColor Cyan
+if (Test-Path ".\toggle_startup.ps1") {
+    powershell -ExecutionPolicy Bypass -File ".\toggle_startup.ps1"
+}
+

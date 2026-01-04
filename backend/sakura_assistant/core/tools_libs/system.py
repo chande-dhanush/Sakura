@@ -148,12 +148,19 @@ def file_open(file_path: str) -> str:
 @tool
 def set_timer(minutes: float, label: str = "Timer") -> str:
     """Sets a background timer."""
-    import winsound
+    import platform
     seconds = int(minutes * 60)
     
     def _timer_thread():
         time.sleep(seconds)
-        winsound.Beep(1000, 500)
+        if platform.system() == "Windows":
+            try:
+                import winsound
+                winsound.Beep(1000, 500)
+            except: pass
+        else:
+            print("\a") # Bell sound on Linux
+
         
     threading.Thread(target=_timer_thread, daemon=True).start()
     return f"Timer set for {minutes} minutes."

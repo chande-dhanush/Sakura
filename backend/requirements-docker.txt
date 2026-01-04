@@ -1,0 +1,66 @@
+# Sakura V10 Backend Dependencies (Docker/Linux)
+# ===============================================
+
+# --- Core Framework ---
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic>=2.0.0
+python-dotenv
+aiofiles
+httpx
+
+# --- LangChain & LLMs ---
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-openai>=0.2.0
+langchain-groq>=0.2.0
+langchain-google-genai>=2.0.0
+
+# --- Memory & Vector Stores ---
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+faiss-cpu
+
+# --- Google APIs ---
+google-auth
+google-auth-oauthlib
+google-api-python-client
+
+# --- Web & Scraping ---
+requests
+beautifulsoup4
+tavily-python
+
+# --- Voice & Audio (Optional in Docker) ---
+# pydub/pyaudio
+pyaudio
+SpeechRecognition
+kokoro>=0.4.1
+soundfile
+
+# --- Tools ---
+spotipy>=2.23.0
+psutil
+# pycaw removed (Windows only)
+# pyperclip removed (Headless issues, but kept for logic)
+pyperclip
+# AppOpener removed (Desktop only)
+# plyer kept (might work)
+plyer
+pytesseract
+Pillow
+mss
+pytz
+
+# --- Observability ---
+structlog
+prometheus_client
+
+# --- Utils ---
+numpy
+scipy
+tiktoken
+colorama
+sympy

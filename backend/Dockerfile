@@ -1,44 +1,40 @@
-# Sakura V10 Backend - Docker Image
-# Optimized for API-only deployment (frontend runs separately)
-
+# Sakura V10 Backend Dockerfile
 FROM python:3.11-slim
 
-# Install system dependencies for voice/screen features
+# Set environment
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV APP_HOME=/app
+
+WORKDIR $APP_HOME
+
+# Install system dependencies
+# - build-essential: for compiling python extensions
+# - libportaudio2: for audio support
+# - tesseract-ocr: for screen reading
+# - curl: for healthcheck
 RUN apt-get update && apt-get install -y \
     build-essential \
-    git \
-    curl \
-    # Optional: Tesseract for screen reading
+    libportaudio2 \
+    libsndfile1 \
+    flac \
+    ffmpeg \
     tesseract-ocr \
-    # Optional: PortAudio for pyaudio (voice)
-    portaudio19-dev \
-    # Cleanup
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Install Python dependencies
+COPY requirements-docker.txt .
+RUN pip install --no-cache-dir -r requirements-docker.txt
 
-# Copy and install Python deps
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
+# Copy source code
 COPY . .
 
-# Environment
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-ENV SAKURA_PORT=8000
+# Create data directories (volume mount points)
+RUN mkdir -p data Notes
 
-# Runtime configuration via env vars:
-# - GROQ_API_KEY (required)
-# - OPENROUTER_API_KEY (optional, for vision)
-# - TAVILY_API_KEY (optional, for web search)
-
+# Expose API port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run (without voice - Docker doesn't have mic access)
-CMD ["python", "server.py"]
+# Run commands
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
