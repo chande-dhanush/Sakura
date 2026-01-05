@@ -58,7 +58,7 @@ from enum import Enum, auto
 # --- Configuration ---
 # V4.2: Use 16kHz to match shared_mic (was 8kHz)
 SAMPLE_RATE = 16000          # Must match shared_mic.py
-BUFFER_DURATION = 1.5        # 1.5s buffer for full wake word capture
+BUFFER_DURATION = 2.0        # 2s buffer to match template length
 BUFFER_SIZE = int(SAMPLE_RATE * BUFFER_DURATION)
 
 # V5.1: Research-backed DTW threshold settings
@@ -66,7 +66,7 @@ BUFFER_SIZE = int(SAMPLE_RATE * BUFFER_DURATION)
 #   - Random speech: best DTW ~2.0-2.5
 #   - Actual wake word: best DTW ~1.0-1.5 (should be lower)
 # Threshold should be between random and wake word
-DTW_THRESHOLD = 1.5         # Strict - only true wake word passes
+DTW_THRESHOLD = 2        # Strict - only true wake word passes
 
 # V5.1: Adaptive Noise Floor (tuned for Alexa-like reliability)
 NOISE_FLOOR_ALPHA = 0.02   # EMA update rate
@@ -92,8 +92,8 @@ N_FFT = 512                  # FFT size for 16kHz
 HOP_LENGTH = 160             # ~10ms hop at 16kHz
 N_MELS = 26                  # Mel filterbank size
 
-# Template storage
-TEMPLATE_DIR = os.path.join(get_project_root(), "data", "wake_templates")
+# Template storage - must match server.py save location
+TEMPLATE_DIR = os.path.join(get_project_root(), "data", "voice", "wake_templates")
 
 
 class WakeState(Enum):
@@ -175,20 +175,53 @@ class WakeWordDetector:
         log_flow("WakeWord", f"V4.3 initialized: threshold={threshold}, templates={len(self._templates)}")
     
     def _load_templates(self):
-        """Load MFCC templates from disk."""
+        """Load MFCC templates from disk (supports .npy and .wav files)."""
         self._templates = []
         
+        print(f"[WAKE] Looking for templates in: {TEMPLATE_DIR}")
+        
         if not os.path.exists(TEMPLATE_DIR):
-            log_warning("Wake word templates directory not found")
+            log_warning(f"Wake word templates directory not found: {TEMPLATE_DIR}")
             return
         
-        for fname in os.listdir(TEMPLATE_DIR):
+        files = os.listdir(TEMPLATE_DIR)
+        print(f"[WAKE] Found files: {files}")
+        
+        for fname in files:
+            filepath = os.path.join(TEMPLATE_DIR, fname)
+            
             if fname.endswith('.npy'):
+                # Pre-computed MFCC template
                 try:
-                    template = np.load(os.path.join(TEMPLATE_DIR, fname))
+                    template = np.load(filepath)
                     self._templates.append(template)
+                    print(f"[WAKE] Loaded NPY template: {fname}")
                 except Exception as e:
                     log_warning(f"Failed to load template {fname}: {e}")
+            
+            elif fname.endswith('.wav'):
+                # WAV file - convert to MFCC on load
+                try:
+                    import wave
+                    print(f"[WAKE] Converting WAV: {fname}")
+                    with wave.open(filepath, 'rb') as wf:
+                        nframes = wf.getnframes()
+                        rate = wf.getframerate()
+                        print(f"[WAKE]   Rate={rate}, Frames={nframes}")
+                        audio_data = wf.readframes(nframes)
+                        samples = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+                        print(f"[WAKE]   Samples shape: {samples.shape}")
+                    
+                    mfcc = self._extract_mfcc(samples)
+                    if mfcc is not None:
+                        self._templates.append(mfcc)
+                        print(f"[WAKE] ✅ Converted {fname} to MFCC, shape={mfcc.shape}")
+                    else:
+                        print(f"[WAKE] ⚠️ MFCC extraction returned None for {fname}")
+                except Exception as e:
+                    import traceback
+                    log_warning(f"Failed to load WAV template {fname}: {e}")
+                    traceback.print_exc()
         
         log_flow("WakeWord", f"Loaded {len(self._templates)} templates")
     
@@ -371,8 +404,14 @@ class WakeWordDetector:
         # Extract MFCC features
         mfcc = self._extract_mfcc(audio_buffer)
         if mfcc is None:
+            print(f"[WAKE] ⚠️ Live MFCC extraction failed (buffer len={len(audio_buffer)})")
             self._buffer.clear()
             return
+        
+        # Debug: print live MFCC shape once
+        if not hasattr(self, '_mfcc_logged'):
+            print(f"[WAKE] Live MFCC shape: {mfcc.shape} (templates: {[t.shape for t in self._templates[:1]]})")
+            self._mfcc_logged = True
         
         # Template voting: count matches
         matches = 0

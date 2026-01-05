@@ -11,7 +11,8 @@
 - **💬 Smart Chat** - Powered by Groq LLMs with tiered architecture
 - **🔧 Tool Use** - 47+ tools (Spotify, Gmail, Calendar, Web Search, Notes, etc.)
 - **🛡️ Enterprise Security** - Simple Auth, Path Sandboxing, Safe Math Parsing
-- **🎙️ Voice** - Wake word detection + TTS with Kokoro
+- **🎙️ Voice** - Wake word detection + TTS with Kokoro + Real-time UI Sync
+- **🧠 Emotional Intelligence** - World Graph memory with mood/intent tracking
 - **🖼️ Vision** - Image analysis via OpenRouter
 - **📊 Observability** - Structured logging & Prometheus metrics
 - **🌐 Quick Search** - `Alt+S` for instant omnibox-style search
@@ -170,12 +171,25 @@ SPOTIFY_CLIENT_SECRET=your_secret     # Spotify
 
 ## 🛠️ Building for Production
 
+### One Command Build (Frontend + Backend)
 ```bash
 cd frontend
 npm run tauri build
 ```
 
-Output: `frontend/src-tauri/target/release/bundle/nsis/Sakura_10.0.0_x64-setup.exe`
+This **automatically**:
+1. Compiles the Python backend with PyInstaller
+2. Bundles it as a Tauri sidecar
+3. Builds the complete installer
+
+**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_10.0.0_x64-setup.exe`
+
+### Development Mode
+```bash
+cd frontend
+npm run tauri dev
+```
+Uses your local Python + venv (no PyInstaller needed).
 
 ---
 

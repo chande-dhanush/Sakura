@@ -38,25 +38,9 @@ except ImportError:
     log.setLevel(logging.INFO)
 
 # =============================================================================
-# SIMPLE AUTH - Change these credentials!
+# NOTE: Auth removed - this is a localhost-only desktop app
+# The frontend and backend communicate only via localhost:8000
 # =============================================================================
-# =============================================================================
-# SIMPLE AUTH - Securely loaded from ENV
-# =============================================================================
-AUTH_USER = os.getenv("AUTH_USER", "sakura")  # Default only for dev
-AUTH_PASS = os.getenv("AUTH_PASS", "sakura123")  # Default only for dev
-
-def verify_auth(request: Request) -> bool:
-    """
-    Verify X-Auth header matches credentials.
-    
-    Expected header format: X-Auth: username:password
-    No bypass possible - all endpoints except /health require auth.
-    """
-    auth_header = request.headers.get("X-Auth", "")
-    expected = f"{AUTH_USER}:{AUTH_PASS}"
-    # Use constant-time comparison to prevent timing attacks
-    return hashlib.sha256(auth_header.encode()).hexdigest() == hashlib.sha256(expected.encode()).hexdigest()
 
 # Lazy import to avoid loading models at import time
 assistant = None
@@ -121,12 +105,125 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Combined health check - returns ready status."""
     return {
-        "status": "healthy",
+        "status": "ready" if assistant is not None else "starting",
         "system": "Sakura V10",
-        "assistant_ready": assistant is not None
+        "ready": assistant is not None
     }
+
+
+@app.get("/health/live")
+async def liveness():
+    """Liveness probe - server process is running."""
+    return {"status": "alive"}
+
+
+@app.get("/health/ready")
+async def readiness():
+    """Readiness probe - fully initialized and ready to serve."""
+    return {
+        "status": "ready" if assistant is not None else "initializing",
+        "ready": assistant is not None
+    }
+
+
+@app.get("/voice/status")
+async def voice_status():
+    """Check voice engine and wake word template status."""
+    import os
+    
+    # Check templates directory
+    templates_dir = os.path.join(os.path.dirname(__file__), "data", "voice", "wake_templates")
+    template_count = 0
+    
+    if os.path.exists(templates_dir):
+        template_count = len([f for f in os.listdir(templates_dir) if f.endswith('.wav')])
+    
+    # Check if voice engine is enabled
+    voice_enabled = os.getenv("SAKURA_ENABLE_VOICE") == "true"
+    
+    return {
+        "enabled": voice_enabled,
+        "wake_word_configured": template_count >= 3,
+        "template_count": template_count,
+        "required_templates": 3
+    }
+
+
+@app.post("/voice/record-template")
+async def record_voice_template():
+    """Record a voice template using the backend's microphone (PyAudio)."""
+    import os
+    import wave
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    from fastapi.responses import JSONResponse
+    
+    templates_dir = os.path.join(os.path.dirname(__file__), "data", "voice", "wake_templates")
+    os.makedirs(templates_dir, exist_ok=True)
+    
+    # Count existing templates
+    existing = len([f for f in os.listdir(templates_dir) if f.endswith('.wav')])
+    
+    if existing >= 3:
+        return {"success": True, "message": "Already have 3 templates", "template_count": existing}
+    
+    def do_record():
+        """Record audio using PyAudio (blocking, runs in thread)."""
+        try:
+            import pyaudio
+            
+            RATE = 16000
+            CHUNK = 1024
+            RECORD_SECONDS = 2
+            
+            p = pyaudio.PyAudio()
+            stream = p.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=RATE,
+                input=True,
+                frames_per_buffer=CHUNK
+            )
+            
+            print(f"🎙️ Recording template {existing + 1}...")
+            frames = []
+            for _ in range(int(RATE / CHUNK * RECORD_SECONDS)):
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                frames.append(data)
+            
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
+            
+            # Save to WAV
+            filename = f"sakura_template_{existing + 1}.wav"
+            filepath = os.path.join(templates_dir, filename)
+            
+            wf = wave.open(filepath, 'wb')
+            wf.setnchannels(1)
+            wf.setsampwidth(2)  # 16-bit
+            wf.setframerate(RATE)
+            wf.writeframes(b''.join(frames))
+            wf.close()
+            
+            print(f"✅ Saved voice template: {filename}")
+            return {"success": True, "filename": filename, "template_count": existing + 1}
+            
+        except Exception as e:
+            print(f"❌ Recording failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    # Run recording in thread pool to not block async
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as pool:
+        result = await loop.run_in_executor(pool, do_record)
+    
+    if not result.get("success"):
+        return JSONResponse(result, status_code=500)
+    
+    return result
 
 
 @app.post("/chat")
@@ -148,9 +245,7 @@ async def chat(request: Request):
     global current_task, generation_cancelled
     generation_cancelled = False
     
-    # Auth check - no bypass
-    if not verify_auth(request):
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    # Note: Auth removed - localhost-only desktop app
     
     try:
         data = await request.json()
@@ -257,14 +352,14 @@ async def get_history():
     Return recent chat history for UI persistence.
     Loads from the conversation memory stored by SmartAssistant.
     """
-    print("📜 [/history] Fetching chat history...")
+    # print("📜 [/history] Fetching chat history...")
     try:
         from sakura_assistant.memory.faiss_store import get_memory_store
         
         store = get_memory_store()
         history = getattr(store, 'conversation_history', [])
         
-        print(f"📜 [/history] Found {len(history)} messages in memory")
+        # print(f"📜 [/history] Found {len(history)} messages in memory")
         
         # Convert to UI format and limit to last 50 messages
         messages = []
@@ -281,7 +376,7 @@ async def get_history():
                 "content": msg.get("content", "")
             })
         
-        print(f"📜 [/history] Returning {len(messages)} messages to frontend")
+        # print(f"📜 [/history] Returning {len(messages)} messages to frontend")
         return {"messages": messages}
     except ImportError as e:
         print(f"⚠️ History module not available: {e}")

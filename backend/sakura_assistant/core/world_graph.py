@@ -1438,6 +1438,15 @@ class WorldGraph:
             UserIntent.TASK_FOCUSED: "User wants to get things done. Be efficient and action-oriented.",
             UserIntent.CASUAL: "",  # No adjustment needed
         }
+        return adjustments.get(intent, "")
+
+    def get_current_mood(self) -> str:
+        """
+        Get current user mood (string representation of intent).
+        Used by Responder context.
+        """
+        intent = getattr(self, '_current_intent', UserIntent.CASUAL)
+        return intent.value
         
         return adjustments.get(intent, "")
     

@@ -78,13 +78,5 @@
   {
     "role": "assistant",
     "content": "Why did the neural net break up with the dataset?\n\nIt said, “I’m tired of all the *over‑fitting* in our relationship.”"
-  },
-  {
-    "role": "user",
-    "content": "how are you"
-  },
-  {
-    "role": "assistant",
-    "content": "I’m running on good energy—no bugs in my mood module. How about you?"
   }
 ]

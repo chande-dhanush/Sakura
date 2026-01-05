@@ -5,8 +5,6 @@
 import { writable, derived, get } from 'svelte/store';
 
 const BACKEND_URL = 'http://localhost:8000';
-// V10 Enterprise Auth Header (Default credentials)
-const AUTH_HEADER = { 'X-Auth': 'sakura:sakura123' };
 
 // Stores
 export const messages = writable([]);
@@ -15,6 +13,17 @@ export const mood = writable('neutral');
 export const currentTools = writable([]);
 export const focusEntity = writable(null);
 export const connectionError = writable(null);
+
+// Backend status: 'starting' | 'ready' | 'error'
+export const backendStatus = writable('starting');
+
+// Voice status
+export const voiceStatus = writable({
+    enabled: false,
+    wakeWordConfigured: false,
+    templateCount: 0,
+    requiredTemplates: 3
+});
 
 // Derived store for mood-based colors
 export const moodColors = derived(mood, ($mood) => {
@@ -44,10 +53,7 @@ export async function sendMessage(query, options = {}) {
     try {
         const response = await fetch(`${BACKEND_URL}/chat`, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                ...AUTH_HEADER 
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 query,
                 tts_enabled: options.tts_enabled || false
@@ -205,10 +211,7 @@ function formatError(message) {
  */
 export async function stopGeneration() {
     try {
-        await fetch(`${BACKEND_URL}/stop`, { 
-            method: 'POST',
-            headers: AUTH_HEADER
-        });
+        await fetch(`${BACKEND_URL}/stop`, { method: 'POST' });
     } catch (e) {
         // Ignore
     }
@@ -219,9 +222,7 @@ export async function stopGeneration() {
  */
 export async function refreshState() {
     try {
-        const response = await fetch(`${BACKEND_URL}/state`, {
-            headers: AUTH_HEADER
-        });
+        const response = await fetch(`${BACKEND_URL}/state`);
         if (response.ok) {
             const state = await response.json();
             mood.set(state.mood || 'neutral');
@@ -251,16 +252,14 @@ export function clearChat() {
  * Load chat history from backend
  */
 export async function loadHistory() {
-    console.log('[Chat] Loading history from backend...');
+    // console.log('[Chat] Loading history from backend...');
     try {
-        const response = await fetch(`${BACKEND_URL}/history`, {
-            headers: AUTH_HEADER
-        });
-        console.log('[Chat] History response status:', response.status);
+        const response = await fetch(`${BACKEND_URL}/history`);
+        // console.log('[Chat] History response status:', response.status);
 
         if (response.ok) {
             const data = await response.json();
-            console.log('[Chat] History data:', data);
+            // console.log('[Chat] History data:', data);
 
             if (data.messages && data.messages.length > 0) {
                 // Convert backend format to UI format
@@ -271,15 +270,90 @@ export async function loadHistory() {
                     tools: [],
                     mode: ''
                 }));
-                messages.set(uiMessages);
-                console.log('[Chat] Loaded', uiMessages.length, 'messages from history');
+
+                // Smart Update: Only set if changed to prevent flicker
+                const current = get(messages);
+                if (JSON.stringify(current.map(m => m.content)) !== JSON.stringify(uiMessages.map(m => m.content))) {
+                    messages.set(uiMessages);
+                    console.log('[Chat] Synced', uiMessages.length, 'messages');
+                }
             } else {
-                console.log('[Chat] No messages in history');
+                if (get(messages).length > 0) {
+                    // messages.set([]); // Optional: clear if backend is empty?
+                }
+                // console.log('[Chat] No messages in history');
             }
         } else {
             console.warn('[Chat] History endpoint returned', response.status);
         }
     } catch (e) {
         console.warn('[Chat] History load failed:', e.message);
+    }
+}
+
+/**
+ * Start polling for history updates (Voice/External fix)
+ */
+export function startPolling(intervalMs = 2000) {
+    console.log(`[Chat] Starting history polling (${intervalMs}ms)`);
+    // Initial load
+    loadHistory();
+    // Poll
+    setInterval(() => {
+        // Only poll if NOT streaming (to avoid conflict)
+        if (!get(isStreaming)) {
+            loadHistory();
+        }
+    }, intervalMs);
+}
+
+/**
+ * Check if backend is ready (poll until ready)
+ * @returns {Promise<boolean>}
+ */
+export async function checkBackendReady() {
+    const maxAttempts = 60; // 60 seconds max wait
+
+    for (let i = 0; i < maxAttempts; i++) {
+        try {
+            const response = await fetch(`${BACKEND_URL}/health/ready`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.ready) {
+                    backendStatus.set('ready');
+                    console.log('[Chat] Backend is ready!');
+                    return true;
+                }
+            }
+        } catch (e) {
+            // Server not yet responding
+        }
+
+        // Wait 1 second before retry
+        await new Promise(r => setTimeout(r, 1000));
+    }
+
+    backendStatus.set('error');
+    connectionError.set('Backend failed to start');
+    return false;
+}
+
+/**
+ * Check voice status from backend
+ */
+export async function checkVoiceStatus() {
+    try {
+        const response = await fetch(`${BACKEND_URL}/voice/status`);
+        if (response.ok) {
+            const data = await response.json();
+            voiceStatus.set({
+                enabled: data.enabled ?? false,
+                wakeWordConfigured: data.wake_word_configured ?? false,
+                templateCount: data.template_count ?? 0,
+                requiredTemplates: data.required_templates ?? 3
+            });
+        }
+    } catch (e) {
+        console.warn('[Chat] Voice status check failed');
     }
 }

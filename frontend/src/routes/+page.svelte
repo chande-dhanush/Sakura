@@ -6,25 +6,37 @@
     import Omnibox from '$lib/components/Omnibox.svelte';
     import Timeline from '$lib/components/Timeline.svelte';
     import WorldGraphPill from '$lib/components/WorldGraphPill.svelte';
-    import { messages, moodColors, refreshState, connectionError, clearChat, loadHistory } from '$lib/stores/chat.js';
+    import VoiceSetup from '$lib/components/VoiceSetup.svelte';
+    import { messages, moodColors, refreshState, connectionError, clearChat, startPolling, backendStatus, voiceStatus, checkBackendReady, checkVoiceStatus } from '$lib/stores/chat.js';
     
     let showMenu = false;
     let historyLoading = false;
     let isQuickSearch = false; // Spotlight mode
+    let showVoiceSetup = false;
     
     onMount(async () => {
-        console.log('[Main] Window mounted, loading history...');
+        console.log('[Main] Window mounted, waiting for backend...');
+        
+        // Wait for backend to be ready (shows loading screen)
+        const ready = await checkBackendReady();
+        if (!ready) {
+            console.error('[Main] Backend failed to start');
+            return;
+        }
+        
         try {
             await refreshState();
             console.log('[Main] State refreshed');
             await loadHistory();
             console.log('[Main] History load complete. Messages in store:', $messages.length);
             
+            // Check voice status
+            await checkVoiceStatus();
+            
             // Listen for Quick Search Trigger (Shift+S global)
             await listen('quick_search_trigger', async () => {
                 console.log('⚡ Quick Search Mode Triggered');
                 isQuickSearch = true;
-                // Ensure focus
                 const appWindow = getCurrentWindow();
                 await appWindow.setFocus();
             });
@@ -90,6 +102,23 @@
 
 <svelte:window on:keydown={handleKeydown} on:blur={handleBlur} />
 
+<!-- LOADING OVERLAY - Shows while backend is starting -->
+{#if $backendStatus === 'starting'}
+    <div class="loading-overlay">
+        <div class="loading-logo">🌸</div>
+        <h2>Starting Sakura...</h2>
+        <p class="loading-hint">Initializing AI assistant...</p>
+        <div class="loading-spinner"></div>
+    </div>
+{:else if $backendStatus === 'error'}
+    <div class="loading-overlay error">
+        <div class="loading-logo">❌</div>
+        <h2>Failed to Start</h2>
+        <p class="loading-hint">Backend could not be initialized. Please restart the app.</p>
+    </div>
+{:else}
+<!-- Main App Content (only when backend is ready) -->
+
 <!-- Overlay for menu -->
 {#if showMenu}
     <div 
@@ -103,7 +132,17 @@
 
 <main class="app" 
       class:quick-search={isQuickSearch}
-      style="--bg: {$moodColors.bg}; --primary: {$moodColors.primary}; --glow: {$moodColors.glow}">
+      class:has-voice-warning={$voiceStatus.enabled && !$voiceStatus.wakeWordConfigured}
+      style="--bg: {$moodColors.bg}; --primary: {$moodColors.primary}; --glow: {$moodColors.glow}"
+      role="application">
+    
+    <!-- VOICE WARNING BANNER - Inside main container -->
+    {#if $voiceStatus.enabled && !$voiceStatus.wakeWordConfigured}
+        <div class="voice-warning">
+            <span>🎤 Voice wake word not configured ({$voiceStatus.templateCount}/3 templates)</span>
+            <button on:click={() => showVoiceSetup = true}>Set Up Voice</button>
+        </div>
+    {/if}
     
     {#if !isQuickSearch}
         <!-- Title Bar - DRAGGABLE -->
@@ -167,6 +206,13 @@
         <Omnibox isQuickSearch={isQuickSearch} /> <!-- Pass Mode -->
     </div>
 </main>
+
+<!-- Voice Setup Modal -->
+{#if showVoiceSetup}
+    <VoiceSetup on:close={() => showVoiceSetup = false} />
+{/if}
+
+{/if} <!-- End of backendStatus check -->
 
 <style>
     /* ===== GLOBAL RESET ===== */
@@ -276,4 +322,85 @@
     }
     
     .input-area { padding: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.2); }
+    
+    /* ===== LOADING OVERLAY ===== */
+    .loading-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(10, 10, 15, 0.98);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        z-index: 1000;
+        border-radius: 12px;
+    }
+    
+    .loading-overlay.error {
+        background: rgba(26, 10, 10, 0.98);
+    }
+    
+    .loading-logo {
+        font-size: 64px;
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .loading-overlay h2 {
+        font-size: 20px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .loading-hint {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .loading-spinner {
+        width: 24px;
+        height: 24px;
+        border: 2px solid rgba(136, 136, 255, 0.3);
+        border-top-color: #8888ff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.8; }
+        50% { transform: scale(1.05); opacity: 1; }
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* ===== VOICE WARNING BANNER ===== */
+    .voice-warning {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        background: rgba(255, 170, 0, 0.15);
+        border-bottom: 1px solid rgba(255, 170, 0, 0.3);
+        color: #ffcc66;
+        font-size: 12px;
+        flex-shrink: 0; /* Don't compress this banner */
+        border-radius: 12px 12px 0 0; /* Match app border radius */
+    }
+    
+    .voice-warning button {
+        background: rgba(255, 170, 0, 0.2);
+        border: 1px solid rgba(255, 170, 0, 0.4);
+        color: #ffcc66;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    
+    .voice-warning button:hover {
+        background: rgba(255, 170, 0, 0.3);
+    }
 </style>

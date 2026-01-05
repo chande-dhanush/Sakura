@@ -866,3 +866,13 @@ python tools/system_reset.py
 - Notes/ folder
 - Documentation
 
+
+## V10.1 Restoration Update
+
+### 1. Voice Sync Architecture
+**Problem:** Voice Engine operates outside the /chat SSE loop, causing UI desync.
+**Solution:** Frontend Polling (3s interval) fetches /history to sync voice inputs.
+
+### 2. EQ Layer Restoration
+Restored WorldGraph EQ methods (get_current_mood) to enable emotional intelligence.
+

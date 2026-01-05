@@ -56,6 +56,7 @@ Notes/
 
 # ============ Tauri ============
 frontend/src-tauri/target/
+frontend/src-tauri/binaries/
 
 # ============ Artifacts ============
 .gemini/

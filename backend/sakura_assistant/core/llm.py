@@ -92,7 +92,7 @@ class SmartAssistant:
             tool_outputs = ""
             tool_used = "None"
             
-            if route_result.is_complex or route_result.tool_hint:
+            if route_result.needs_tools or route_result.tool_hint:
                 print(f"⚙️ Execution Phase: {route_result.classification}")
                 state.record_llm_call("execution")
                 

@@ -102,16 +102,49 @@ fn find_backend_dir() -> Option<PathBuf> {
     None
 }
 
-fn start_backend() -> Result<(), String> {
+fn start_backend(app: &tauri::App) -> Result<(), String> {
+    // PRODUCTION MODE: Use bundled sidecar
+    // Check if bundled sidecar exists (indicates production build)
+    let sidecar_path = app.path().resource_dir()
+        .ok()
+        .map(|p| p.join("binaries").join(if cfg!(windows) { "sakura-backend.exe" } else { "sakura-backend" }));
+    
+    if let Some(path) = sidecar_path.filter(|p| p.exists()) {
+        println!("🚀 Starting bundled backend sidecar...");
+        println!("   Path: {:?}", path);
+        
+        let mut cmd = Command::new(&path);
+        cmd.stdout(Stdio::inherit());
+        cmd.stderr(Stdio::inherit());
+        
+        // Set working directory to resource dir for data access
+        if let Ok(resource_dir) = app.path().resource_dir() {
+            cmd.current_dir(&resource_dir);
+        }
+        
+        match cmd.spawn() {
+            Ok(child) => {
+                if let Ok(mut guard) = BACKEND.lock() {
+                    *guard = Some(child);
+                }
+                println!("✅ Sidecar backend started on port 8000");
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("⚠️ Sidecar failed, falling back to dev mode: {}", e);
+            }
+        }
+    }
+    
+    // DEV MODE: Use Python with venv
     let backend_dir = find_backend_dir()
         .ok_or_else(|| "Could not find backend/server.py".to_string())?;
     
     let server_py = backend_dir.join("server.py");
     
     // V10: Use venv Python (PA/Scripts/python.exe on Windows)
-    // Falls back to system python if venv not found
     let venv_python = backend_dir.parent()
-        .map(|root| root.join("PA").join("Scripts").join("python.exe"))
+        .map(|root| root.join("PA").join("Scripts").join(if cfg!(windows) { "python.exe" } else { "python" }))
         .filter(|p| p.exists());
     
     let python_cmd = if let Some(venv_py) = venv_python {
@@ -122,7 +155,7 @@ fn start_backend() -> Result<(), String> {
         if cfg!(windows) { "python".to_string() } else { "python3".to_string() }
     };
     
-    println!("🐍 Starting Python backend...");
+    println!("🐍 Starting Python backend (dev mode)...");
     println!("   Script: {:?}", server_py);
     
     let mut cmd = Command::new(&python_cmd);
@@ -208,8 +241,8 @@ pub fn run() {
             force_quit
         ])
         .setup(|app| {
-            // Start Python backend
-            if let Err(e) = start_backend() {
+            // Start Python backend (sidecar in prod, python in dev)
+            if let Err(e) = start_backend(app) {
                 eprintln!("Warning: {}", e);
             }
             
@@ -344,10 +377,11 @@ pub fn run() {
             }
             
             // Wait for backend to be ready (Poll /health)
+            // NOTE: SmartAssistant init takes 5-15s, so use generous timeout
             println!("⏳ Waiting for backend to start...");
             let mut ready = false;
             
-            for _ in 0..15 { // Try for 15 seconds
+            for _ in 0..45 { // Try for 45 seconds
                 if let Ok(resp) = client.get("http://127.0.0.1:8000/health").send() {
                     if resp.status().is_success() {
                         println!("✅ Backend ready!");

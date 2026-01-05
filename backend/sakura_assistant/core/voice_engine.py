@@ -6,7 +6,7 @@ from typing import Optional, Callable
 import traceback
 
 from ..utils.wake_word import init_wake_detector, WakeState
-from ..utils.shared_mic import start_shared_mic, register_mic_consumer, activate_mic_consumer, deactivate_mic_consumer
+from ..utils.shared_mic import start_shared_mic, stop_shared_mic, register_mic_consumer, activate_mic_consumer, deactivate_mic_consumer
 from ..utils.tts import speak_async
 from ..core.llm import SmartAssistant
 
@@ -100,9 +100,13 @@ class VoiceEngine:
                     # Adjust for noise briefly
                     self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
                     
+                    # Tuning for natural speech (prevent cutoff)
+                    self.recognizer.pause_threshold = 1.2      # Wait 1.2s of silence before ending (was 0.8)
+                    self.recognizer.non_speaking_duration = 0.8 # Min silence length
+                    
                     # Listen (blocking, with timeout)
                     try:
-                        audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                        audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=15)
                     except sr.WaitTimeoutError:
                         print("TIMEOUT: No speech detected.")
                         return None
@@ -141,12 +145,25 @@ class VoiceEngine:
                     print("⚙️ Processing command...")
                     
                     try:
+                        # V10: Get history from central memory store
+                        from ..memory.faiss_store import get_memory_store
+                        store = get_memory_store()
+                        
+                        # 1. Sync User Message to UI
+                        # Use append_to_history (Thread-safe, Syncs with UI)
+                        store.append_to_history({"role": "user", "content": command})
+                        
+                        history = getattr(store, "conversation_history", [])
+                        
                         # Direct call to LLM with history
-                        history = getattr(self.assistant.store, "conversation_history", [])
                         response = self.assistant.run(command, history=history)
                         
                         # Extract text response
-                        reply_text = response.get("content", "")
+                        reply_text = response.get("content", "") if isinstance(response, dict) else str(response)
+                        
+                        # 2. Sync Assistant Message to UI
+                        if reply_text:
+                            store.append_to_history({"role": "assistant", "content": reply_text})
                         
                         # --- SPEAKING PHASE ---
                         if reply_text:
