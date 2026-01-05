@@ -44,23 +44,65 @@ except ImportError:
 
 # Lazy import to avoid loading models at import time
 assistant = None
+voice_engine = None  # Initialized if SAKURA_ENABLE_VOICE=true
 current_task: Optional[asyncio.Task] = None
 generation_cancelled = False
 
 
+# State flags
+SETUP_REQUIRED = False
+INIT_ERROR = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
-    global assistant
+    global assistant, SETUP_REQUIRED, INIT_ERROR
     print("🚀 Starting Sakura Backend...")
     
     # Import here to delay model loading until server starts
     from sakura_assistant.core.llm import SmartAssistant
-    assistant = SmartAssistant()
-    print("✅ SmartAssistant initialized")
     
-    # Start Voice Engine if enabled via flag
-    if os.getenv("SAKURA_ENABLE_VOICE") == "true":
+    # BOOTSTRAP: Ensure data files exist in persistent storage
+    try:
+        import shutil
+        from sakura_assistant.utils.pathing import get_project_root, get_bundled_path
+        
+        # 1. Ensure Data Directory
+        project_root = get_project_root()
+        data_dir = os.path.join(project_root, "data")
+        os.makedirs(data_dir, exist_ok=True)
+        
+        # 2. Copy Default Bookmarks if missing
+        target_bookmarks = os.path.join(data_dir, "bookmarks.json")
+        if not os.path.exists(target_bookmarks):
+            bundled_bookmarks = get_bundled_path("data/bookmarks.json")
+            if os.path.exists(bundled_bookmarks) and os.path.abspath(bundled_bookmarks) != os.path.abspath(target_bookmarks):
+                print(f"📦 Bootstrapping default bookmarks to: {target_bookmarks}")
+                shutil.copy2(bundled_bookmarks, target_bookmarks)
+                
+    except Exception as e:
+        print(f"⚠️ Data bootstrap warning: {e}")
+
+    try:
+        assistant = SmartAssistant()
+        print("✅ SmartAssistant initialized")
+    except Exception as e:
+        import traceback
+        err = traceback.format_exc()
+        print(f"⚠️ SmartAssistant Init Failed (Likely missing keys). Entering Setup Mode.")
+        # Don't crash - allow UI to show Setup Screen
+        SETUP_REQUIRED = True
+        INIT_ERROR = str(e)
+        
+        # Log to file for debug
+        try:
+            with open("sakura_startup_log.txt", "w") as f:
+                f.write(f"Startup Error (Setup Mode Triggered):\n{err}")
+        except:
+            pass
+    
+    # Start Voice Engine if enabled via flag AND assistant is ready
+    if os.getenv("SAKURA_ENABLE_VOICE") == "true" and assistant:
         try:
             from sakura_assistant.core.voice_engine import VoiceEngine
             global voice_engine
@@ -102,14 +144,97 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.post("/setup")
+async def save_setup(request: Request):
+    """Save API keys to .env and re-initialize assistant."""
+    global assistant, SETUP_REQUIRED, INIT_ERROR
+    
+    try:
+        data = await request.json()
+        
+        # 1. Validate keys
+        groq_key = data.get("GROQ_API_KEY", "").strip()
+        tavily_key = data.get("TAVILY_API_KEY", "").strip()
+        
+        if not groq_key:
+            return JSONResponse({"success": False, "message": "Groq API Key is required"}, status_code=400)
+            
+        # 2. Write to .env in persistent storage
+        from sakura_assistant.utils.pathing import get_project_root
+        
+        env_path = os.path.join(get_project_root(), ".env")
+        
+        # Optional fields
+        openrouter_key = data.get("OPENROUTER_API_KEY", "").strip()
+        spotify_id = data.get("SPOTIPY_CLIENT_ID", "").strip()
+        spotify_secret = data.get("SPOTIPY_CLIENT_SECRET", "").strip()
+        mic_index = data.get("MICROPHONE_INDEX", "").strip()
+
+        env_content = f"""# Sakura V10 User Configuration
+GROQ_API_KEY={groq_key}
+TAVILY_API_KEY={tavily_key}
+OPENROUTER_API_KEY={openrouter_key}
+SPOTIPY_CLIENT_ID={spotify_id}
+SPOTIPY_CLIENT_SECRET={spotify_secret}
+MICROPHONE_INDEX={mic_index}
+SAKURA_ENABLE_VOICE=true
+"""
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.write(env_content)
+            
+        # 3. Reload Env (Update os.environ for current process)
+        os.environ["GROQ_API_KEY"] = groq_key
+        if tavily_key: os.environ["TAVILY_API_KEY"] = tavily_key
+        if openrouter_key: os.environ["OPENROUTER_API_KEY"] = openrouter_key
+        if spotify_id: os.environ["SPOTIPY_CLIENT_ID"] = spotify_id
+        if spotify_secret: os.environ["SPOTIPY_CLIENT_SECRET"] = spotify_secret
+        if mic_index: os.environ["MICROPHONE_INDEX"] = mic_index
+        os.environ["SAKURA_ENABLE_VOICE"] = "true"
+        
+        # 4. RESET CONTAINER & Re-init Assistant
+        # Critical: Container caches LLM config at init. Must reset to pick up env vars.
+        from sakura_assistant.core.container import reset_container
+        reset_container()
+        
+        from sakura_assistant.core.llm import SmartAssistant
+        try:
+            assistant = SmartAssistant()
+            SETUP_REQUIRED = False
+            INIT_ERROR = None
+            
+            # Start Voice Engine if previously failed or not started
+            if os.getenv("SAKURA_ENABLE_VOICE") == "true":
+                try:
+                    from sakura_assistant.core.voice_engine import VoiceEngine
+                    global voice_engine
+                    if 'voice_engine' not in globals() or voice_engine is None:
+                        voice_engine = VoiceEngine(assistant)
+                        voice_engine.start()
+                except Exception as ve:
+                    print(f"⚠️ Voice start warning: {ve}")
+
+            return {"success": True, "message": "Setup complete! Sakura is ready."}
+        except Exception as e:
+            return JSONResponse({"success": False, "message": f"Keys saved, but initialization failed: {str(e)}"}, status_code=500)
+            
+    except Exception as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
 
 @app.get("/health")
 async def health_check():
     """Combined health check - returns ready status."""
+    status = "ready"
+    if SETUP_REQUIRED:
+        status = "setup_required"
+    elif assistant is None:
+        status = "starting"
+        
     return {
-        "status": "ready" if assistant is not None else "starting",
+        "status": status,
         "system": "Sakura V10",
-        "ready": assistant is not None
+        "ready": assistant is not None,
+        "error": INIT_ERROR
     }
 
 
@@ -122,10 +247,73 @@ async def liveness():
 @app.get("/health/ready")
 async def readiness():
     """Readiness probe - fully initialized and ready to serve."""
+    status = "ready"
+    if SETUP_REQUIRED:
+        status = "setup_required"
+    elif assistant is None:
+        status = "initializing"
+        
     return {
-        "status": "ready" if assistant is not None else "initializing",
+        "status": status,
         "ready": assistant is not None
     }
+
+
+# ============================================================================
+# FILE UPLOAD FOR RAG
+# ============================================================================
+
+from fastapi import UploadFile, File
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """
+    Upload a file for RAG ingestion.
+    Supports: PDF, TXT, MD, DOCX, images (PNG, JPG)
+    """
+    try:
+        from sakura_assistant.utils.pathing import get_project_root
+        from sakura_assistant.memory.ingestion.pipeline import get_ingestion_pipeline
+        
+        # 1. Save file to uploads directory
+        uploads_dir = os.path.join(get_project_root(), "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        # Use original filename (sanitized)
+        safe_name = "".join(c for c in file.filename if c.isalnum() or c in "._- ")
+        file_path = os.path.join(uploads_dir, safe_name)
+        
+        # Write file
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+        
+        print(f"📥 Saved uploaded file: {file_path}")
+        
+        # 2. Ingest into RAG
+        pipeline = get_ingestion_pipeline()
+        result = pipeline.ingest_file_sync(file_path)
+        
+        if result.get("error"):
+            return JSONResponse({
+                "success": False, 
+                "message": result.get("message", "Ingestion failed")
+            }, status_code=400)
+        
+        return {
+            "success": True,
+            "file_id": result.get("file_id"),
+            "filename": result.get("filename"),
+            "message": f"✅ Ingested '{result.get('filename')}'"
+        }
+        
+    except Exception as e:
+        import traceback
+        print(f"❌ Upload error: {traceback.format_exc()}")
+        return JSONResponse({
+            "success": False,
+            "message": str(e)
+        }, status_code=500)
 
 
 @app.get("/voice/status")
@@ -389,12 +577,21 @@ async def get_history():
 @app.post("/shutdown")
 async def shutdown():
     """
-    Graceful shutdown - save World Graph before exit.
+    Graceful shutdown - save World Graph and conversation history before exit.
     Called by Tauri before force-killing the process.
     """
     if assistant and hasattr(assistant, 'world_graph'):
         assistant.world_graph.save()
         print("💾 World Graph saved via /shutdown")
+    
+    # CRITICAL: Flush conversation history to disk
+    try:
+        from sakura_assistant.memory.faiss_store import get_memory_store
+        store = get_memory_store()
+        store.flush_saves()
+        print(f"💾 Conversation history saved ({len(store.conversation_history)} messages)")
+    except Exception as e:
+        print(f"⚠️ Failed to flush history on shutdown: {e}")
     
     # Exit after response is sent
     import threading

@@ -86,5 +86,117 @@
   {
     "role": "assistant",
     "content": "I’m running on good energy—no bugs in my mood module. How about you?"
+  },
+  {
+    "role": "user",
+    "content": "tedy"
+  },
+  {
+    "role": "assistant",
+    "content": "Got it. What’s on the agenda today?"
+  },
+  {
+    "role": "user",
+    "content": "got what, what do u know about me?"
+  },
+  {
+    "role": "assistant",
+    "content": "You’re Dhanush, 22, born 29 Oct, based in Bangalore. You work as an AI/ML engineer and experimental agent builder, favoring rapid prototyping and aggressive refactoring. Your core interests are AI/ML, full‑stack web dev, workflow automation, anime/Japanese media, and short bike/cycling trips. You prefer practical, direct replies and enjoy a playful, lightly teasing tone."
+  },
+  {
+    "role": "user",
+    "content": "can u open whatsapp for me"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'ExecutionResult' object has no attribute 'output'"
+  },
+  {
+    "role": "user",
+    "content": "awesome anyways play brothers in arms on youtube"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'ExecutionResult' object has no attribute 'output'"
+  },
+  {
+    "role": "user",
+    "content": "play singles anthem on spotify"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'ExecutionResult' object has no attribute 'output'"
+  },
+  {
+    "role": "user",
+    "content": "Hey sakura, nice to meet you"
+  },
+  {
+    "role": "assistant",
+    "content": "Nice to meet you too, Dhanush.  \nGot your name—so you’re the one who builds AI and rides bikes.  \nWhat can I help you with today?"
+  },
+  {
+    "role": "user",
+    "content": "nothing much, what do u know about me so far?"
+  },
+  {
+    "role": "assistant",
+    "content": "You’re Dhanush, 22, born 29 Oct, from Bangalore.  \nAI/ML engineer, builds prototypes fast, refactors aggressively.  \nEnjoys AI, full‑stack dev, anime, short bike/cycling trips, and travel.  \nYou like practical, direct replies, a bit of light roasting, and a sharp sidekick vibe."
+  },
+  {
+    "role": "user",
+    "content": "awesome, can u play brothers in arms on youtube please"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'ExecutionResult' object has no attribute 'output'"
+  },
+  {
+    "role": "user",
+    "content": "okay play it on spotify instead"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'ExecutionResult' object has no attribute 'output'"
+  },
+  {
+    "role": "user",
+    "content": "i think u got the wrong song, it's brother's in arms by dire straits"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'ExecutionResult' object has no attribute 'output'"
+  },
+  {
+    "role": "user",
+    "content": "Hey"
+  },
+  {
+    "role": "assistant",
+    "content": "Hey Dhanush! How’s it going?"
+  },
+  {
+    "role": "user",
+    "content": "can u play brothers in arms on youtube"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'ExecutionResult' object has no attribute 'output'"
+  },
+  {
+    "role": "user",
+    "content": "what was i talking about earlier?"
+  },
+  {
+    "role": "assistant",
+    "content": "You were asking me to play “Brothers in Arms” on YouTube."
+  },
+  {
+    "role": "user",
+    "content": "before that?"
+  },
+  {
+    "role": "assistant",
+    "content": "I’m not seeing any earlier topic in the chat. Could you remind me what you were discussing before the “Brothers in Arms” request?"
   }
 ]

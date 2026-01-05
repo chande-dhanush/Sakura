@@ -3,7 +3,6 @@
     import { moodColors } from '$lib/stores/chat.js';
     
     export let tools = [];
-    export let mode = '';
     
     // Default to COLLAPSED for clean UI - users expand if curious
     let expanded = false;

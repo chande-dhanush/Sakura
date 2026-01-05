@@ -38,14 +38,30 @@ class SmartAssistant:
         self.tools = get_all_tools()
         self.tool_map = {t.name: t for t in self.tools}
         
+        # Get LLMs from container
+        router_llm = self.container.get_router_llm()
+        planner_llm = self.container.get_planner_llm()
+        responder_llm = self.container.get_responder_llm()
+        
+        # Validate LLMs are available (prevents NoneType errors later)
+        if router_llm is None or planner_llm is None or responder_llm is None:
+            missing = []
+            if router_llm is None: missing.append("Router")
+            if planner_llm is None: missing.append("Planner")
+            if responder_llm is None: missing.append("Responder")
+            raise RuntimeError(
+                f"❌ No LLM configured for: {', '.join(missing)}. "
+                f"Please set GROQ_API_KEY or OPENROUTER_API_KEY in your .env file."
+            )
+        
         # Initialize Components via Container
-        self.router = IntentRouter(self.container.get_router_llm())
+        self.router = IntentRouter(router_llm)
         self.executor = ToolExecutor(
             tools=self.tools,
-            summarizer_llm=self.container.get_planner_llm()
+            summarizer_llm=planner_llm
         )
         self.responder = ResponseGenerator(
-            self.container.get_responder_llm(),
+            responder_llm,
             SYSTEM_PERSONALITY
         )
         
@@ -106,11 +122,11 @@ class SmartAssistant:
                     state
                 )
                 
-                tool_outputs = exec_result.output
-                tool_used = exec_result.main_tool_used
-                if exec_result.tool_history:
+                tool_outputs = exec_result.outputs
+                tool_used = exec_result.tool_used
+                if exec_result.tool_messages:
                      # Log actions to World Graph
-                     for action in exec_result.tool_history:
+                     for action in exec_result.tool_messages:
                          # Attempt to parse args if possible, or just raw
                          pass # Executor logs internally? No, need to log here or in executor
                          # Ideally executor should return structured log to record

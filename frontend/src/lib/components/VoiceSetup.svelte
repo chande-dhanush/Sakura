@@ -62,7 +62,12 @@
     }
 </script>
 
-<div class="voice-setup-overlay" on:click|self={close} role="dialog" aria-modal="true">
+<div class="voice-setup-overlay" 
+    on:click|self={close} 
+    on:keydown|stopPropagation
+    role="dialog" 
+    aria-modal="true"
+    tabindex="0">
     <div class="voice-setup-modal">
         <button class="close-btn" on:click={close}>×</button>
         

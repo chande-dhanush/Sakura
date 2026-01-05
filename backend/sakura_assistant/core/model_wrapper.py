@@ -56,9 +56,9 @@ class ReliableLLM:
                 print(f"🔧 [{self.name}] Recovering from Groq XML tool call...")
                 try:
                     # Parse kwargs like: query="git change origin"
-                     match_tools = self._recover_groq_xml(err_str)
-                     if match_tools:
-                         return match_tools
+                    match_tools = self._recover_groq_xml(err_str)
+                    if match_tools:
+                        return match_tools
                 except Exception as parse_err:
                     print(f"❌ Recovery failed: {parse_err}")
 

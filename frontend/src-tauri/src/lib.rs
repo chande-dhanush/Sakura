@@ -55,7 +55,18 @@ fn hide_main_window(app: tauri::AppHandle) {
 #[tauri::command]
 fn force_quit() {
     println!("💥 Force quitting app and backend...");
-    // Kill the Python backend immediately
+    
+    // Try graceful shutdown first (saves conversation history)
+    let client = reqwest::blocking::Client::new();
+    if let Ok(_) = client.post("http://localhost:8000/shutdown")
+        .timeout(std::time::Duration::from_millis(500))
+        .send() 
+    {
+        println!("✅ Graceful shutdown signal sent");
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+    
+    // Kill the Python backend
     if let Ok(mut guard) = BACKEND.lock() {
         if let Some(ref mut child) = *guard {
             let _ = child.kill();
@@ -104,22 +115,57 @@ fn find_backend_dir() -> Option<PathBuf> {
 
 fn start_backend(app: &tauri::App) -> Result<(), String> {
     // PRODUCTION MODE: Use bundled sidecar
-    // Check if bundled sidecar exists (indicates production build)
-    let sidecar_path = app.path().resource_dir()
-        .ok()
-        .map(|p| p.join("binaries").join(if cfg!(windows) { "sakura-backend.exe" } else { "sakura-backend" }));
+    // Robust Discovery: Check multiple locations and names
+    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+    let res_dir = app.path().resource_dir().ok();
     
-    if let Some(path) = sidecar_path.filter(|p| p.exists()) {
+    // Possible Filenames
+    let suffixes = if cfg!(windows) {
+        vec!["sakura-backend-x86_64-pc-windows-msvc.exe", "sakura-backend.exe"]
+    } else {
+        vec!["sakura-backend"]
+    };
+    
+    // Possible Directories
+    let mut dirs = vec![];
+    if let Some(d) = &exe_dir { dirs.push(d.clone()); } // Check root (flattened)
+    if let Some(d) = &res_dir { dirs.push(d.clone()); } // Check resources/
+    if let Some(d) = &res_dir { dirs.push(d.join("binaries")); } // Check resources/binaries/
+    
+    // Find first match
+    let mut sidecar_path: Option<PathBuf> = None;
+    for dir in dirs {
+        for name in &suffixes {
+            let candidate = dir.join(name);
+            if candidate.exists() {
+                println!("✅ Found sidecar at: {:?}", candidate);
+                sidecar_path = Some(candidate);
+                break;
+            }
+        }
+        if sidecar_path.is_some() { break; }
+    }
+
+    if let Some(path) = sidecar_path {
         println!("🚀 Starting bundled backend sidecar...");
         println!("   Path: {:?}", path);
         
         let mut cmd = Command::new(&path);
+        // HIDE CONSOLE WINDOW on Windows (Crucial for polished feel)
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        
+        // Output handling
         cmd.stdout(Stdio::inherit());
         cmd.stderr(Stdio::inherit());
         
-        // Set working directory to resource dir for data access
-        if let Ok(resource_dir) = app.path().resource_dir() {
-            cmd.current_dir(&resource_dir);
+        // Set working directory to resource dir (or exe dir) for data access checks
+        if let Some(wd) = res_dir.or(exe_dir) {
+            cmd.current_dir(wd);
         }
         
         match cmd.spawn() {
@@ -131,7 +177,7 @@ fn start_backend(app: &tauri::App) -> Result<(), String> {
                 return Ok(());
             }
             Err(e) => {
-                eprintln!("⚠️ Sidecar failed, falling back to dev mode: {}", e);
+                eprintln!("⚠️ Sidecar failed to spawn: {}", e);
             }
         }
     }
@@ -312,9 +358,9 @@ pub fn run() {
                 )?;
             }
 
-            // Enable Auto-Start by default (as per user request)
-            use tauri_plugin_autostart::ManagerExt;
-            let _ = app.handle().autolaunch().enable();
+            // Auto-start removed per user request (Manual scheduling preferred)
+            // use tauri_plugin_autostart::ManagerExt;
+            // let _ = app.handle().autolaunch().enable();
             
             // Position bubble to bottom-right
             if let Some(bubble) = app.get_webview_window("bubble") {

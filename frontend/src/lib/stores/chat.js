@@ -319,6 +319,14 @@ export async function checkBackendReady() {
             const response = await fetch(`${BACKEND_URL}/health/ready`);
             if (response.ok) {
                 const data = await response.json();
+
+                // V10: Check for Setup Mode (Missing Keys)
+                if (data.status === "setup_required") {
+                    backendStatus.set('setup_required');
+                    console.log('[Chat] Backend requires setup.');
+                    return true;
+                }
+
                 if (data.ready) {
                     backendStatus.set('ready');
                     console.log('[Chat] Backend is ready!');

@@ -17,7 +17,8 @@ a = Analysis(
     datas=[
         # Include data directories
         ('sakura_assistant', 'sakura_assistant'),
-        # Note: 'Notes' and 'data' folders are created at runtime
+        ('data', 'data'),  # Bundle default data (bookmarks, etc.)
+        # Note: 'Notes' and 'data' folders are created at runtime in AppData
     ] + ([('Notes', 'Notes')] if os.path.exists(os.path.join(backend_dir, 'Notes')) else []),
     hiddenimports=[
         # LangChain imports
@@ -50,7 +51,7 @@ a = Analysis(
         'google.oauth2',
         'googleapiclient',
         'requests',
-        'beautifulsoup4',
+        'bs4',  # beautifulsoup4 module name
         'sympy',
         'tiktoken',
         'structlog',
@@ -60,6 +61,12 @@ a = Analysis(
         'kokoro',
         'speech_recognition',
         'faiss',
+        'AppOpener',
+        'plyer',
+        'pycaw',
+        'mss',
+        'pystray',
+        'PIL',
     ],
     hookspath=[],
     hooksconfig={},

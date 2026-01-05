@@ -99,6 +99,7 @@ class Planner:
             # System
             "file": "system", "open": "system", "screen": "system", "note": "system",
             "clipboard": "system", "copy": "system", "paste": "system", "task": "system",
+            "bookmark": "system", "site": "system", "shortcut": "system", "url": "system",
             # Utility
             "weather": "utility", "convert": "utility", "math": "utility",
             "calculate": "utility", "define": "utility", "location": "utility",

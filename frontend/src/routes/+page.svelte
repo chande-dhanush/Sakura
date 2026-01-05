@@ -7,50 +7,56 @@
     import Timeline from '$lib/components/Timeline.svelte';
     import WorldGraphPill from '$lib/components/WorldGraphPill.svelte';
     import VoiceSetup from '$lib/components/VoiceSetup.svelte';
-    import { messages, moodColors, refreshState, connectionError, clearChat, startPolling, backendStatus, voiceStatus, checkBackendReady, checkVoiceStatus } from '$lib/stores/chat.js';
+    import Setup from '$lib/components/Setup.svelte'; // V10: New Onboarding
+    import { messages, moodColors, refreshState, connectionError, clearChat, startPolling, backendStatus, voiceStatus, checkBackendReady, checkVoiceStatus, loadHistory } from '$lib/stores/chat.js';
     
     let showMenu = false;
     let historyLoading = false;
     let isQuickSearch = false; // Spotlight mode
     let showVoiceSetup = false;
+    let showSettings = false; // V10: Settings Modal State
     
     onMount(async () => {
         console.log('[Main] Window mounted, waiting for backend...');
         
         // Wait for backend to be ready (shows loading screen)
+        // If SETUP_REQUIRED, this will return true but set status to 'setup_required'
         const ready = await checkBackendReady();
         if (!ready) {
             console.error('[Main] Backend failed to start');
             return;
         }
         
-        try {
-            await refreshState();
-            console.log('[Main] State refreshed');
-            await loadHistory();
-            console.log('[Main] History load complete. Messages in store:', $messages.length);
-            
-            // Check voice status
-            await checkVoiceStatus();
-            
-            // Listen for Quick Search Trigger (Shift+S global)
-            await listen('quick_search_trigger', async () => {
-                console.log('⚡ Quick Search Mode Triggered');
-                isQuickSearch = true;
-                const appWindow = getCurrentWindow();
-                await appWindow.setFocus();
-            });
+        // Only load data if fully ready (not in setup mode)
+        if ($backendStatus === 'ready') {
+            try {
+                await refreshState();
+                console.log('[Main] State refreshed');
+                await loadHistory();
+                console.log('[Main] History load complete. Messages in store:', $messages.length);
+                
+                // Check voice status
+                await checkVoiceStatus();
+                
+                // Listen for Quick Search Trigger (Shift+S global)
+                await listen('quick_search_trigger', async () => {
+                    console.log('⚡ Quick Search Mode Triggered');
+                    isQuickSearch = true;
+                    const appWindow = getCurrentWindow();
+                    await appWindow.setFocus();
+                });
 
-            // Listen for Full Mode Trigger (Shift+F default)
-            await listen('full_mode_trigger', async () => {
-                console.log('🔄 Full Mode Triggered');
-                isQuickSearch = false;
-                const appWindow = getCurrentWindow();
-                await appWindow.setFocus();
-            });
-            
-        } catch (e) {
-            console.error('[Main] Init error:', e);
+                // Listen for Full Mode Trigger (Shift+F default)
+                await listen('full_mode_trigger', async () => {
+                    console.log('🔄 Full Mode Triggered');
+                    isQuickSearch = false;
+                    const appWindow = getCurrentWindow();
+                    await appWindow.setFocus();
+                });
+                
+            } catch (e) {
+                console.error('[Main] Init error:', e);
+            }
         }
     });
     
@@ -84,7 +90,9 @@
     function handleKeydown(e) {
         if (e.key === 'Escape') {
             e.preventDefault();
-            if (showMenu) {
+            if (showSettings) {
+                showSettings = false; // Close settings on ESC
+            } else if (showMenu) {
                 showMenu = false;
             } else {
                 hideWindow();
@@ -102,8 +110,10 @@
 
 <svelte:window on:keydown={handleKeydown} on:blur={handleBlur} />
 
-<!-- LOADING OVERLAY - Shows while backend is starting -->
-{#if $backendStatus === 'starting'}
+<!-- SETUP MODE - Onboarding for new users -->
+{#if $backendStatus === 'setup_required'}
+    <Setup />
+{:else if $backendStatus === 'starting'}
     <div class="loading-overlay">
         <div class="loading-logo">🌸</div>
         <h2>Starting Sakura...</h2>
@@ -172,7 +182,7 @@
                     <button on:click={handleClearChat}>
                         <span class="menu-icon">🗑️</span> Clear Chat
                     </button>
-                    <button on:click={() => { showMenu = false; }}>
+                    <button on:click={() => { showMenu = false; showSettings = true; }}>
                         <span class="menu-icon">⚙️</span> Settings
                     </button>
                     <div class="menu-divider"></div>
@@ -212,6 +222,11 @@
     <VoiceSetup on:close={() => showVoiceSetup = false} />
 {/if}
 
+<!-- SETTINGS MODAL (Over everything else when active) -->
+{#if showSettings}
+    <Setup isUpdateMode={true} onClose={() => showSettings = false} />
+{/if}
+
 {/if} <!-- End of backendStatus check -->
 
 <style>
@@ -222,12 +237,22 @@
         box-sizing: border-box;
     }
     
+    :global(html) {
+        height: 100%;
+        overflow: hidden;
+    }
+    
     :global(body) {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
         background: transparent;
         color: #fff;
         overflow: hidden;
         -webkit-font-smoothing: antialiased;
+        height: 100%;
+        width: 100%;
+        position: fixed;
+        top: 0;
+        left: 0;
     }
     
     /* ... Scrollbar styles omitted for brevity ... */
@@ -244,7 +269,7 @@
     
     /* ===== DRAG REGION ===== */
     [data-tauri-drag-region] { -webkit-app-region: drag; app-region: drag; cursor: grab; user-select: none; }
-    [data-tauri-drag-region] button, [data-tauri-drag-region] input { -webkit-app-region: no-drag; app-region: no-drag; cursor: pointer; }
+    [data-tauri-drag-region] button { -webkit-app-region: no-drag; app-region: no-drag; cursor: pointer; }
     
     /* ===== MAIN APP ===== */
     .app {

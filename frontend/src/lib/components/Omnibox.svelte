@@ -8,6 +8,10 @@
     let textarea;
     let fileInput;
     let attachedFile = null;
+    let isUploading = false;
+    let uploadError = '';
+    
+    const BACKEND_URL = "http://localhost:8000";
     
     async function handleSubmit() {
         if (!query.trim() || $isStreaming) return;
@@ -34,22 +38,49 @@
         textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
     }
     
-    function handleFileSelect(e) {
+    async function handleFileSelect(e) {
         const file = e.target.files?.[0];
-        if (file) {
-            attachedFile = file;
-            // TODO: Upload to backend and add to RAG
+        if (!file) return;
+        
+        attachedFile = file;
+        uploadError = '';
+        isUploading = true;
+        
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const res = await fetch(`${BACKEND_URL}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await res.json();
+            
+            if (data.success) {
+                console.log('✅ File uploaded:', data);
+                // File stays attached as visual confirmation
+            } else {
+                uploadError = data.message || 'Upload failed';
+                attachedFile = null;
+            }
+        } catch (e) {
+            uploadError = 'Upload failed: ' + e.message;
+            attachedFile = null;
+        } finally {
+            isUploading = false;
         }
     }
     
     function removeFile() {
         attachedFile = null;
+        uploadError = '';
         if (fileInput) fileInput.value = '';
     }
 
     async function triggerVoice() {
         try {
-            await fetch('http://127.0.0.1:8000/voice/trigger', { method: 'POST' });
+            await fetch(`${BACKEND_URL}/voice/trigger`, { method: 'POST' });
         } catch (e) {
             console.error("Voice trigger failed", e);
         }
@@ -57,12 +88,20 @@
 </script>
 
 <form class="omnibox" class:quick-search={isQuickSearch} on:submit|preventDefault={handleSubmit} style="--glow: {$moodColors.glow}; --primary: {$moodColors.primary}">
+    <!-- Upload Error -->
+    {#if uploadError}
+        <div class="upload-error">
+            ⚠️ {uploadError}
+            <button type="button" on:click={() => uploadError = ''}>×</button>
+        </div>
+    {/if}
+    
     <!-- Attached File Preview -->
     {#if attachedFile}
-        <div class="file-preview">
-            <span class="file-icon">📎</span>
+        <div class="file-preview" class:uploading={isUploading}>
+            <span class="file-icon">{isUploading ? '⏳' : '✅'}</span>
             <span class="file-name">{attachedFile.name}</span>
-            <button type="button" class="file-remove" on:click={removeFile}>×</button>
+            <button type="button" class="file-remove" on:click={removeFile} disabled={isUploading}>×</button>
         </div>
     {/if}
     
@@ -75,11 +114,22 @@
             accept=".pdf,.txt,.md,.doc,.docx,.png,.jpg,.jpeg"
             style="display: none"
         />
-        <button type="button" class="attach-btn" on:click={() => fileInput?.click()} title="Attach file">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" 
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+        <button 
+            type="button" 
+            class="attach-btn" 
+            class:uploading={isUploading}
+            on:click={() => fileInput?.click()} 
+            title="Attach file for context"
+            disabled={isUploading}
+        >
+            {#if isUploading}
+                <span class="spinner">⏳</span>
+            {:else}
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" 
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            {/if}
         </button>
         
         <!-- Text Input -->
@@ -159,14 +209,41 @@
         align-items: center;
     }
     
+    .upload-error {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 10px;
+        background: rgba(255, 68, 68, 0.15);
+        border: 1px solid rgba(255, 68, 68, 0.3);
+        border-radius: 8px;
+        font-size: 12px;
+        color: #ff8888;
+    }
+    
+    .upload-error button {
+        background: none;
+        border: none;
+        color: #ff8888;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 0 4px;
+    }
+    
     .file-preview {
         display: flex;
         align-items: center;
         gap: 8px;
         padding: 6px 10px;
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(46, 204, 113, 0.1);
+        border: 1px solid rgba(46, 204, 113, 0.3);
         border-radius: 8px;
         font-size: 12px;
+    }
+    
+    .file-preview.uploading {
+        background: rgba(255, 170, 0, 0.1);
+        border-color: rgba(255, 170, 0, 0.3);
     }
     
     .file-icon {
@@ -209,9 +286,14 @@
         justify-content: center;
     }
     
-    .attach-btn:hover {
+    .attach-btn:hover:not(:disabled) {
         background: rgba(255, 255, 255, 0.1);
         color: var(--primary);
+    }
+    
+    .attach-btn:disabled, .attach-btn.disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
     }
     
     .input-wrapper {

@@ -1,29 +1,36 @@
 <!-- Sakura V10 Timeline Component - Chat history container -->
 <script>
-    import { onMount, tick } from 'svelte';
-    import { messages, moodColors, sendMessage } from '$lib/stores/chat.js';
+    import { onMount, afterUpdate, tick } from 'svelte';
+    import { messages, moodColors, sendMessage, isStreaming } from '$lib/stores/chat.js';
     import TimelineItem from './TimelineItem.svelte';
     
     let container;
+    let shouldAutoScroll = true;
+    let lastMessageCount = 0;
     
-    // Auto-scroll to bottom when new messages arrive
-    $: if ($messages.length && container) {
+    // Track if user scrolled up - if so, don't auto-scroll
+    function handleScroll() {
+        if (!container) return;
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        // If within 150px of bottom, enable auto-scroll
+        shouldAutoScroll = scrollHeight - scrollTop - clientHeight < 150;
+        showScrollButton = !shouldAutoScroll;
+    }
+    
+    // Auto-scroll on new messages
+    $: if ($messages && container && shouldAutoScroll) {
+        // Use tick to wait for DOM update
         (async () => {
-             await tick(); // Wait for DOM update
-             scrollToBottom();
+            await tick();
+            container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         })();
     }
 
     let showScrollButton = false;
 
-    function handleScroll() {
-        if (!container) return;
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        showScrollButton = scrollHeight - scrollTop - clientHeight > 150;
-    }
-
     function scrollToBottom() {
         if (container) {
+            shouldAutoScroll = true;
             container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         }
     }

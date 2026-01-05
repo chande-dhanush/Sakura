@@ -4,7 +4,15 @@ from dotenv import load_dotenv
 from .utils.pathing import normalize_path, get_project_root
 
 # Load environment variables
-load_dotenv()
+# Load environment variables
+# Check persistent data directory first (for installed app)
+_env_path = os.path.join(get_project_root(), ".env")
+if os.path.exists(_env_path):
+    print(f"📖 Loading .env from: {_env_path}")
+    load_dotenv(_env_path, override=True)
+else:
+    # Fallback to default (dev mode / current dir)
+    load_dotenv()
 
 # --- Config Loading ---
 CONFIG_FILE = os.path.join(get_project_root(), "config.json")
@@ -379,6 +387,8 @@ TOOL HINTS (use for DIRECT):
 - Timer/alarm → "set_timer"
 - Reminder → "set_reminder"
 - Open [app] → "open_app"
+- Open [site] → "open_site"
+- Bookmarks → "list_bookmarks"
 - Notes/list notes → "note_list"
 
 TOOL HINTS (use for PLAN):
@@ -403,7 +413,8 @@ TOOL_GROUPS = {
                "wikipedia", "arxiv", "document_context", "forget_document", "web_search"],
     "email": ["gmail", "email"],
     "calendar": ["calendar", "reminder", "timer", "event"],
-    "system": ["screen", "file", "app", "note", "task", "clipboard", "open"],
+    "system": ["screen", "file", "app", "note", "task", "clipboard", "open",
+               "bookmark", "site", "website", "url", "shortcut"],
     "utility": ["weather", "math", "convert", "location", "currency", "define"],
 }
 # Tools available in ALL filtered contexts (per user's coverage concern)
@@ -417,6 +428,8 @@ TOOL_GROUPS_UNIVERSAL = [
     "clipboard_write",
     "note_create",      # V9.1: Notes are universal utility
     "note_append",      # V9.1: Allow "do X and save a note"
+    "open_site",        # V10: Users often want to open sites quickly
+    "list_bookmarks",   # V10: Bookmarks are common references
 ]
 
 TOOL_SCHEMAS = {

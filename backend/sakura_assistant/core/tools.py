@@ -15,7 +15,8 @@ from .tools_libs.google import (
     tasks_list, tasks_create
 )
 from .tools_libs.web import (
-    play_youtube, web_search, search_wikipedia, search_arxiv, get_news, web_scrape
+    play_youtube, get_weather, open_site, list_bookmarks, save_bookmark,
+    web_search, search_wikipedia, search_arxiv, get_news, web_scrape
 )
 from .tools_libs.system import (
     get_system_info, read_screen, open_app, 
@@ -134,10 +135,31 @@ def define_word(word: str) -> str:
 
 @tool
 def currency_convert(amount: float, from_currency: str, to_currency: str) -> str:
-    """Convert currency."""
-    # Stubbed for simplicity in Facade, or use a lib. 
-    # The original implementation used a free API.
-    return "💱 Currency conversion temporarily unavailable in V10 Refactor."
+    """Convert currency between any two currencies (e.g., USD to INR)."""
+    import requests
+    try:
+        # Use free exchangerate-api (no key required)
+        from_curr = from_currency.upper().strip()
+        to_curr = to_currency.upper().strip()
+        
+        url = f"https://api.exchangerate-api.com/v4/latest/{from_curr}"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code != 200:
+            return f"❌ Could not fetch rates for {from_curr}."
+        
+        data = response.json()
+        rates = data.get("rates", {})
+        
+        if to_curr not in rates:
+            return f"❌ Currency '{to_curr}' not found."
+        
+        rate = rates[to_curr]
+        converted = amount * rate
+        
+        return f"💱 {amount:.2f} {from_curr} = {converted:.2f} {to_curr} (Rate: 1 {from_curr} = {rate:.4f} {to_curr})"
+    except Exception as e:
+        return f"❌ Conversion failed: {e}"
 
 @tool
 def clear_all_ephemeral_memory() -> str:
@@ -157,7 +179,8 @@ def get_all_tools():
         set_timer, volume_control, get_location, set_reminder,
         
         # Web & Media
-        spotify_control, play_youtube,
+        spotify_control, play_youtube, get_weather,
+        open_site, list_bookmarks, save_bookmark,
         web_search, search_wikipedia, search_arxiv, get_news, web_scrape,
         
         # Google
