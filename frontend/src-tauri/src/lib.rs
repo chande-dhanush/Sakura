@@ -442,6 +442,13 @@ pub fn run() {
                 eprintln!("⚠️ Backend startup timed out or failed health check");
             }
             
+            // V10: Show main window after backend is ready
+            if let Some(main_window) = app.get_webview_window("main") {
+                let _ = main_window.show();
+                let _ = main_window.set_focus();
+                println!("🪟 Main window shown");
+            }
+            
             Ok(())
         })
         .on_window_event(|window, event| {

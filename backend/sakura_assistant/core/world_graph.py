@@ -1240,10 +1240,8 @@ class WorldGraph:
                 self.session_start = datetime.now()
                 self.last_compression_turn = 0
                 
-                # 3. Re-initialize identity (fresh user:self)
-                self._init_identity()
-                
-                print(f"🔄 [WorldGraph] Reset complete - fresh identity initialized")
+                # Note: Identity will be re-initialized on first interaction
+                print(f"🔄 [WorldGraph] Reset complete - fresh state initialized")
                 return True
                 
             except Exception as e:

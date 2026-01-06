@@ -186,6 +186,28 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
     },
     
     # ═══════════════════════════════════════════════════════════════════════
+    # NEWS (V10.1: Force tool use to prevent hallucination)
+    # ═══════════════════════════════════════════════════════════════════════
+    {
+        "pattern": r"\b(what('s|s| is|'re|re| are) the |latest |recent |today('s|s)? )?(news|headlines)\b",
+        "tool": "get_news",
+        "args_extractor": lambda m, text: {"topic": _extract_news_topic(text)},
+        "description": "what's the news / latest news",
+    },
+    {
+        "pattern": r"\b(give|get|show|tell)( me)?( the| some)?\s*(latest\s+)?(news|headlines)\b",
+        "tool": "get_news",
+        "args_extractor": lambda m, text: {"topic": _extract_news_topic(text)},
+        "description": "give me the news",
+    },
+    {
+        "pattern": r"\bnews\s+(about|on|for|regarding)\s+(.+)$",
+        "tool": "get_news",
+        "args_extractor": lambda m, text: {"topic": m.group(2).strip()},
+        "description": "news about X",
+    },
+    
+    # ═══════════════════════════════════════════════════════════════════════
     # FORCE COMPLEX (Don't force specific tool, but ensure LLM planning runs)
     # ═══════════════════════════════════════════════════════════════════════
     {
@@ -251,6 +273,19 @@ def _extract_note_args(match, text: str) -> Dict[str, Any]:
             return {"title": "Quick Note", "content": m.group(1).strip()}
     
     return {"title": "Quick Note", "content": text}
+
+
+def _extract_news_topic(text: str) -> str:
+    """Extract topic from news request."""
+    import re
+    # Look for topic indicators
+    for pattern in [r"news\s+(about|on|for|regarding)\s+(.+)$", 
+                    r"(tech|technology|sports|business|science|politics|entertainment)\s+news",
+                    r"news.*(tech|technology|sports|business|science|politics|entertainment)"]:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            return m.group(2) if m.lastindex >= 2 else m.group(1)
+    return ""  # Empty = general news
 
 
 # ═══════════════════════════════════════════════════════════════════════════

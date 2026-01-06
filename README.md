@@ -17,6 +17,13 @@
 - **📊 Observability** - Structured logging & Prometheus metrics
 - **🌐 Quick Search** - `Alt+S` for instant omnibox-style search
 - **📍 Bubble Widget** - Always-on floating widget
+- **📎 File Upload** - Attach PDFs, docs, images for RAG ingestion (V10.1)
+
+### 🆕 V10.1 Updates (January 2026)
+- **Terminal Action Deduplication** - Prevents LLM from calling same tool 5x
+- **Window Auto-Show** - Main window now shows automatically after backend ready
+- **Settings UI Fix** - Save button now visible with proper scrolling
+- **Layout Stability** - Fixed app window expanding with message content
 
 ---
 
@@ -112,16 +119,27 @@ This configures:
 1. **Google OAuth** - For Gmail/Calendar access
 2. **Wake Word Templates** - Records your voice for "Sakura" activation
 
-### Google OAuth Setup
+### Google OAuth Setup (Optional)
+> **Note:** Google integration (Gmail, Calendar, Tasks) is **optional**. The app works perfectly without it.
+
+To enable Gmail/Calendar/Tasks:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Create OAuth 2.0 Client ID (Desktop App)
-3. Download JSON → rename to `credentials.json`
-4. Place in `backend/` folder
-5. Run `python first_setup.py`
+2. Create a new project (or use existing)
+3. Enable these APIs: `Gmail API`, `Google Calendar API`, `Tasks API`
+4. Go to **OAuth consent screen** → Configure as "External" → Add your email as test user
+5. Go to **Credentials** → Create **OAuth 2.0 Client ID** → Select "Desktop App"
+6. Download the JSON file → Rename to `credentials.json`
+7. Place it in `backend/` folder (or `%APPDATA%/SakuraV10/` for installed version)
+8. Run the app → First Gmail/Calendar request will open browser for authorization
+9. After authentication, `token.json` is created and you're set!
+
+**Troubleshooting:**
+- "Access blocked" → Add your Google account as a test user in OAuth consent screen
+- "credentials.json not found" → Make sure the file is in the correct directory
 
 ### Wake Word Setup
-The setup wizard will guide you to record 3-5 voice samples saying "Sakura".
-Templates are saved to `backend/data/wake_templates/`.
+The setup wizard guides you to record 3-5 voice samples saying "Sakura".
+Templates are saved to `data/wake_templates/` in your app data folder.
 
 ---
 

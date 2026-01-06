@@ -73,8 +73,10 @@
     }
     
     function handleClearChat() {
-        clearChat();
-        showMenu = false;
+        if (confirm('🗑️ Clear all chat history, memory, and World Graph?\n\nThis cannot be undone.')) {
+            clearChat();
+            showMenu = false;
+        }
     }
 
     function closeMenu() {
@@ -274,7 +276,9 @@
     /* ===== MAIN APP ===== */
     .app {
         width: 100%;
-        height: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         background: var(--bg);
@@ -340,6 +344,7 @@
     
     .timeline-container { 
         flex: 1; 
+        min-height: 0; /* Critical for flex children to shrink properly */
         overflow: hidden; /* Let Timeline component handle scrolling */
         display: flex; 
         flex-direction: column;

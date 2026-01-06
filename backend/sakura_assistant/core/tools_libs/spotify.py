@@ -80,56 +80,78 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
     try:
         action = action.lower()
         if action == "play":
-            # Ensure we are targeting 'Levos' strictly
+            # Device Selection Logic
+            target_device_name = os.getenv("SPOTIFY_DEVICE_NAME", "").lower()
+            target_device = None
+            
+            # 1. Fetch devices
             try:
                 devices = client.devices()
+                device_list = devices.get('devices', [])
             except:
                 return "❌ Spotify API Error: Could not fetch devices."
 
-            levos_device = None
-            for d in devices.get('devices', []):
-                if 'levos' in d['name'].lower():
-                    levos_device = d
+            # 2. Find matching device
+            for d in device_list:
+                d_name = d['name'].lower()
+                # Priority 1: Exact match on configured name
+                if target_device_name and target_device_name in d_name:
+                    target_device = d
+                    break
+                # Priority 2: Already active device (if no specific target set)
+                if not target_device_name and d['is_active']:
+                    target_device = d
                     break
             
-            # If Levos not found, try launching App (assuming we are on Levos)
-            if not levos_device:
+            # Priority 3: First available device (if no target and no active)
+            if not target_device and not target_device_name and device_list:
+                target_device = device_list[0]
+
+            # 3. If still no device, try launching App
+            if not target_device:
                 if app_open:
-                    print("🔄 Device 'Levos' not found. Launching local Spotify...")
+                    print("🔄 No Spotify device found. Launching local app...")
                     try:
                         app_open("spotify", match_closest=True, output=False)
                         
                         # Poll for device (up to 20 seconds)
                         print("⏳ Waiting for Spotify to connect...")
                         for i in range(10):
-                            time.sleep(5)
+                            time.sleep(2) # Faster polling
                             try:
                                 devices = client.devices()
-                                for d in devices.get('devices', []):
-                                    if 'levos' in d['name'].lower():
-                                        levos_device = d
-                                        print(f"✅ Found device: {d['name']}")
+                                device_list = devices.get('devices', [])
+                                for d in device_list:
+                                    # Check again for target or any device
+                                    d_name = d['name'].lower()
+                                    if target_device_name:
+                                        if target_device_name in d_name:
+                                            target_device = d
+                                            break
+                                    else:
+                                        # Use any device if no target
+                                        target_device = d
                                         break
+                                if target_device:
+                                    print(f"✅ Found device: {target_device['name']}")
+                                    break
                             except:
                                 pass
-                                
-                            if levos_device:
-                                break
                     except Exception as e:
                         print(f"⚠️ App launch failed: {e}")
 
-            if not levos_device:
-                available = ", ".join([d['name'] for d in devices.get('devices', [])])
-                return f"❌ Device 'Levos' is not online. Available: {available}"
+            if not target_device:
+                available = ", ".join([d['name'] for d in device_list]) if device_list else "None"
+                return f"❌ No Spotify device found. Available: {available}. Try opening Spotify manually."
 
-            # Force activation of Levos
-            if not levos_device['is_active']:
+            # 4. Activate Device
+            if not target_device['is_active']:
                 try:
-                    print(f"🔄 Activating 'Levos' ({levos_device['id']})...")
-                    client.transfer_playback(levos_device['id'], force_play=False)
+                    print(f"🔄 Activating '{target_device['name']}' ({target_device['id']})...")
+                    client.transfer_playback(target_device['id'], force_play=False)
                     time.sleep(1)
                 except Exception as e:
-                    return f"❌ Failed to activate 'Levos': {e}"
+                    return f"❌ Failed to activate '{target_device['name']}': {e}"
 
             # Now proceed with Play
             if song_name:

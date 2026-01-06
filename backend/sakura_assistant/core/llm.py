@@ -108,6 +108,11 @@ class SmartAssistant:
             tool_outputs = ""
             tool_used = "None"
             
+            # DEBUG: Log route result details
+            print(f"🔍 DEBUG: route_result.needs_tools = {route_result.needs_tools}")
+            print(f"🔍 DEBUG: route_result.tool_hint = {route_result.tool_hint}")
+            print(f"🔍 DEBUG: route_result.classification = {route_result.classification}")
+            
             if route_result.needs_tools or route_result.tool_hint:
                 print(f"⚙️ Execution Phase: {route_result.classification}")
                 state.record_llm_call("execution")
@@ -124,15 +129,29 @@ class SmartAssistant:
                 
                 tool_outputs = exec_result.outputs
                 tool_used = exec_result.tool_used
+                
+                # DEBUG: Log execution result
+                print(f"🔍 DEBUG: exec_result.outputs = '{tool_outputs[:100]}...' (len={len(tool_outputs)})")
+                print(f"🔍 DEBUG: exec_result.tool_used = {tool_used}")
+                print(f"🔍 DEBUG: exec_result.success = {exec_result.success}")
+                
                 if exec_result.tool_messages:
                      # Log actions to World Graph
                      for action in exec_result.tool_messages:
-                         # Attempt to parse args if possible, or just raw
-                         pass # Executor logs internally? No, need to log here or in executor
-                         # Ideally executor should return structured log to record
-                         # For now, we trust Executor runs, but WorldGraph recording was inside loop
-                         # TODO: Restore granular WorldGraph recording inside Executor or via callback
-                         pass
+                         try:
+                             # action is a ToolMessage or similar dict
+                             tool_name = action.get("tool", "unknown")
+                             tool_args = action.get("args", {})
+                             tool_result = action.get("content", "")
+                             
+                             self.world_graph.record_action(
+                                 tool=tool_name,
+                                 args=tool_args,
+                                 result=str(tool_result),
+                                 success=True # Assumed if we got a result
+                             )
+                         except Exception as wg_err:
+                             print(f"⚠️ World Graph recording failed: {wg_err}")
             
             # 5. Response
             state.record_llm_call("responding")

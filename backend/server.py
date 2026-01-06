@@ -166,16 +166,18 @@ async def save_setup(request: Request):
         
         # Optional fields
         openrouter_key = data.get("OPENROUTER_API_KEY", "").strip()
-        spotify_id = data.get("SPOTIPY_CLIENT_ID", "").strip()
-        spotify_secret = data.get("SPOTIPY_CLIENT_SECRET", "").strip()
+        spotify_id = data.get("SPOTIFY_CLIENT_ID", "").strip()
+        spotify_secret = data.get("SPOTIFY_CLIENT_SECRET", "").strip()
+        spotify_device = data.get("SPOTIFY_DEVICE_NAME", "").strip()
         mic_index = data.get("MICROPHONE_INDEX", "").strip()
 
         env_content = f"""# Sakura V10 User Configuration
 GROQ_API_KEY={groq_key}
 TAVILY_API_KEY={tavily_key}
 OPENROUTER_API_KEY={openrouter_key}
-SPOTIPY_CLIENT_ID={spotify_id}
-SPOTIPY_CLIENT_SECRET={spotify_secret}
+SPOTIFY_CLIENT_ID={spotify_id}
+SPOTIFY_CLIENT_SECRET={spotify_secret}
+SPOTIFY_DEVICE_NAME={spotify_device}
 MICROPHONE_INDEX={mic_index}
 SAKURA_ENABLE_VOICE=true
 """
@@ -186,8 +188,9 @@ SAKURA_ENABLE_VOICE=true
         os.environ["GROQ_API_KEY"] = groq_key
         if tavily_key: os.environ["TAVILY_API_KEY"] = tavily_key
         if openrouter_key: os.environ["OPENROUTER_API_KEY"] = openrouter_key
-        if spotify_id: os.environ["SPOTIPY_CLIENT_ID"] = spotify_id
-        if spotify_secret: os.environ["SPOTIPY_CLIENT_SECRET"] = spotify_secret
+        if spotify_id: os.environ["SPOTIFY_CLIENT_ID"] = spotify_id
+        if spotify_secret: os.environ["SPOTIFY_CLIENT_SECRET"] = spotify_secret
+        if spotify_device: os.environ["SPOTIFY_DEVICE_NAME"] = spotify_device
         if mic_index: os.environ["MICROPHONE_INDEX"] = mic_index
         os.environ["SAKURA_ENABLE_VOICE"] = "true"
         
@@ -573,6 +576,38 @@ async def get_history():
         print(f"⚠️ History load failed: {e}")
         return {"messages": [], "error": str(e)}
 
+
+@app.post("/clear")
+async def clear_all():
+    """
+    Clear all chat history, World Graph, and episodic memory.
+    Used by UI "Clear Chat" button.
+    """
+    global assistant
+    
+    if not assistant:
+        return {"success": False, "error": "Assistant not initialized"}
+    
+    try:
+        # 1. Clear conversation memory
+        if hasattr(assistant, 'memory') and assistant.memory:
+            assistant.memory.clear()
+            print("🗑️ Conversation memory cleared")
+        
+        # 2. Reset World Graph
+        if hasattr(assistant, 'world_graph'):
+            assistant.world_graph.reset()
+            assistant.world_graph.save()
+            print("🗑️ World Graph reset")
+        
+        # 3. Note: Ephemeral RAG documents are session-based and will be 
+        #    cleared automatically on restart. No explicit clear needed.
+        
+        return {"success": True, "message": "All memory cleared"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
 
 @app.post("/shutdown")
 async def shutdown():

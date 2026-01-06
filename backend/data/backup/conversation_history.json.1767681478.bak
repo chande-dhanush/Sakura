@@ -1,38 +1,6 @@
 [
   {
     "role": "user",
-    "content": "What can you do?"
-  },
-  {
-    "role": "assistant",
-    "content": "I can help with:\n\n- Email: read and send messages  \n- Calendar: view events, create appointments  \n- Music: play, pause, skip, adjust volume via Spotify  \n- Search: web, Wikipedia, news, scientific papers  \n- Notes: create, read, append, open smart notes  \n- Files: read/write/open local files  \n- System: view battery/CPU, take screenshots, open apps, check weather, timers, currency, math, dictionary, location."
-  },
-  {
-    "role": "user",
-    "content": "awesome, what's 6*100/10*20+21"
-  },
-  {
-    "role": "assistant",
-    "content": "1221"
-  },
-  {
-    "role": "user",
-    "content": "perfect, what's today's news?"
-  },
-  {
-    "role": "assistant",
-    "content": "Here’s what made headlines today:\n\n1. Google News  \n2. Capricorn Daily Horoscope Today, January 4, 2026 – Times of India  \n3. Horoscope Today: January 4, 2026 – Vogue India  \n4. Tarot Horoscope Today – Hindustan Times  \n5. Traffic curbs in place for Chithra Santhe in Bengaluru – Deccan Herald"
-  },
-  {
-    "role": "user",
-    "content": "hi, how are you today?"
-  },
-  {
-    "role": "assistant",
-    "content": "I encountered an error: 'WorldGraph' object has no attribute 'get_current_mood'"
-  },
-  {
-    "role": "user",
     "content": "hey, how are you today?"
   },
   {
@@ -198,5 +166,53 @@
   {
     "role": "assistant",
     "content": "I’m not seeing any earlier topic in the chat. Could you remind me what you were discussing before the “Brothers in Arms” request?"
+  },
+  {
+    "role": "user",
+    "content": "awesome can u play brothers in arms on youtube"
+  },
+  {
+    "role": "assistant",
+    "content": "Now playing “Brothers in Arms” on YouTube."
+  },
+  {
+    "role": "user",
+    "content": "play singles anthem on spotify"
+  },
+  {
+    "role": "assistant",
+    "content": "Playing now."
+  },
+  {
+    "role": "user",
+    "content": "who am i? :P"
+  },
+  {
+    "role": "assistant",
+    "content": "You’re Dhanush, 22, from Bangalore—AI/ML engineer, experimental agent builder, full‑stack web dev, anime fan, and a short‑bike traveler. You like practical, direct answers, enjoy a bit of teasing, and want an assistant that’s sharp, sarcastic, and quietly supportive."
+  },
+  {
+    "role": "user",
+    "content": "what do i like doing the most?"
+  },
+  {
+    "role": "assistant",
+    "content": "You’re happiest when you’re hacking an AI prototype or automating a workflow—then you unwind with a quick bike trip or a binge‑watch of anime."
+  },
+  {
+    "role": "user",
+    "content": "Play some music"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'user:self'"
+  },
+  {
+    "role": "user",
+    "content": "Play some music on spotify"
+  },
+  {
+    "role": "assistant",
+    "content": "I encountered an error: 'user:self'"
   }
 ]

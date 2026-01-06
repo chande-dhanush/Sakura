@@ -7,6 +7,7 @@
     let openRouterKey = "";
     let spotifyClientId = "";
     let spotifyClientSecret = "";
+    let spotifyDeviceName = ""; // Optional specific device
     let micIndex = "";  // Optional override
     
     let showAdvanced = false;
@@ -37,8 +38,9 @@
                     GROQ_API_KEY: groqKey.trim(),
                     TAVILY_API_KEY: tavilyKey.trim(),
                     OPENROUTER_API_KEY: openRouterKey.trim(),
-                    SPOTIPY_CLIENT_ID: spotifyClientId.trim(),
-                    SPOTIPY_CLIENT_SECRET: spotifyClientSecret.trim(),
+                    SPOTIFY_CLIENT_ID: spotifyClientId.trim(),
+                    SPOTIFY_CLIENT_SECRET: spotifyClientSecret.trim(),
+                    SPOTIFY_DEVICE_NAME: spotifyDeviceName.trim(),
                     MICROPHONE_INDEX: micIndex.trim()
                 })
             });
@@ -135,6 +137,10 @@
                         <input id="spotify-secret" type="password" bind:value={spotifyClientSecret} placeholder="Client Secret" />
                     </div>
                     <div class="form-group">
+                        <label for="spotify-device">Spotify Device Name (Optional)</label>
+                        <input id="spotify-device" type="text" bind:value={spotifyDeviceName} placeholder="e.g. DESKTOP-PC or 'My Phone' (Leave empty for auto)" />
+                    </div>
+                    <div class="form-group">
                         <label for="mic-index">Microphone Index (Optional)</label>
                         <input id="mic-index" type="number" bind:value={micIndex} placeholder="Default: 1" />
                         <small>Change only if voice detection fails.</small>
@@ -198,9 +204,11 @@
         border-radius: 24px;
         width: 100%;
         max-width: 480px;
-        max-height: 90vh;
+        max-height: 85vh;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
     }
     
     /* ===== HEADER ===== */
@@ -248,7 +256,9 @@
     
     /* ===== SCROLL CONTAINER ===== */
     .scroll-container {
-        max-height: 50vh;
+        flex: 1;
+        min-height: 0;
+        max-height: 40vh;
         overflow-y: auto;
         padding-right: 8px;
         margin-bottom: 20px;

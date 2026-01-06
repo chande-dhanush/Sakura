@@ -15,7 +15,7 @@ from .tools_libs.google import (
     tasks_list, tasks_create
 )
 from .tools_libs.web import (
-    play_youtube, get_weather, open_site, list_bookmarks, save_bookmark,
+    play_youtube, get_weather,
     web_search, search_wikipedia, search_arxiv, get_news, web_scrape
 )
 from .tools_libs.system import (
@@ -180,7 +180,6 @@ def get_all_tools():
         
         # Web & Media
         spotify_control, play_youtube, get_weather,
-        open_site, list_bookmarks, save_bookmark,
         web_search, search_wikipedia, search_arxiv, get_news, web_scrape,
         
         # Google

@@ -38,6 +38,9 @@
 | **Tauri UI** | ✅ | V10: Native desktop app with Svelte frontend |
 | **SSE Streaming** | ✅ | V10: Real-time token streaming via FastAPI |
 | **Window Modes** | ✅ | V10: Hidden/Input/Full with hotkeys |
+| **File Upload** | ✅ | V10.1: Attach files for RAG ingestion |
+| **Terminal Action Guard** | ✅ | V10.1: Prevents duplicate tool calls (music, open, etc.) |
+| **Auto Window Show** | ✅ | V10.1: Main window auto-shows after backend ready |
 
 ---
 

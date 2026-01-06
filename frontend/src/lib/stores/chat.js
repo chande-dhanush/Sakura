@@ -243,7 +243,26 @@ export function deleteMessage(id) {
 /**
  * Clear all chat history
  */
-export function clearChat() {
+export async function clearChat() {
+    try {
+        // Call backend to clear all memory
+        const response = await fetch(`${BACKEND_URL}/clear`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                console.log('[Chat] Backend memory cleared:', data.message);
+            } else {
+                console.warn('[Chat] Backend clear failed:', data.error);
+            }
+        }
+    } catch (e) {
+        console.warn('[Chat] Clear API failed:', e.message);
+    }
+
+    // Clear frontend store
     messages.set([]);
     connectionError.set(null);
 }

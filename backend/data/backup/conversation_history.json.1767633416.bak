@@ -182,5 +182,53 @@
   {
     "role": "assistant",
     "content": "I encountered an error: 'ExecutionResult' object has no attribute 'output'"
+  },
+  {
+    "role": "user",
+    "content": "what was i talking about earlier?"
+  },
+  {
+    "role": "assistant",
+    "content": "You were asking me to play “Brothers in Arms” on YouTube."
+  },
+  {
+    "role": "user",
+    "content": "before that?"
+  },
+  {
+    "role": "assistant",
+    "content": "I’m not seeing any earlier topic in the chat. Could you remind me what you were discussing before the “Brothers in Arms” request?"
+  },
+  {
+    "role": "user",
+    "content": "awesome can u play brothers in arms on youtube"
+  },
+  {
+    "role": "assistant",
+    "content": "Now playing “Brothers in Arms” on YouTube."
+  },
+  {
+    "role": "user",
+    "content": "play singles anthem on spotify"
+  },
+  {
+    "role": "assistant",
+    "content": "Playing now."
+  },
+  {
+    "role": "user",
+    "content": "who am i? :P"
+  },
+  {
+    "role": "assistant",
+    "content": "You’re Dhanush, 22, from Bangalore—AI/ML engineer, experimental agent builder, full‑stack web dev, anime fan, and a short‑bike traveler. You like practical, direct answers, enjoy a bit of teasing, and want an assistant that’s sharp, sarcastic, and quietly supportive."
+  },
+  {
+    "role": "user",
+    "content": "what do i like doing the most?"
+  },
+  {
+    "role": "assistant",
+    "content": "You’re happiest when you’re hacking an AI prototype or automating a workflow—then you unwind with a quick bike trip or a binge‑watch of anime."
   }
 ]

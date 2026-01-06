@@ -87,10 +87,12 @@ class Planner:
             # Music
             "play": "music", "music": "music", "spotify": "music", "song": "music",
             "pause": "music", "skip": "music", "volume": "music", "youtube": "music",
-            # Search (including ephemeral RAG)
+            # Search (including ephemeral RAG and document queries)
             "search": "search", "google": "search", "find": "search", "look up": "search",
             "news": "search", "wikipedia": "search", "arxiv": "search", "scrape": "search",
             "document": "search", "refer": "search", "content": "search", "context": "search",
+            "attached": "search", "uploaded": "search", "ingested": "search", "docs": "search",
+            "pdf": "search", "file i": "search", "from the": "search",
             # Email
             "email": "email", "gmail": "email", "mail": "email", "inbox": "email",
             # Calendar
@@ -274,14 +276,42 @@ class Planner:
             
             # PARSE NATIVE TOOL CALLS
             if response.tool_calls:
+                # V10: Deduplicate and limit terminal actions
+                TERMINAL_TOOLS = {
+                    "play_youtube", "spotify_control", "open_app",
+                    "file_open", "gmail_send_email", "calendar_create_event",
+                    "tasks_create", "note_create", "set_timer", "set_reminder"
+                }
+                
                 plan = []
+                seen_terminal = set()  # Track terminal tools already added
+                
                 for i, call in enumerate(response.tool_calls):
+                    tool_name = call["name"]
+                    
+                    # Skip duplicate terminal actions
+                    if tool_name in TERMINAL_TOOLS:
+                        if tool_name in seen_terminal:
+                            print(f"⚠️ Planner: Skipping duplicate terminal action: {tool_name}")
+                            continue
+                        seen_terminal.add(tool_name)
+                    
                     plan.append({
-                        "id": i + 1,
-                        "tool": call["name"],
+                        "id": len(plan) + 1,
+                        "tool": tool_name,
                         "args": call["args"],
                         "tool_call_id": call["id"]
                     })
+                    
+                    # V10: Stop after first terminal action (one action = one tab)
+                    if tool_name in TERMINAL_TOOLS:
+                        print(f"🛑 Planner: Stopping plan after terminal action: {tool_name}")
+                        break
+                
+                # Safety cap
+                if len(plan) > 3:
+                    print(f"⚠️ Planner: Capping plan from {len(plan)} to 3 steps")
+                    plan = plan[:3]
                 
                 # Log usage
                 _log_planner_usage(est_tokens, len(plan), is_retry=bool(hindsight))
@@ -292,5 +322,9 @@ class Planner:
                 return {"plan": [], "message": response}
 
         except Exception as e:
-            print(f"❌ Planner Error: {e}")
-            return {"plan": []}
+            import traceback
+            print(f"❌ PLANNER ERROR ❌")
+            print(f"   Message: {e}")
+            print(f"   Traceback:")
+            traceback.print_exc()
+            return {"plan": [], "error": str(e)}

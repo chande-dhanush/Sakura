@@ -64,6 +64,12 @@ class ToolExecutor:
             result = self.tool_map[tool_name].invoke(args)
             return str(result), True
         except Exception as e:
+            import traceback
+            print(f"❌ TOOL EXECUTION ERROR ❌")
+            print(f"   Tool: {tool_name}")
+            print(f"   Args: {args}")
+            print(f"   Error: {e}")
+            traceback.print_exc()
             return f"Error: {e}", False
 
     def execute(self, user_input: str, route_result: Any, graph_context: str, state: Any = None) -> ExecutionResult:
@@ -108,8 +114,16 @@ class ToolExecutor:
             
             final_tool_used = exec_res.tool_used
             
-            # Logic to stop if "final answer" tools are used or if explicitly done?
-            # Planner logic handles this (returns empty plan if satisfied)
+            # 4. CHECK FOR TERMINAL ACTIONS (Stop loop after completion)
+            # These tools complete the user's request - no need for more iterations
+            TERMINAL_ACTIONS = {
+                "play_youtube", "spotify_control", "open_app",
+                "file_open", "gmail_send_email", "calendar_create_event",
+                "tasks_create", "note_create", "set_timer", "set_reminder"
+            }
+            if final_tool_used in TERMINAL_ACTIONS and exec_res.success:
+                print(f"⏹️ [Executor] Terminal action '{final_tool_used}' completed - stopping loop.")
+                break
             
         return ExecutionResult(
             outputs="\n".join(all_outputs),
@@ -139,6 +153,14 @@ class ToolExecutor:
         tool_used = "None"
         last_result = None
         all_success = True
+        
+        # V10: Terminal actions that complete a request - stop after first one
+        TERMINAL_ACTIONS = {
+            "play_youtube", "spotify_control", "open_app", "open_site",
+            "file_open", "gmail_send_email", "calendar_create_event",
+            "tasks_create", "note_create", "set_timer", "set_reminder"
+        }
+        terminal_executed = False
         
         # Cap iterations
         steps = steps[:max_iterations]
@@ -195,6 +217,11 @@ class ToolExecutor:
                 
                 if state:
                     state.record_tool_result(success=True)
+                
+                # V10: Stop after terminal actions (prevent multiple YouTube tabs)
+                if tool_name in TERMINAL_ACTIONS:
+                    print(f"⏹️ [Executor] Terminal action '{tool_name}' completed - stopping plan execution.")
+                    break
                     
             except Exception as e:
                 err_msg = f"Error: {e}"
