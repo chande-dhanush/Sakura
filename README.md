@@ -66,8 +66,8 @@ You can make Sakura your own! To change the user profile (Name, Role, Interests)
 ### Manual Setup (All Platforms)
 ```bash
 # 1. Clone repo
-git clone https://github.com/your-username/sakura-v10.git
-cd sakura-v10
+git clone https://github.com/chande-dhanush/sakura_v_9.1.git
+cd sakura_v_9.1
 
 # 2. Create Python venv
 python -m venv PA
