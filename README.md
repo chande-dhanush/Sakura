@@ -38,7 +38,7 @@
 ```powershell
 # 1. Clone and enter directory
 git clone https://github.com/chande-dhanush/Sakura_V_9.1.git
-cd sakura-v10
+cd Sakura_V_9.1
 
 # 2. Run automated setup (as Administrator)
 .\setup.ps1
