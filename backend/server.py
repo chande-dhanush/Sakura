@@ -589,7 +589,7 @@ async def clear_all():
         return {"success": False, "error": "Assistant not initialized"}
     
     try:
-        # 1. Clear conversation memory
+        # 1. Clear conversation memory (in-memory)
         if hasattr(assistant, 'memory') and assistant.memory:
             assistant.memory.clear()
             print("🗑️ Conversation memory cleared")
@@ -600,8 +600,21 @@ async def clear_all():
             assistant.world_graph.save()
             print("🗑️ World Graph reset")
         
-        # 3. Note: Ephemeral RAG documents are session-based and will be 
-        #    cleared automatically on restart. No explicit clear needed.
+        # 3. Clear FAISS store's in-memory conversation history
+        try:
+            from sakura_assistant.memory.faiss_store import get_memory_store
+            store = get_memory_store()
+            store.conversation_history.clear()
+            print("🗑️ FAISS conversation history cleared (in-memory)")
+        except Exception as e:
+            print(f"⚠️ FAISS clear failed: {e}")
+        
+        # 4. Delete conversation_history.json file
+        import os
+        history_path = os.path.join(os.path.dirname(__file__), "data", "conversation_history.json")
+        if os.path.exists(history_path):
+            os.remove(history_path)
+            print(f"🗑️ Deleted {history_path}")
         
         return {"success": True, "message": "All memory cleared"}
     except Exception as e:

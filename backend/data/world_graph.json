@@ -1,7 +1,29 @@
 {
   "version": "v7",
-  "current_turn": 0,
-  "current_session": "bd279cec-848c-44ad-af29-28a7112f9d81",
-  "entities": {},
+  "current_turn": 7,
+  "current_session": "4704bc76-e59e-4c28-9d1a-195eee06a35c",
+  "entities": {
+    "user:self": {
+      "id": "user:self",
+      "type": "user",
+      "name": "User",
+      "attributes": {
+        "role": "user",
+        "created_after_reset": true
+      },
+      "lifecycle": "promoted",
+      "source": "user_stated",
+      "mutable_by": [
+        "user_stated",
+        "user_confirmed"
+      ],
+      "created_at": "2026-01-06T12:39:42.568803",
+      "last_referenced": "2026-01-06T12:39:42.568803",
+      "reference_count": 0,
+      "confidence": 0.5,
+      "not_claims": [],
+      "summary": ""
+    }
+  },
   "actions": []
 }

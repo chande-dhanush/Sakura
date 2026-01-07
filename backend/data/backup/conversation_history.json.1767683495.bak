@@ -38,21 +38,5 @@
   {
     "role": "assistant",
     "content": "I need to use a tool for that. Let me help you differently—how about I set up a daily AI digest or a news‑feed alert for you? Just say the word."
-  },
-  {
-    "role": "user",
-    "content": "can you tell me the difference between multi agent and single agent architectures"
-  },
-  {
-    "role": "assistant",
-    "content": "Single‑agent systems keep all logic in one brain—fast, simple, but they get stuck when tasks grow complex or need specialization.  \nMulti‑agent setups split the job into little specialists that talk to each other—more flexible and scalable, but you pay the price of coordination overhead and a bit more latency.  \nSo, pick one when you’re shipping a quick prototype, and go multi‑agent when the problem really needs teamwork."
-  },
-  {
-    "role": "user",
-    "content": "what's the most recommended library to implement agent architectures on langchain?"
-  },
-  {
-    "role": "assistant",
-    "content": "LangChain’s own AgentExecutor is fine for a single‑brain bot, but if you want true multi‑agent flow, LangGraph is the go‑to.  \nCrewAI and AutoGen are solid alternatives, but LangGraph gives the cleanest orchestration for complex, specialist agents."
   }
 ]

@@ -1,6 +1,6 @@
 <!-- 
     VoiceSetup.svelte - Wake Word Template Recording Component
-    Records 3 samples of user saying "Sakura" using the BACKEND microphone (PyAudio)
+    Records 5 samples of user saying "Sakura" using the BACKEND microphone (PyAudio)
 -->
 <script>
     import { createEventDispatcher } from 'svelte';
@@ -83,16 +83,16 @@
                 </button>
             </div>
             
-        {:else if step <= 3}
+        {:else if step <= 5}
             <!-- RECORDING STEPS -->
             <div class="step-content">
                 <div class="progress-dots">
-                    {#each [1, 2, 3] as i}
+                    {#each [1, 2, 3, 4, 5] as i}
                         <div class="dot" class:active={step === i} class:done={step > i}></div>
                     {/each}
                 </div>
                 
-                <h2>Recording {step} of 3</h2>
+                <h2>Recording {step} of 5</h2>
                 <p>Say <strong>"Sakura"</strong> clearly when recording starts</p>
                 
                 {#if countdown > 0}

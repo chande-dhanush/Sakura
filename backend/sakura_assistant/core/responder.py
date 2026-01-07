@@ -140,7 +140,16 @@ STUDY MODE ACTIVE:
         # Current mood and tool outputs
         system_parts.append(f"CURRENT MOOD: {context.current_mood}")
         if context.tool_outputs:
-            system_parts.append(context.tool_outputs)
+            system_parts.append(f"""
+╔══════════════════════════════════════════════════════════════════╗
+║  ⚡ TOOL ALREADY EXECUTED - RESULTS BELOW - YOU MUST USE THESE  ║
+╚══════════════════════════════════════════════════════════════════╝
+{context.tool_outputs}
+╔══════════════════════════════════════════════════════════════════╗
+║  END OF TOOL RESULTS - Respond using this data, don't say       ║
+║  "I need a tool" - the tool already ran successfully!           ║
+╚══════════════════════════════════════════════════════════════════╝
+""")
         system_parts.append("Task: Respond naturally based on context.")
         
         messages.append(SystemMessage(content="\n".join(system_parts)))

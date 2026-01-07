@@ -418,7 +418,20 @@ class WorldGraph:
         Return the user identity node.
         
         INVARIANT: This ALWAYS returns a valid node. Never None.
+        Creates the identity if it doesn't exist (e.g., after a reset).
         """
+        if "user:self" not in self.entities:
+            # Auto-create identity node if missing
+            self.entities["user:self"] = EntityNode(
+                id="user:self",
+                name="User",
+                type=EntityType.USER,
+                attributes={"role": "user", "created_after_reset": True},
+                lifecycle=EntityLifecycle.PROMOTED,
+                source=EntitySource.USER_STATED,
+                created_at=datetime.now()
+            )
+            print("🔄 [WorldGraph] Created fresh user:self identity")
         return self.entities["user:self"]
     
     def is_user_reference(self, text: str) -> Tuple[bool, float]:
