@@ -1,17 +1,25 @@
 <script>
     import { fade, fly } from 'svelte/transition';
+    import { onMount } from 'svelte';
     import { backendStatus } from '$lib/stores/chat.js';
     
     let groqKey = "";
     let tavilyKey = "";
+    let googleKey = "";  // V10.2: Google API Key for Gemini backup
     let openRouterKey = "";
     let spotifyClientId = "";
     let spotifyClientSecret = "";
     let spotifyDeviceName = ""; // Optional specific device
     let micIndex = "";  // Optional override
     
+    // V10.2: User Personalization
+    let userName = "";
+    let userLocation = "";
+    let userBio = "";
+    
     let showAdvanced = false;
     let isSubmitting = false;
+    let isLoading = false;
     let error = "";
     let success = "";
     
@@ -20,6 +28,31 @@
     
     // BACKEND_URL from environment or default
     const BACKEND_URL = "http://localhost:8000"; // Should match chat.js
+    
+    // V10.2: Load existing settings when panel opens (UX fix)
+    onMount(async () => {
+        if (isUpdateMode) {
+            isLoading = true;
+            try {
+                const res = await fetch(`${BACKEND_URL}/settings`);
+                if (res.ok) {
+                    const data = await res.json();
+                    // Pre-populate user personalization (not masked)
+                    userName = data.USER_NAME || "";
+                    userLocation = data.USER_LOCATION || "";
+                    userBio = data.USER_BIO || "";
+                    // Show masked keys as placeholders (user can clear and re-enter)
+                    if (data.has_groq) groqKey = data.GROQ_API_KEY;
+                    if (data.has_google) googleKey = data.GOOGLE_API_KEY;
+                    console.log("[Settings] Loaded existing values");
+                }
+            } catch (e) {
+                console.error("[Settings] Failed to load existing:", e);
+            } finally {
+                isLoading = false;
+            }
+        }
+    });
 
     async function handleSubmit() {
         if (!groqKey.trim()) {
@@ -37,11 +70,16 @@
                 body: JSON.stringify({
                     GROQ_API_KEY: groqKey.trim(),
                     TAVILY_API_KEY: tavilyKey.trim(),
+                    GOOGLE_API_KEY: googleKey.trim(),
                     OPENROUTER_API_KEY: openRouterKey.trim(),
                     SPOTIFY_CLIENT_ID: spotifyClientId.trim(),
                     SPOTIFY_CLIENT_SECRET: spotifyClientSecret.trim(),
                     SPOTIFY_DEVICE_NAME: spotifyDeviceName.trim(),
-                    MICROPHONE_INDEX: micIndex.trim()
+                    MICROPHONE_INDEX: micIndex.trim(),
+                    // User personalization (stored in settings.json, not .env)
+                    USER_NAME: userName.trim(),
+                    USER_LOCATION: userLocation.trim(),
+                    USER_BIO: userBio.trim()
                 })
             });
             
@@ -119,6 +157,35 @@
                     bind:value={openRouterKey} 
                     placeholder="sk-or-..." 
                 />
+            </div>
+
+            <div class="form-group">
+                <label for="google">
+                    Google API Key <span class="optional">(Recommended)</span>
+                </label>
+                <input 
+                    id="google" 
+                    type="password" 
+                    bind:value={googleKey} 
+                    placeholder="AIza..." 
+                />
+                <small>Enables Gemini 2.0 Flash backup. Get at <a href="https://aistudio.google.com/" target="_blank">aistudio.google.com</a></small>
+            </div>
+
+            <!-- User Personalization (V10.2) -->
+            <div class="section-title">👤 User Profile (Optional)</div>
+            
+            <div class="form-group">
+                <label for="user-name">Your Name</label>
+                <input id="user-name" type="text" bind:value={userName} placeholder="e.g. Alex" />
+            </div>
+            <div class="form-group">
+                <label for="user-location">Location</label>
+                <input id="user-location" type="text" bind:value={userLocation} placeholder="e.g. Bangalore, India" />
+            </div>
+            <div class="form-group">
+                <label for="user-bio">Short Bio</label>
+                <input id="user-bio" type="text" bind:value={userBio} placeholder="e.g. AI engineer who loves anime" />
             </div>
 
             <!-- Advanced Toggle -->
@@ -311,6 +378,15 @@
     
     small a { color: #ffb6c1; text-decoration: none; }
     small a:hover { text-decoration: underline; }
+    
+    .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 20px 0 10px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
     
     /* ===== TOGGLE ADVANCED ===== */
     .toggle-advanced {

@@ -1,5 +1,6 @@
 <!-- Sakura V10 Omnibox Component -->
 <script>
+    import { onDestroy } from 'svelte';
     import { sendMessage, isStreaming, stopGeneration, moodColors } from '$lib/stores/chat.js';
     
     export let isQuickSearch = false;
@@ -11,14 +12,35 @@
     let isUploading = false;
     let uploadError = '';
     
+    // Rate limiting (10s cooldown)
+    let cooldownRemaining = 0;
+    let cooldownInterval = null;
+    const COOLDOWN_SECONDS = 10;
+    
     const BACKEND_URL = "http://localhost:8000";
     
+    function startCooldown() {
+        cooldownRemaining = COOLDOWN_SECONDS;
+        cooldownInterval = setInterval(() => {
+            cooldownRemaining--;
+            if (cooldownRemaining <= 0) {
+                clearInterval(cooldownInterval);
+                cooldownInterval = null;
+            }
+        }, 1000);
+    }
+    
+    onDestroy(() => {
+        if (cooldownInterval) clearInterval(cooldownInterval);
+    });
+    
     async function handleSubmit() {
-        if (!query.trim() || $isStreaming) return;
+        if (!query.trim() || $isStreaming || cooldownRemaining > 0) return;
         const q = query;
         query = '';
         attachedFile = null;
         if (textarea) textarea.style.height = 'auto';
+        startCooldown();
         await sendMessage(q, { tts_enabled: isQuickSearch });
     }
     
@@ -160,6 +182,10 @@
             {#if $isStreaming}
                 <button type="button" class="stop-btn" on:click={stopGeneration} title="Stop">
                     ⏹
+                </button>
+            {:else if cooldownRemaining > 0}
+                <button type="button" class="send-btn cooldown" disabled title="Wait {cooldownRemaining}s">
+                    <span class="cooldown-timer">{cooldownRemaining}</span>
                 </button>
             {:else}
                 <button type="submit" class="send-btn" disabled={!query.trim()} title="Send">
@@ -353,6 +379,16 @@
     .send-btn:disabled {
         opacity: 0.3;
         cursor: not-allowed;
+    }
+    
+    .send-btn.cooldown {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .cooldown-timer {
+        font-size: 12px;
+        font-weight: 600;
     }
     
     .stop-btn {
