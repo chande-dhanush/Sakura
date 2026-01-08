@@ -152,47 +152,85 @@ async def save_setup(request: Request):
     try:
         data = await request.json()
         
-        # 1. Validate keys
+        # 1. Validate keys (Groq required only for first-time setup)
         groq_key = data.get("GROQ_API_KEY", "").strip()
-        tavily_key = data.get("TAVILY_API_KEY", "").strip()
         
-        if not groq_key:
-            return JSONResponse({"success": False, "message": "Groq API Key is required"}, status_code=400)
-            
-        # 2. Write to .env in persistent storage
+        # 2. Load existing .env to MERGE (not overwrite)
         from sakura_assistant.utils.pathing import get_project_root
-        
         env_path = os.path.join(get_project_root(), ".env")
         
-        # Optional fields
-        openrouter_key = data.get("OPENROUTER_API_KEY", "").strip()
-        spotify_id = data.get("SPOTIFY_CLIENT_ID", "").strip()
-        spotify_secret = data.get("SPOTIFY_CLIENT_SECRET", "").strip()
-        spotify_device = data.get("SPOTIFY_DEVICE_NAME", "").strip()
-        mic_index = data.get("MICROPHONE_INDEX", "").strip()
-
-        env_content = f"""# Sakura V10 User Configuration
-GROQ_API_KEY={groq_key}
-TAVILY_API_KEY={tavily_key}
-OPENROUTER_API_KEY={openrouter_key}
-SPOTIFY_CLIENT_ID={spotify_id}
-SPOTIFY_CLIENT_SECRET={spotify_secret}
-SPOTIFY_DEVICE_NAME={spotify_device}
-MICROPHONE_INDEX={mic_index}
-SAKURA_ENABLE_VOICE=true
-"""
+        existing_env = {}
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        key, _, val = line.partition("=")
+                        existing_env[key.strip()] = val.strip()
+        
+        # 3. Merge new values with existing (only update if provided)
+        def merge_key(key, new_val):
+            """Only update if new value is provided, otherwise keep existing."""
+            if new_val:
+                return new_val
+            return existing_env.get(key, "")
+        
+        merged = {
+            "GROQ_API_KEY": merge_key("GROQ_API_KEY", groq_key),
+            "TAVILY_API_KEY": merge_key("TAVILY_API_KEY", data.get("TAVILY_API_KEY", "").strip()),
+            "OPENROUTER_API_KEY": merge_key("OPENROUTER_API_KEY", data.get("OPENROUTER_API_KEY", "").strip()),
+            "GOOGLE_API_KEY": merge_key("GOOGLE_API_KEY", data.get("GOOGLE_API_KEY", "").strip()),
+            "SPOTIFY_CLIENT_ID": merge_key("SPOTIFY_CLIENT_ID", data.get("SPOTIFY_CLIENT_ID", "").strip()),
+            "SPOTIFY_CLIENT_SECRET": merge_key("SPOTIFY_CLIENT_SECRET", data.get("SPOTIFY_CLIENT_SECRET", "").strip()),
+            "SPOTIFY_DEVICE_NAME": merge_key("SPOTIFY_DEVICE_NAME", data.get("SPOTIFY_DEVICE_NAME", "").strip()),
+            "MICROPHONE_INDEX": merge_key("MICROPHONE_INDEX", data.get("MICROPHONE_INDEX", "").strip()),
+            "SAKURA_ENABLE_VOICE": "true",
+        }
+        
+        # Validate: Groq key must exist (either new or existing)
+        if not merged["GROQ_API_KEY"]:
+            return JSONResponse({"success": False, "message": "Groq API Key is required"}, status_code=400)
+        
+        # 4. Write merged .env
+        env_lines = ["# Sakura V10 User Configuration"]
+        for key, val in merged.items():
+            if val:  # Only write non-empty values
+                env_lines.append(f"{key}={val}")
+        
         with open(env_path, "w", encoding="utf-8") as f:
-            f.write(env_content)
+            f.write("\n".join(env_lines) + "\n")
+        
+        # 5. Save User Personalization to separate JSON (not in .env)
+        user_settings = {
+            "user_name": data.get("USER_NAME", "").strip(),
+            "user_location": data.get("USER_LOCATION", "").strip(),
+            "user_bio": data.get("USER_BIO", "").strip(),
+        }
+        
+        # Merge with existing user_settings.json
+        settings_path = os.path.join(get_project_root(), "data", "user_settings.json")
+        os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+        
+        existing_settings = {}
+        if os.path.exists(settings_path):
+            try:
+                with open(settings_path, "r", encoding="utf-8") as f:
+                    existing_settings = json.load(f)
+            except:
+                pass
+        
+        # Only update if new value provided
+        for key, val in user_settings.items():
+            if val:
+                existing_settings[key] = val
+        
+        with open(settings_path, "w", encoding="utf-8") as f:
+            json.dump(existing_settings, f, indent=2)
             
-        # 3. Reload Env (Update os.environ for current process)
-        os.environ["GROQ_API_KEY"] = groq_key
-        if tavily_key: os.environ["TAVILY_API_KEY"] = tavily_key
-        if openrouter_key: os.environ["OPENROUTER_API_KEY"] = openrouter_key
-        if spotify_id: os.environ["SPOTIFY_CLIENT_ID"] = spotify_id
-        if spotify_secret: os.environ["SPOTIFY_CLIENT_SECRET"] = spotify_secret
-        if spotify_device: os.environ["SPOTIFY_DEVICE_NAME"] = spotify_device
-        if mic_index: os.environ["MICROPHONE_INDEX"] = mic_index
-        os.environ["SAKURA_ENABLE_VOICE"] = "true"
+        # 6. Reload Env (Update os.environ from merged values)
+        for key, val in merged.items():
+            if val:
+                os.environ[key] = val
         
         # 4. RESET CONTAINER & Re-init Assistant
         # Critical: Container caches LLM config at init. Must reset to pick up env vars.
@@ -222,6 +260,45 @@ SAKURA_ENABLE_VOICE=true
             
     except Exception as e:
         return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
+
+@app.get("/settings")
+async def get_settings():
+    """Return current settings for frontend pre-population (V10.2 UX fix)."""
+    from sakura_assistant.utils.pathing import get_project_root
+    
+    # Load .env values (masked for security)
+    def mask_key(key: str) -> str:
+        val = os.getenv(key, "")
+        if val and len(val) > 8:
+            return val[:4] + "..." + val[-4:]
+        return "***" if val else ""
+    
+    # Load user settings
+    settings_path = os.path.join(get_project_root(), "data", "user_settings.json")
+    user_settings = {}
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, 'r', encoding='utf-8') as f:
+                user_settings = json.load(f)
+        except:
+            pass
+    
+    return {
+        # API Keys (masked)
+        "GROQ_API_KEY": mask_key("GROQ_API_KEY"),
+        "TAVILY_API_KEY": mask_key("TAVILY_API_KEY"),
+        "GOOGLE_API_KEY": mask_key("GOOGLE_API_KEY"),
+        "OPENROUTER_API_KEY": mask_key("OPENROUTER_API_KEY"),
+        "SPOTIFY_CLIENT_ID": mask_key("SPOTIFY_CLIENT_ID"),
+        # User personalization (not masked)
+        "USER_NAME": user_settings.get("user_name", ""),
+        "USER_LOCATION": user_settings.get("user_location", ""),
+        "USER_BIO": user_settings.get("user_bio", ""),
+        # Flags
+        "has_groq": bool(os.getenv("GROQ_API_KEY")),
+        "has_google": bool(os.getenv("GOOGLE_API_KEY")),
+    }
 
 
 @app.get("/health")

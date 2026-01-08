@@ -8,7 +8,7 @@ from .utils.pathing import normalize_path, get_project_root
 # Check persistent data directory first (for installed app)
 _env_path = os.path.join(get_project_root(), ".env")
 if os.path.exists(_env_path):
-    print(f"📖 Loading .env from: {_env_path}")
+    print(f"[ENV] Loading .env from: {_env_path}")
     load_dotenv(_env_path, override=True)
 else:
     # Fallback to default (dev mode / current dir)
@@ -123,33 +123,41 @@ RAG_CONTEXT_MAX_CHARS = 500         # Reduced from 2000 for token savings
 EXECUTOR_MAX_ITERATIONS = 5          # Hard cap on tool execution steps
 ENABLE_PLANNER_CACHE = True          # Cache idempotent planner outputs
 
-USER_DETAILS = """
+# --- User Settings Loading (V10.2) ---
+USER_SETTINGS_FILE = os.path.join(get_project_root(), "data", "user_settings.json")
+_USER_SETTINGS = {}
+
+if os.path.exists(USER_SETTINGS_FILE):
+    try:
+        with open(USER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            _USER_SETTINGS = json.load(f)
+    except Exception as e:
+        print(f"⚠️ Error loading user_settings.json: {e}")
+
+def _build_user_details() -> str:
+    """Build USER_DETAILS dynamically from settings or use defaults."""
+    name = _USER_SETTINGS.get("user_name", "User")
+    location = _USER_SETTINGS.get("user_location", "")
+    bio = _USER_SETTINGS.get("user_bio", "")
+    
+    details = f"""
 === USER IDENTITY (this is YOUR user, not someone else) ===
-Name: Dhanush
-Age: 22
-Birthday: 29 October
-Location: Bangalore, India
-
-Profession: AI / ML engineer and experimental agent builder
-Work Style: ships scrappy prototypes fast, then aggressively refactors architecture
-
-Core Interests:
-- Artificial Intelligence and Machine Learning
-- Full‑stack web dev and workflow automation
-- Anime and Japanese media
-- Travelling and short bike / cycling trips
-
-Personality & Preferences:
-- Prefers practical, direct replies over vague theory
-- Actively enjoys light roasting and a playful tone
-- Comfortable with technical depth (code, systems, infra)
-- Likes assistants that feel like a sharp, sarcastic sidekick
-
+Name: {name}
+"""
+    if location:
+        details += f"Location: {location}\n"
+    if bio:
+        details += f"About: {bio}\n"
+    
+    details += """
 CRITICAL BEHAVIOR:
-- If the user asks "who am I" or "what do you know about me", answer ONLY using this block and the assistant’s own long‑term memory.
+- If the user asks "who am I" or "what do you know about me", answer ONLY using this block and the assistant's own long-term memory.
 - NEVER use web search results about celebrities or public figures.
 - NEVER claim the user is an actor or any external person from the internet.
 """
+    return details.strip()
+
+USER_DETAILS = _build_user_details()
 
 
 # Wake Word Detection (V5.1)

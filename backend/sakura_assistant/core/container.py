@@ -64,7 +64,7 @@ class Container:
     
     @property
     def has_backup(self) -> bool:
-        return self.has_openrouter or bool(self.openai_api_key)
+        return bool(self.google_api_key) or self.has_openrouter or bool(self.openai_api_key)
     
     def get_router_llm(self):
         """Get or create router LLM (lazy-loaded)."""
@@ -124,10 +124,25 @@ class Container:
         return ReliableLLM(primary, backup, name)
     
     def _create_backup_llm(self):
-        """Create backup LLM (OpenRouter or OpenAI)."""
-        from langchain_openai import ChatOpenAI
+        """Create backup LLM (Google Gemini > OpenRouter > OpenAI)."""
         
+        # Priority 1: Direct Gemini API (most reliable for beta distribution)
+        if self.google_api_key:
+            try:
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                return ChatGoogleGenerativeAI(
+                    model="gemini-2.0-flash",
+                    google_api_key=self.google_api_key,
+                    temperature=0.3,
+                    max_retries=self.config.max_retries,
+                    timeout=30
+                )
+            except ImportError:
+                print("⚠️ langchain_google_genai not installed, falling back to OpenRouter")
+        
+        # Priority 2: OpenRouter (multi-model gateway)
         if self.openrouter_api_key:
+            from langchain_openai import ChatOpenAI
             return ChatOpenAI(
                 model=self.config.backup_model,
                 temperature=0.3,
@@ -136,7 +151,10 @@ class Container:
                 max_retries=self.config.max_retries,
                 request_timeout=30
             )
-        elif self.openai_api_key:
+        
+        # Priority 3: OpenAI direct
+        if self.openai_api_key:
+            from langchain_openai import ChatOpenAI
             return ChatOpenAI(
                 model="gpt-4o-mini",
                 temperature=0.3,

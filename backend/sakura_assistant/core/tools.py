@@ -129,7 +129,7 @@ def define_word(word: str) -> str:
         r = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}", timeout=5)
         if r.status_code == 200:
             d = r.json()[0]['meanings'][0]['definitions'][0]['definition']
-            return f"📖 {word}: {d}"
+            return f"[DEF] {word}: {d}"
         return "Not found."
     except: return "Error."
 
