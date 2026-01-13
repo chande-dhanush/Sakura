@@ -153,11 +153,11 @@ class GlobalRateLimiter:
     - Gemini 2.0 Flash: 15 RPM, 1M TPM, 1M context
     """
     
-    # Model-specific rate limits (VERIFIED from Groq console)
+    # Model-specific rate limits (VERIFIED from Groq console Jan 2026)
     MODEL_LIMITS = {
-        # Groq models (Free tier - verified Jan 2025)
+        # Groq models
         "llama-3.3-70b-versatile": RateLimitConfig(
-            rpm=30, burst=5, tpm=1000, context_window=128000, name="Llama-70B"
+            rpm=30, burst=5, tpm=12000, context_window=128000, name="Llama-70B"
         ),
         "llama-3.1-8b-instant": RateLimitConfig(
             rpm=30, burst=10, tpm=20000, context_window=128000, name="Llama-8B"
@@ -171,16 +171,16 @@ class GlobalRateLimiter:
             rpm=15, burst=3, tpm=1000000, context_window=1000000, name="Gemini-Flash"
         ),
         
-        # OpenRouter models (conservative estimates)
+        # OpenRouter models (user-verified limits)
         "google/gemini-2.0-flash-exp:free": RateLimitConfig(
             rpm=15, burst=3, tpm=100000, context_window=128000, name="OR-Gemini"
         ),
         "openai/gpt-oss-20b": RateLimitConfig(
-            rpm=8, burst=5, tpm=3000, context_window=8192, name="OR-GPT"
+            rpm=30, burst=5, tpm=8000, context_window=8192, name="OR-GPT"
         ),
     }
     
-    # Default for unknown models
+    # Default for unknown models (conservative)
     DEFAULT_LIMIT = RateLimitConfig(rpm=8, burst=2, tpm=3000, context_window=8192, name="Unknown")
     
     def __init__(self):
