@@ -16,7 +16,39 @@ except ImportError:
     # Fallback for standalone script execution
     PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-CREDENTIALS_PATH = os.path.join(PROJECT_ROOT, 'credentials.json')
+# V10.3: Multi-location fallback for credentials.json
+# In frozen mode, credentials might be in different locations
+def _resolve_credentials_path():
+    """Find credentials.json with fallback locations and detailed logging."""
+    possible_paths = [
+        os.path.join(PROJECT_ROOT, 'credentials.json'),  # APPDATA or project root
+    ]
+    
+    # If frozen (sidecar), check additional locations
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(sys.executable)
+        possible_paths.extend([
+            os.path.join(exe_dir, 'credentials.json'),           # Next to .exe
+            os.path.join(exe_dir, '..', 'credentials.json'),     # Parent of .exe
+        ])
+    else:
+        # Dev mode: check script directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        possible_paths.append(os.path.join(script_dir, 'credentials.json'))
+    
+    # Log where we're looking (helps debug frozen mode)
+    print(f"[AUTH] Searching for credentials.json in:")
+    for i, path in enumerate(possible_paths, 1):
+        exists = os.path.exists(path)
+        status = "FOUND" if exists else "not found"
+        print(f"   {i}. {path} [{status}]")
+        if exists:
+            return path
+    
+    # Return default (will fail later with helpful error)
+    return possible_paths[0]
+
+CREDENTIALS_PATH = _resolve_credentials_path()
 TOKEN_PATH = os.path.join(PROJECT_ROOT, 'token.json')
 
 # Scopes must match tools.py

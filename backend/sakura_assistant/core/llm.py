@@ -20,6 +20,12 @@ from ..utils.study_mode import detect_study_mode
 from .agent_state import AgentState, RateLimitExceeded
 from ..utils.memory import cleanup_memory
 
+# V10.3: Summary Memory for long-context
+from ..memory.summary_memory import get_summary_memory
+
+# V10.4: Flight Recorder for observability
+from ..utils.flight_recorder import get_recorder, span
+
 from langchain_core.messages import HumanMessage
 
 class SmartAssistant:
@@ -70,6 +76,10 @@ class SmartAssistant:
         self.world_graph = WorldGraph(
             persist_path=os.path.join(get_project_root(), "data", "world_graph.json")
         )
+        
+        # V10.3: Summary Memory (compresses old turns for long-context)
+        self.summary_memory = get_summary_memory(planner_llm)
+        
         print("✅ SmartAssistant Initialized (Modular V10 Architecture)")
 
     def run(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
@@ -81,9 +91,11 @@ class SmartAssistant:
         4. Executor (Tools)
         5. Responder (Final Answer)
         """
-        print(f"🚀 [LLM] SmartAssistant.run() STARTED")
+        print(f"\U0001f680 [LLM] SmartAssistant.run() STARTED")
         start_time = time.time()
         state = AgentState()
+        recorder = get_recorder()
+        recorder.start_trace(user_input)
         
         # 1. Vision Short-Circuit
         if image_data:
@@ -99,8 +111,10 @@ class SmartAssistant:
             
             # 3. Routing
             state.record_llm_call("routing")
-            route_result = self.router.route(user_input, history, study_mode_active)
-            print(f"🚦 Router Decision: {route_result.classification}")
+            with span("Router"):
+                route_result = self.router.route(user_input, history, study_mode_active)
+            recorder.log("Router", f"Decision: {route_result.classification} (hint: {route_result.tool_hint})")
+            print(f"\U0001f6a6 Router Decision: {route_result.classification}")
             
             state.current_intent = route_result.classification
             
@@ -120,12 +134,14 @@ class SmartAssistant:
                 # Fetch Graph Context for Executor
                 graph_context = self.world_graph.get_context_for_planner(user_input)
                 
-                exec_result = self.executor.execute(
-                    user_input,
-                    route_result,
-                    graph_context,
-                    state
-                )
+                with span("Executor"):
+                    exec_result = self.executor.execute(
+                        user_input,
+                        route_result,
+                        graph_context,
+                        state
+                    )
+                recorder.log("Executor", f"Tool: {exec_result.tool_used}, Success: {exec_result.success}")
                 
                 tool_outputs = exec_result.outputs
                 tool_used = exec_result.tool_used
@@ -153,9 +169,15 @@ class SmartAssistant:
                          except Exception as wg_err:
                              print(f"⚠️ World Graph recording failed: {wg_err}")
             
+            # V10.3: Record turn in Summary Memory
+            self.summary_memory.add_turn("user", user_input)
+            
             # 5. Response
             state.record_llm_call("responding")
             print(f"🏁 Response Phase")
+            
+            # V10.3: Get compressed summary for context injection
+            summary_context = self.summary_memory.get_context_injection()
             
             # Prepare Responder Context
             from .responder import ResponseContext
@@ -169,11 +191,18 @@ class SmartAssistant:
                 study_mode=study_mode_active
             )
             
-            response_text = self.responder.generate(resp_context)
+            with span("Responder"):
+                response_text = self.responder.generate(resp_context)
+            recorder.log("Responder", f"Generated {len(response_text)} chars")
+            
+            # V10.3: Record assistant response in Summary Memory
+            self.summary_memory.add_turn("assistant", response_text)
             
             # Update Graph Logic
             self.world_graph.advance_turn()
             self.world_graph.save()
+            
+            recorder.end_trace(success=True, response_preview=response_text[:80])
             
             return {
                 "content": response_text,
@@ -186,12 +215,14 @@ class SmartAssistant:
             }
             
         except RateLimitExceeded:
-             return {
+            recorder.end_trace(success=False, response_preview="rate_limited")
+            return {
                 "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
                  "metadata": {"status": "rate_limited"}
              }
         except Exception as e:
-            print(f"❌ Pipeline Error: {e}")
+            recorder.end_trace(success=False, response_preview=str(e)[:50])
+            print(f"\u274c Pipeline Error: {e}")
             import traceback
             traceback.print_exc()
             return {

@@ -42,6 +42,38 @@ class ReliableLLM:
         self.name = name
     
     def invoke(self, messages, timeout=LLM_TIMEOUT, **kwargs):
+        """
+        Synchronous LLM invocation with rate limiting.
+        
+        V10.4: All models (Router, Planner, Responder) are rate limited.
+        """
+        from .rate_limiter import get_rate_limiter
+        import asyncio
+        
+        # Get model name for rate limiting
+        model_name = getattr(self.primary, 'model_name', None) or \
+                     getattr(self.primary, 'model', 'unknown')
+        
+        # Acquire rate limit (blocking for sync context)
+        limiter = get_rate_limiter()
+        bucket = limiter.get_bucket(model_name)
+        
+        # Use event loop if available, otherwise skip async acquire
+        try:
+            loop = asyncio.get_running_loop()
+            # Can't await in sync context, just proceed
+        except RuntimeError:
+            # No event loop, do blocking check
+            import time
+            while bucket.tokens < 1:
+                bucket._refill()
+                if bucket.tokens < 1:
+                    sleep_time = (1 - bucket.tokens) / bucket.rate
+                    print(f"⏳ [{self.name}] Rate limited: waiting {sleep_time:.2f}s")
+                    time.sleep(min(sleep_time, 2.0))  # Cap at 2s per iteration
+            bucket.tokens -= 1
+            bucket.total_requests += 1
+        
         print(f"🔄 [{self.name}] Invoking LLM...")
         try:
             result = invoke_with_timeout(self.primary, messages, timeout=timeout, **kwargs)
@@ -107,6 +139,71 @@ class ReliableLLM:
                 "id": call_id
             }]
         )
+    
+    async def ainvoke(self, messages, timeout=LLM_TIMEOUT, **kwargs):
+        """
+        True async invocation with backpressure rate limiting.
+        
+        V10.4: 
+        - Uses native LangChain ainvoke() for true async
+        - Rate limits via token bucket (induces latency, not 429 crashes)
+        - Enables parallel tool execution via asyncio.gather()
+        """
+        from .rate_limiter import get_rate_limiter
+        
+        # Get model name for rate limiting
+        model_name = getattr(self.primary, 'model_name', None) or \
+                     getattr(self.primary, 'model', 'unknown')
+        
+        # Acquire rate limit (will sleep if bucket empty)
+        limiter = get_rate_limiter()
+        wait_time = await limiter.acquire(model_name)
+        
+        if wait_time > 0:
+            print(f"⏳ [{self.name}] Rate limited: waited {wait_time:.2f}s")
+        
+        print(f"🔄 [{self.name}] Async invoking LLM...")
+        
+        try:
+            # LangChain models have native ainvoke() support
+            if hasattr(self.primary, 'ainvoke'):
+                result = await self.primary.ainvoke(messages, **kwargs)
+            else:
+                # Fallback to sync in thread if no native async
+                import asyncio
+                result = await asyncio.to_thread(self.primary.invoke, messages, **kwargs)
+            
+            print(f"✅ [{self.name}] Async LLM call succeeded")
+            return result
+            
+        except Exception as e:
+            err_str = str(e)
+            
+            # Try XML recovery for Groq errors
+            if "failed_generation" in err_str and "<function=" in err_str:
+                print(f"🔧 [{self.name}] Recovering from Groq XML tool call...")
+                try:
+                    match_tools = self._recover_groq_xml(err_str)
+                    if match_tools:
+                        return match_tools
+                except Exception as parse_err:
+                    print(f"❌ Recovery failed: {parse_err}")
+            
+            # Try backup
+            if self.backup:
+                print(f"⚠️ {self.name} Primary async failed: {e}. Switching to Backup...")
+                try:
+                    if hasattr(self.backup, 'ainvoke'):
+                        return await self.backup.ainvoke(messages, **kwargs)
+                    else:
+                        import asyncio
+                        return await asyncio.to_thread(self.backup.invoke, messages, **kwargs)
+                except Exception as backup_err:
+                    print(f"❌ {self.name} Backup async also failed: {backup_err}")
+                    raise backup_err
+            
+            print(f"❌ {self.name} Async Failed (No Backup): {e}")
+            raise e
 
     def bind_tools(self, tools):
         """

@@ -1,0 +1,17 @@
+==================================================
+SAKURA WORLD GRAPH: O(1) SCALING AUDIT
+==================================================
+
+METHODOLOGY:
+- Inserted entities from 10 to 10,000
+- Measured 1000 dict.get() lookups per size
+- Reported average and P99 latency
+
+RESULTS:
+      10 entities: 87.00ns avg, 100.12ns P99
+     100 entities: 85.80ns avg, 100.12ns P99
+    1000 entities: 91.40ns avg, 199.77ns P99
+   10000 entities: 91.81ns avg, 100.12ns P99
+
+VERDICT: O(1) CONFIRMED
+Max/Min Ratio: 1.07x (< 3x = constant time)

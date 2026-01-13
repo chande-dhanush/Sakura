@@ -50,6 +50,42 @@ class ToolExecutor:
         else:
             self.planner = None
     
+    # V10.3: Misclassification Recovery - Fallback chain for failed tools
+    FALLBACK_MAP = {
+        "spotify_control": "play_youtube",     # Spotify fails → try YouTube
+        "play_youtube": "web_search",          # YouTube fails → search
+    }
+    
+    def _extract_search_term(self, tool_name: str, args: Dict, original_query: str = "") -> str:
+        """
+        Extract the human-readable search term from tool args.
+        Gemini's insight: Can't pass Spotify URI to YouTube - need original query.
+        """
+        # Priority 1: Named search parameters
+        search_keys = ["query", "topic", "song", "track", "search_term", "q"]
+        for key in search_keys:
+            if key in args and args[key]:
+                return str(args[key])
+        
+        # Priority 2: Action args for Spotify
+        if tool_name == "spotify_control" and args.get("action") == "play":
+            # If there's a track_name or artist, use that
+            if args.get("track_name"):
+                return args["track_name"]
+            if args.get("query"):
+                return args["query"]
+        
+        # Priority 3: Fall back to original user query
+        if original_query:
+            return original_query
+        
+        # Priority 4: Stringify first non-action arg
+        for key, val in args.items():
+            if key not in ["action", "uri"] and val:
+                return str(val)
+        
+        return ""
+    
     def execute_single(self, tool_name: str, args: Dict) -> Tuple[str, bool]:
         """
         Execute a single tool call.
@@ -192,6 +228,34 @@ class ToolExecutor:
                 res = self.tool_map[tool_name].invoke(tool_args)
                 res_str = str(res)
                 
+                # V10.3: Check for "soft failures" (tool ran but couldn't complete)
+                failure_indicators = ["not found", "failed", "error", "couldn't", "unable"]
+                is_soft_failure = any(ind in res_str.lower() for ind in failure_indicators)
+                
+                # Try fallback if soft failure and fallback exists
+                if is_soft_failure and tool_name in self.FALLBACK_MAP:
+                    fallback_tool = self.FALLBACK_MAP[tool_name]
+                    if fallback_tool in self.tool_map:
+                        # Extract original search term (don't pass Spotify URI to YouTube!)
+                        search_term = self._extract_search_term(tool_name, tool_args)
+                        if search_term:
+                            print(f"🔄 [V10.3] Misclassification recovery: {tool_name} → {fallback_tool}")
+                            print(f"   Extracted term: '{search_term}'")
+                            
+                            # Build fallback args
+                            if fallback_tool == "play_youtube":
+                                fallback_args = {"topic": search_term}
+                            elif fallback_tool == "web_search":
+                                fallback_args = {"query": search_term}
+                            else:
+                                fallback_args = {"query": search_term}
+                            
+                            # Execute fallback
+                            fallback_res = self.tool_map[fallback_tool].invoke(fallback_args)
+                            res_str = f"[Fallback: {fallback_tool}] {fallback_res}"
+                            tool_name = fallback_tool  # Update for logging
+                            is_soft_failure = False  # Recovery succeeded
+                
                 # Prune output for ReAct history
                 pruned_res = self.prune_output(res_str)
                 
@@ -212,11 +276,11 @@ class ToolExecutor:
                     "tool": tool_name, 
                     "args": tool_args, 
                     "output": res_str, 
-                    "success": True
+                    "success": not is_soft_failure
                 }
                 
                 if state:
-                    state.record_tool_result(success=True)
+                    state.record_tool_result(success=not is_soft_failure)
                 
                 # V10: Stop after terminal actions (prevent multiple YouTube tabs)
                 if tool_name in TERMINAL_ACTIONS:

@@ -1,4 +1,4 @@
-# Sakura V10.1 — Technical Documentation
+# Sakura V10.4 — Technical Documentation
 
 ---
 
@@ -22,7 +22,7 @@
 | Hard 4-LLM Call Limit | V5+ | Circuit breaker prevents runaway costs |
 | Multi-LLM Failover | V5+ | Groq → Gemini cascade with timeout protection |
 | Memory Judger | V4+ | LLM-based importance filtering |
-| 46+ Tools | V10+ | Gmail, Calendar, Spotify, Notes, Vision, RAG |
+| 46 Tools | V10+ | Gmail, Calendar, Spotify, Notes, Vision, RAG |
 | Kokoro TTS | V10+ | Neural voice synthesis with idle unload |
 | Wake Word Detection | V10+ | Custom DTW-based voice activation |
 | Smart Router | V10+ | DIRECT/PLAN/CHAT classification with tool hints |
@@ -33,6 +33,10 @@
 | File Upload | V10.1 | Attach files for RAG ingestion |
 | Terminal Action Guard | V10.1 | Prevents duplicate tool calls |
 | Window Auto-Show | V10.1 | Main window auto-shows after backend ready |
+| Flight Recorder | V10.4 | JSONL tracing with per-stage latency breakdown |
+| Few-Shot Router | V10.4 | 15 examples for improved PLAN detection |
+| Async LLM | V10.4 | Native ainvoke() with asyncio.gather() support |
+| Token Bucket Rate Limiter | V10.4 | Backpressure-based RPM/TPM limiting per model |
 
 ---
 

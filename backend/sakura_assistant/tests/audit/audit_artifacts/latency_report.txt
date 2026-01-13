@@ -1,0 +1,13 @@
+==================================================
+SAKURA ROUTE LATENCY AUDIT
+==================================================
+
+DIRECT ROUTE:
+  Samples: 2
+  P50: 199.70ms
+  P99: 399.39ms
+
+TARGETS:
+  Direct Route: < 1000ms (1s)
+  Plan Route: < 5000ms (5s)
+  Chat Route: < 500ms

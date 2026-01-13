@@ -13,19 +13,60 @@ from typing import Optional, Tuple, List, Dict, Any
 from langchain_core.messages import SystemMessage, HumanMessage
 
 
-# Router prompt for V10 classification
+# Router prompt for V10 classification with Few-Shot Examples
 ROUTER_SYSTEM_PROMPT = """You are a query classifier for a personal AI assistant.
 
 Classify the user's query into ONE of these categories:
 
 DIRECT - Single, obvious tool action that can be executed immediately.
-Examples: "check email", "what's the weather", "play music", "set timer 5 min"
-
-PLAN - Requires multiple steps, research, or complex reasoning.
-Examples: "who is X and what are they known for", "compare A and B", "research topic"
-
+PLAN - Requires multiple steps, research, reasoning chains, or complex comparison.
 CHAT - Pure conversation, no tools needed.
-Examples: "hi", "thanks", "tell me a joke", "explain quantum physics"
+
+=== FEW-SHOT EXAMPLES ===
+
+User: "Play Numb by Linkin Park"
+{"classification": "DIRECT", "tool_hint": "spotify_control", "reason": "Single media action"}
+
+User: "What is the weather in Tokyo?"
+{"classification": "DIRECT", "tool_hint": "get_weather", "reason": "Single lookup"}
+
+User: "What time is it?"
+{"classification": "DIRECT", "tool_hint": "get_time", "reason": "Single lookup"}
+
+User: "What's the weather?"
+{"classification": "DIRECT", "tool_hint": "get_weather", "reason": "Single lookup"}
+
+User: "Hi there!"
+{"classification": "CHAT", "tool_hint": null, "reason": "Greeting, no tool needed"}
+
+User: "Thanks for your help"
+{"classification": "CHAT", "tool_hint": null, "reason": "Gratitude, no tool needed"}
+
+User: "Explain quantum physics"
+{"classification": "CHAT", "tool_hint": null, "reason": "Knowledge explanation, no tool"}
+
+User: "Find a recipe for lasagna and add the ingredients to my shopping list"
+{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Search recipe -> Add to list"}
+
+User: "Who is the CEO of the company that made ChatGPT?"
+{"classification": "PLAN", "tool_hint": null, "reason": "Reasoning required: Identify company -> Identify CEO"}
+
+User: "Research quantum computing and summarize the key concepts"
+{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Research -> Summarize"}
+
+User: "Compare Python and JavaScript for web development"
+{"classification": "PLAN", "tool_hint": null, "reason": "Comparison requires research on both"}
+
+User: "Who is the president of France and what are they known for?"
+{"classification": "PLAN", "tool_hint": null, "reason": "Multi-part question requiring lookup + synthesis"}
+
+User: "What happened in the news today?"
+{"classification": "PLAN", "tool_hint": null, "reason": "Requires news search + summarization"}
+
+User: "Look up the best restaurants nearby and check their reviews"
+{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Search -> Check reviews"}
+
+=== END EXAMPLES ===
 
 Return JSON only:
 {"classification": "DIRECT|PLAN|CHAT", "tool_hint": "tool_name or null"}
