@@ -54,5 +54,13 @@
   {
     "role": "assistant",
     "content": "LangChain’s own AgentExecutor is fine for a single‑brain bot, but if you want true multi‑agent flow, LangGraph is the go‑to.  \nCrewAI and AutoGen are solid alternatives, but LangGraph gives the cleanest orchestration for complex, specialist agents."
+  },
+  {
+    "role": "user",
+    "content": "What time is it?"
+  },
+  {
+    "role": "assistant",
+    "content": "02:16 PM."
   }
 ]

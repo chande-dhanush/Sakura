@@ -1,0 +1,8 @@
+{"event": "trace_start", "trace_id": "trace_1768293958257", "query": "What time is it?", "timestamp": "2026-01-13T14:15:58.257267"}
+{"event": "span", "trace_id": "trace_1768293958257", "stage": "Router", "status": "SUCCESS", "content": "completed", "elapsed_ms": 481.16, "duration_ms": 480.65}
+{"event": "span", "trace_id": "trace_1768293958257", "stage": "Router", "status": "INFO", "content": "Decision: DIRECT (hint: get_time)", "elapsed_ms": 481.75}
+{"event": "span", "trace_id": "trace_1768293958257", "stage": "Executor", "status": "SUCCESS", "content": "completed", "elapsed_ms": 5241.49, "duration_ms": 4758.53}
+{"event": "span", "trace_id": "trace_1768293958257", "stage": "Executor", "status": "INFO", "content": "Tool: get_system_info, Success: True", "elapsed_ms": 5242.58}
+{"event": "span", "trace_id": "trace_1768293958257", "stage": "Responder", "status": "SUCCESS", "content": "completed", "elapsed_ms": 5685.92, "duration_ms": 434.59}
+{"event": "span", "trace_id": "trace_1768293958257", "stage": "Responder", "status": "INFO", "content": "Generated 9 chars", "elapsed_ms": 5687.62}
+{"event": "trace_end", "trace_id": "trace_1768293958257", "success": true, "total_ms": 5690.18, "response_preview": "02:16 PM.", "span_count": 6}

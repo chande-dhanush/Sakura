@@ -7,12 +7,14 @@ import { writable, derived, get } from 'svelte/store';
 const BACKEND_URL = 'http://localhost:8000';
 
 // Stores
+// Stores
 export const messages = writable([]);
 export const isStreaming = writable(false);
 export const mood = writable('neutral');
 export const currentTools = writable([]);
 export const focusEntity = writable(null);
 export const connectionError = writable(null);
+export const traceLogs = writable([]); // V10.4: Flight Recorder Traces
 
 // Backend status: 'starting' | 'ready' | 'error'
 export const backendStatus = writable('starting');
@@ -46,6 +48,7 @@ export async function sendMessage(query, options = {}) {
     isStreaming.set(true);
     connectionError.set(null);
     currentTools.set([]);
+    traceLogs.set([]); // Reset logs for new turn
 
     // Add user message
     messages.update(m => [...m, { role: 'user', content: query, id: Date.now() }]);
@@ -91,6 +94,17 @@ export async function sendMessage(query, options = {}) {
                                 content: '...',
                                 tools: [],
                                 id: assistantId
+                            }]);
+                            break;
+
+                        case 'timing':
+                            // V10.4: Handle Flight Recorder trace events
+                            traceLogs.update(logs => [...logs, {
+                                stage: data.stage,
+                                status: data.status,
+                                ms: data.ms,
+                                info: data.info,
+                                timestamp: Date.now()
                             }]);
                             break;
 

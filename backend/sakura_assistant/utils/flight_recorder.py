@@ -40,6 +40,11 @@ class FlightRecorder:
         self.trace_id: Optional[str] = None
         self.trace_start: float = 0
         self.spans: list = []
+        self.callback = None  # V10.4: SSE bridge
+        
+    def set_callback(self, callback):
+        """Set a real-time callback for SSE events."""
+        self.callback = callback
         
     def start_trace(self, query: str) -> str:
         """Start a new trace for a request."""
@@ -112,12 +117,20 @@ class FlightRecorder:
             raise
     
     def _write(self, entry: Dict[str, Any]):
-        """Append entry to JSONL file."""
+        """Append entry to JSONL file and notify callback."""
+        # 1. Write to file
         try:
             with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:
             print(f"[!] Flight recorder write failed: {e}")
+            
+        # 2. Notify callback (SSE)
+        if self.callback:
+            try:
+                self.callback(entry)
+            except Exception as e:
+                print(f"[!] Flight recorder callback failed: {e}")
     
     def get_recent_traces(self, limit: int = 10) -> list:
         """Get the most recent traces for debugging."""

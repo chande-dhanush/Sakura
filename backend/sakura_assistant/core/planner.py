@@ -161,6 +161,133 @@ class Planner:
         print(f"🔧 Planner: {len(all_tools)} → {len(valid_tools)} tools (Groups: {detected_groups})")
         return valid_tools
 
+    async def aplan(self, user_input: str, context: str = "", hindsight: str = None,
+             intent_mode: str = "action", resolution=None, tool_history: list = None) -> Dict[str, Any]:
+        """Async version of plan using native ainvoke."""
+        # V5.1: REASONING_ONLY mode - no tools needed
+        if intent_mode == "reasoning":
+            print(f"🧠 Planner: REASONING mode - skipping tools")
+            return {"plan": [], "mode": "reasoning"}
+        
+        # V9.2: TIER-1 FORCED ROUTING (Deterministic - bypasses LLM)
+        if not hindsight and not tool_history:
+            from .forced_router import get_forced_tool, build_forced_plan
+            forced = get_forced_tool(user_input)
+            if forced and forced.get("tool"):
+                plan = build_forced_plan(forced)
+                if plan:
+                    print(f"⚡ [Tier-1] Forced plan (Async): {forced['tool']}")
+                    return plan
+        
+        # V4.2: Check cache
+        from ..config import ENABLE_PLANNER_CACHE
+        if ENABLE_PLANNER_CACHE and not hindsight and not tool_history and intent_mode == "action":
+            normalized = _normalize_for_cache(user_input)
+            if normalized in _CACHEABLE_PATTERNS:
+                print(f"⚡ Planner: Cache hit (Async) for '{normalized}'")
+                return _CACHEABLE_PATTERNS[normalized]
+        
+        # Context Building (Copy of sync logic)
+        reference_block = ""
+        if resolution and resolution.resolved:
+            resolved = resolution.resolved
+            if hasattr(resolved, 'name'):
+                reference_block = f"\n[RESOLVED REFERENCE]\nUser is referring to: {resolved.name} ({resolved.type.value if hasattr(resolved, 'type') else 'entity'})\n"
+            elif hasattr(resolved, 'tool'):
+                reference_block = f"\n[RESOLVED REFERENCE]\nUser is referring to last action: {resolved.tool} with args {resolved.args}\n"
+            
+            if resolution.action == "repeat":
+                reference_block += "ACTION: User wants to REPEAT this action.\n"
+            elif resolution.action == "modify_tool":
+                reference_block += "ACTION: User wants to do the SAME THING with a DIFFERENT tool.\n"
+
+        context_block = ""
+        if context and len(context) > 10:
+            context_block = f"\n[GRAPH CONTEXT]\n{context}\n"
+        
+        if hindsight:
+            system_prompt = PLANNER_RETRY_PROMPT.format(
+                user_input=user_input,
+                context=context_block + reference_block,
+                hindsight=hindsight
+            )
+            user_content = f"Original request: {user_input}"
+        else:
+            system_prompt = PLANNER_STATIC_PROMPT.format(
+                context=context_block + reference_block
+            )
+            user_content = f"Request: {user_input}"
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_content)
+        ]
+        
+        if tool_history:
+            if len(tool_history) > 5:
+                tool_history = tool_history[-5:]
+            messages.extend(tool_history)
+            messages.append(HumanMessage(content=f"[GOAL REMINDER]\nOriginal User Request: \"{user_input}\"\nBased on the tool results above, what is your next step to complete this goal? If the goal is complete, do NOT call any tools."))
+        
+        est_tokens = (len(system_prompt) + len(user_content)) // 4
+        print(f"🧠 Planner: ~{est_tokens} tokens (Async)")
+
+        try:
+            print("🧠 Planner: Thinking (Async Native Tool Use)...")
+            
+            all_tools = get_all_tools()
+            tools = self._filter_tools(all_tools, intent_mode, user_input)
+            llm_with_tools = self.llm.bind_tools(tools)
+            
+            from .context_governor import get_context_governor
+            governor = get_context_governor()
+            messages, _, tool_history = governor.enforce(messages, "PLANNER", tool_history=tool_history)
+            
+            # ASYNC INVOKE
+            response = await llm_with_tools.ainvoke(messages)
+            
+            if response.tool_calls:
+                TERMINAL_TOOLS = {
+                    "play_youtube", "spotify_control", "open_app",
+                    "file_open", "gmail_send_email", "calendar_create_event",
+                    "tasks_create", "note_create", "set_timer", "set_reminder"
+                }
+                
+                plan = []
+                seen_terminal = set()
+                
+                for i, call in enumerate(response.tool_calls):
+                    tool_name = call["name"]
+                    if tool_name in TERMINAL_TOOLS:
+                        if tool_name in seen_terminal: continue
+                        seen_terminal.add(tool_name)
+                    
+                    plan.append({
+                        "id": len(plan) + 1,
+                        "tool": tool_name,
+                        "args": call["args"],
+                        "tool_call_id": call["id"]
+                    })
+                    
+                    if tool_name in TERMINAL_TOOLS:
+                        break
+                
+                if len(plan) > 3:
+                    plan = plan[:3]
+                
+                _log_planner_usage(est_tokens, len(plan), is_retry=bool(hindsight))
+                print(f"📋 Planner Output: {len(plan)} steps (Async).")
+                return {"plan": plan, "message": response}
+            else:
+                print("🧠 Planner: No tools called (Chat mode)")
+                return {"plan": [], "message": response}
+
+        except Exception as e:
+            import traceback
+            print(f"❌ Async Planner Error: {e}")
+            traceback.print_exc()
+            return {"plan": [], "error": str(e)}
+
     def plan(self, user_input: str, context: str = "", hindsight: str = None,
              intent_mode: str = "action", resolution=None, tool_history: list = None) -> Dict[str, Any]:
         """

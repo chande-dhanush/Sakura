@@ -58,6 +58,36 @@ class ResponseGenerator:
         self.llm = llm
         self.personality = personality
     
+    async def agenerate(self, context: ResponseContext) -> str:
+        """Async version of generate."""
+        messages = self._build_messages(context)
+        
+        try:
+            print(f"🤖 Synthesizing (Async)... ({len(messages)} messages)")
+            
+            # Invoke with tool_choice=none if supported
+            try:
+                response = await self.llm.ainvoke(messages, tool_choice="none")
+            except TypeError:
+                response = await self.llm.ainvoke(messages)
+            
+            raw_response = response.content
+            
+            # Validate and clean response
+            final_response, had_violation = self.validate_output(raw_response)
+            if had_violation:
+                print("⚠️ Responder tool-call violation detected and stripped")
+            
+            # Check for false action claims (if no tools were used)
+            if not context.tool_outputs:
+                final_response = self._check_action_claim(final_response)
+            
+            return final_response
+            
+        except Exception as e:
+            print(f"❌ Async Response generation error: {e}")
+            return "I apologize, but I encountered an issue. Could you please try again?"
+
     def generate(self, context: ResponseContext) -> str:
         """
         Generate a natural response based on context.

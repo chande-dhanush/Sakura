@@ -108,6 +108,154 @@ class ToolExecutor:
             traceback.print_exc()
             return f"Error: {e}", False
 
+    async def aexecute(self, user_input: str, route_result: Any, graph_context: str, state: Any = None) -> ExecutionResult:
+        """Async version of execute (ReAct loop)."""
+        print(f"🔄 [Executor] Starting Async ReAct loop for: {user_input[:50]}...")
+        
+        all_tool_messages = []
+        all_outputs = []
+        final_tool_used = "None"
+        MAX_REACT_STEPS = 5
+        
+        for i in range(MAX_REACT_STEPS):
+            print(f"🔄 [Executor] Async Iteration {i+1}/{MAX_REACT_STEPS}")
+            
+            # 1. PLAN (Async)
+            if not self.planner:
+                return ExecutionResult("Error: No planner configured", [], "Error", None, False)
+                
+            plan_result = await self.planner.aplan(
+                user_input=user_input,
+                context=graph_context,
+                tool_history=all_tool_messages,
+                intent_mode=route_result.classification if hasattr(route_result, 'classification') else "action"
+            )
+            
+            steps = plan_result.get("plan", [])
+            if not steps:
+                print("⏹️ [Executor] Checkmate - No more steps needed.")
+                break
+                
+            # 2. EXECUTE (Async)
+            exec_res = await self.aexecute_plan(steps, state=state)
+            
+            # 3. OBSERVE
+            all_tool_messages.extend(exec_res.tool_messages)
+            if exec_res.outputs:
+                all_outputs.append(exec_res.outputs)
+            
+            final_tool_used = exec_res.tool_used
+            
+            # 4. TERMINAL CHECK
+            TERMINAL_ACTIONS = {
+                "play_youtube", "spotify_control", "open_app",
+                "file_open", "gmail_send_email", "calendar_create_event",
+                "tasks_create", "note_create", "set_timer", "set_reminder"
+            }
+            if final_tool_used in TERMINAL_ACTIONS and exec_res.success:
+                print(f"⏹️ [Executor] Terminal action '{final_tool_used}' completed - stopping loop.")
+                break
+            
+        return ExecutionResult(
+            outputs="\n".join(all_outputs),
+            tool_messages=all_tool_messages,
+            tool_used=final_tool_used,
+            last_result=None,
+            success=True
+        )
+
+    async def aexecute_plan(self, steps: List[Dict], state=None, 
+                     max_iterations: int = 5,
+                     max_output_chars: int = 2000) -> ExecutionResult:
+        """Async version of execute_plan."""
+        import asyncio
+        results_text = []
+        tool_messages = []
+        tool_used = "None"
+        last_result = None
+        all_success = True
+        
+        TERMINAL_ACTIONS = {
+            "play_youtube", "spotify_control", "open_app", "open_site",
+            "file_open", "gmail_send_email", "calendar_create_event",
+            "tasks_create", "note_create", "set_timer", "set_reminder"
+        }
+        
+        steps = steps[:max_iterations]
+        
+        for step in steps:
+            tool_name = step.get("tool")
+            tool_args = step.get("args", {})
+            call_id = step.get("tool_call_id", f"call_{step.get('id', 0)}")
+            
+            if tool_name not in self.tool_map:
+                err = f"Tool '{tool_name}' not found."
+                results_text.append(f"Step {step.get('id')} Error: {err}")
+                tool_messages.append(ToolMessage(tool_call_id=call_id, content=err, name=tool_name, status="error"))
+                continue
+            
+            print(f"▶️ Async Executing Step {step.get('id')}: {tool_name} {tool_args}")
+            
+            try:
+                # Run sync tool in thread
+                tool_instance = self.tool_map[tool_name]
+                if hasattr(tool_instance, 'ainvoke'):
+                    # Some tools might support ainvoke natively? Most LangChain tools fallback to sync.
+                    # Use ainvoke if available, else tool.invoke
+                    res = await tool_instance.ainvoke(tool_args)
+                else:
+                    res = await asyncio.to_thread(tool_instance.invoke, tool_args)
+                
+                res_str = str(res)
+                
+                # Misclassification Recovery Logic (Same as sync)
+                failure_indicators = ["not found", "failed", "error", "couldn't", "unable"]
+                is_soft_failure = any(ind in res_str.lower() for ind in failure_indicators)
+                
+                if is_soft_failure and tool_name in self.FALLBACK_MAP:
+                    fallback_tool = self.FALLBACK_MAP[tool_name]
+                    if fallback_tool in self.tool_map:
+                        search_term = self._extract_search_term(tool_name, tool_args)
+                        if search_term:
+                            print(f"🔄 [Async Recovery] {tool_name} → {fallback_tool} ('{search_term}')")
+                            if fallback_tool == "play_youtube": fallback_args = {"topic": search_term}
+                            elif fallback_tool == "web_search": fallback_args = {"query": search_term}
+                            else: fallback_args = {"query": search_term}
+                            
+                            fallback_res = await asyncio.to_thread(self.tool_map[fallback_tool].invoke, fallback_args)
+                            res_str = f"[Fallback: {fallback_tool}] {fallback_res}"
+                            tool_name = fallback_tool
+                            is_soft_failure = False
+                
+                pruned_res = self.prune_output(res_str)
+                tool_messages.append(ToolMessage(tool_call_id=call_id, content=pruned_res, name=tool_name))
+                
+                if len(res_str) > max_output_chars:
+                    res_str = res_str[:max_output_chars] + "... [truncated]"
+                
+                results_text.append(f"Step {step.get('id')} ({tool_name}): {res_str}")
+                tool_used = tool_name
+                last_result = {"tool": tool_name, "args": tool_args, "output": res_str, "success": not is_soft_failure}
+                
+                if state: state.record_tool_result(success=not is_soft_failure)
+                
+                if tool_name in TERMINAL_ACTIONS:
+                    print(f"⏹️ [Async Executor] Terminal action '{tool_name}' completed.")
+                    break
+                    
+            except Exception as e:
+                err_msg = f"Error: {e}"
+                tool_messages.append(ToolMessage(tool_call_id=call_id, content=err_msg, name=tool_name, status="error"))
+                results_text.append(f"Step {step.get('id')} Error: {e}")
+                last_result = {"tool": tool_name, "args": tool_args, "output": str(e), "success": False}
+                if state: state.record_tool_result(success=False)
+        
+        outputs = ""
+        if results_text:
+            outputs = "\n\n=== TOOL EXECUTION LOG ===\n" + "\n".join(results_text)
+        
+        return ExecutionResult(outputs=outputs, tool_messages=tool_messages, tool_used=tool_used, last_result=last_result, success=all_success)
+
     def execute(self, user_input: str, route_result: Any, graph_context: str, state: Any = None) -> ExecutionResult:
         """
         Main execution entry point. Runs the ReAct loop.

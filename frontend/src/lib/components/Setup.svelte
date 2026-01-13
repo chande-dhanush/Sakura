@@ -3,33 +3,39 @@
     import { onMount } from 'svelte';
     import { backendStatus } from '$lib/stores/chat.js';
     
-    let groqKey = "";
-    let tavilyKey = "";
-    let googleKey = "";  // V10.2: Google API Key for Gemini backup
-    let openRouterKey = "";
-    let spotifyClientId = "";
-    let spotifyClientSecret = "";
-    let spotifyDeviceName = ""; // Optional specific device
-    let micIndex = "";  // Optional override
+    // BACKEND_URL logic
+    const BACKEND_URL = "http://localhost:8000"; 
     
-    // V10.2: User Personalization
-    let userName = "";
-    let userLocation = "";
-    let userBio = "";
+    // Configuration State
+    let config = {
+        GROQ_API_KEY: "",
+        TAVILY_API_KEY: "",
+        OPENROUTER_API_KEY: "",
+        GOOGLE_API_KEY: "",
+        SPOTIFY_CLIENT_ID: "",
+        SPOTIFY_CLIENT_SECRET: "",
+        SPOTIFY_DEVICE_NAME: "",
+        MICROPHONE_INDEX: "",
+        USER_NAME: "",
+        USER_LOCATION: "",
+        USER_BIO: ""
+    };
+
+    // UI Props
+    export let isUpdateMode = false;
+    export let onClose = () => {};
+
+    // Internal State
+    let originalConfig = {};
+    let dirtyFields = new Set(); // Senior pattern: O(1) lookups
     
-    let showAdvanced = false;
     let isSubmitting = false;
     let isLoading = false;
     let error = "";
     let success = "";
-    
-    export let isUpdateMode = false;
-    export let onClose = () => {};
-    
-    // BACKEND_URL from environment or default
-    const BACKEND_URL = "http://localhost:8000"; // Should match chat.js
-    
-    // V10.2: Load existing settings when panel opens (UX fix)
+    let showAdvanced = false;
+
+    // Load Settings
     onMount(async () => {
         if (isUpdateMode) {
             isLoading = true;
@@ -37,63 +43,120 @@
                 const res = await fetch(`${BACKEND_URL}/settings`);
                 if (res.ok) {
                     const data = await res.json();
-                    // Pre-populate user personalization (not masked)
-                    userName = data.USER_NAME || "";
-                    userLocation = data.USER_LOCATION || "";
-                    userBio = data.USER_BIO || "";
-                    // Show masked keys as placeholders (user can clear and re-enter)
-                    if (data.has_groq) groqKey = data.GROQ_API_KEY;
-                    if (data.has_google) googleKey = data.GOOGLE_API_KEY;
+                    
+                    // Map backend response to config
+                    config = {
+                        GROQ_API_KEY: data.GROQ_API_KEY || "",
+                        TAVILY_API_KEY: data.TAVILY_API_KEY || "",
+                        OPENROUTER_API_KEY: data.OPENROUTER_API_KEY || "",
+                        GOOGLE_API_KEY: data.GOOGLE_API_KEY || "",
+                        SPOTIFY_CLIENT_ID: data.SPOTIFY_CLIENT_ID || "",
+                        SPOTIFY_CLIENT_SECRET: "", // Never return secrets
+                        SPOTIFY_DEVICE_NAME: "", // Optional
+                        MICROPHONE_INDEX: "",
+                        USER_NAME: data.USER_NAME || "",
+                        USER_LOCATION: data.USER_LOCATION || "",
+                        USER_BIO: data.USER_BIO || ""
+                    };
+                    
+                    // Clone for comparison
+                    originalConfig = { ...config };
                     console.log("[Settings] Loaded existing values");
                 }
             } catch (e) {
-                console.error("[Settings] Failed to load existing:", e);
+                console.error("[Settings] Failed to load:", e);
+                error = "Failed to load settings from brain.";
             } finally {
                 isLoading = false;
             }
         }
     });
 
+    // Reactive Input Handler (Dirty Tracking)
+    function handleInput(field, value) {
+        config[field] = value;
+        
+        // Classic dirty check: Does current value differ from original?
+        if (value !== originalConfig[field]) {
+            dirtyFields.add(field);
+        } else {
+            dirtyFields.delete(field);
+        }
+        dirtyFields = dirtyFields; // Trigger Svelte reactivity
+    }
+
+    // Google Auth File Upload
+    async function handleGoogleUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        isSubmitting = true;
+        
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/settings/google-auth`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                success = "Credentials uploaded! Auth ready.";
+                setTimeout(() => success = "", 3000);
+            } else {
+                error = data.message || "Upload failed";
+            }
+        } catch (e) {
+            error = "Upload error: " + e.message;
+        } finally {
+            isSubmitting = false;
+        }
+    }
+
+    // Save Changes (PATCH)
     async function handleSubmit() {
-        if (!groqKey.trim()) {
-            error = "Groq API Key is required to power the brain 🧠";
-            return;
+        if (dirtyFields.size === 0) {
+            return; // Nothing to save
         }
         
         isSubmitting = true;
         error = "";
+        success = "";
         
         try {
-            const res = await fetch(`${BACKEND_URL}/setup`, {
-                method: "POST",
+            // Build payload with ONLY dirty fields
+            const payload = {};
+            dirtyFields.forEach(field => {
+                payload[field] = config[field].trim();
+            });
+
+            const res = await fetch(`${BACKEND_URL}/settings`, {
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    GROQ_API_KEY: groqKey.trim(),
-                    TAVILY_API_KEY: tavilyKey.trim(),
-                    GOOGLE_API_KEY: googleKey.trim(),
-                    OPENROUTER_API_KEY: openRouterKey.trim(),
-                    SPOTIFY_CLIENT_ID: spotifyClientId.trim(),
-                    SPOTIFY_CLIENT_SECRET: spotifyClientSecret.trim(),
-                    SPOTIFY_DEVICE_NAME: spotifyDeviceName.trim(),
-                    MICROPHONE_INDEX: micIndex.trim(),
-                    // User personalization (stored in settings.json, not .env)
-                    USER_NAME: userName.trim(),
-                    USER_LOCATION: userLocation.trim(),
-                    USER_BIO: userBio.trim()
-                })
+                body: JSON.stringify(payload)
             });
             
             const data = await res.json();
             
             if (data.success) {
-                success = "Configuration saved! Rebooting brain...";
-                setTimeout(() => {
-                    // Force re-check of backend status to switch to Chat view
-                    backendStatus.set("connected"); 
-                    location.reload(); // Simple reload to clear state and re-fetch health
-                }, 1500);
+                success = "Settings updated successfully!";
+                
+                // Reset state to new baseline
+                originalConfig = { ...config };
+                dirtyFields.clear();
+                dirtyFields = dirtyFields;
+                
+                // If not update mode (first setup), reload to start
+                if (!isUpdateMode) {
+                    setTimeout(() => {
+                        backendStatus.set("connected");
+                        location.reload();
+                    }, 1500);
+                }
             } else {
-                error = data.message || "Setup failed. Check keys.";
+                error = data.message || "Update failed.";
             }
         } catch (e) {
             error = "Connection failed: " + e.message;
@@ -121,96 +184,146 @@
         </div>
         
         <div class="scroll-container">
+            <!-- GROQ -->
             <div class="form-group">
-                <label for="groq">
-                    Groq API Key <span class="required">(Required)</span>
-                </label>
-                <input 
-                    id="groq" 
-                    type="password" 
-                    bind:value={groqKey} 
-                    placeholder="gsk_..." 
-                    class:error={error && !groqKey}
-                />
+                <label for="groq">Groq API Key <span class="required">(Required)</span></label>
+                <div class="input-wrapper">
+                    <input 
+                        id="groq" 
+                        type="password" 
+                        value={config.GROQ_API_KEY}
+                        on:input={(e) => handleInput('GROQ_API_KEY', e.target.value)}
+                        placeholder="gsk_••••••••"
+                        class:error={error && !config.GROQ_API_KEY}
+                    />
+                    {#if dirtyFields.has('GROQ_API_KEY')}
+                        <span class="badge-changed" in:fade>Modified</span>
+                    {/if}
+                </div>
                 <small>Get free key at <a href="https://console.groq.com" target="_blank">console.groq.com</a></small>
             </div>
 
+            <!-- TAVILY -->
             <div class="form-group">
-                <label for="tavily">
-                    Tavily API Key <span class="optional">(Recommended)</span>
-                </label>
-                <input 
-                    id="tavily" 
-                    type="password" 
-                    bind:value={tavilyKey} 
-                    placeholder="tvly-..." 
-                />
+                <label for="tavily">Tavily API Key <span class="optional">(Recommended)</span></label>
+                <div class="input-wrapper">
+                    <input 
+                        id="tavily" 
+                        type="password"
+                        value={config.TAVILY_API_KEY}
+                        on:input={(e) => handleInput('TAVILY_API_KEY', e.target.value)}
+                        placeholder="tvly-••••••••"
+                    />
+                    {#if dirtyFields.has('TAVILY_API_KEY')}
+                        <span class="badge-changed" in:fade>Modified</span>
+                    {/if}
+                </div>
             </div>
 
+            <!-- GOOGLE / GMAIL AUTH -->
+            <div class="section-title">📧 Gmail & Calendar (Google Auth)</div>
             <div class="form-group">
-                <label for="openrouter">
-                    OpenRouter Key <span class="optional">(Optional)</span>
-                </label>
-                <input 
-                    id="openrouter" 
-                    type="password" 
-                    bind:value={openRouterKey} 
-                    placeholder="sk-or-..." 
-                />
+                <label>Google Credentials (credentials.json)</label>
+                <div class="file-upload-row">
+                    <input 
+                        type="file" 
+                        accept=".json" 
+                        on:change={handleGoogleUpload} 
+                        id="google-upload"
+                        class="file-input"
+                    />
+                    <label for="google-upload" class="file-label">
+                        📁 Upload credentials.json
+                    </label>
+                    <small style="margin-left: 10px; color: #aaa;">Required for Gmail/Calendar tools</small>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="google">Google API Key (Gemini Backup)</label>
+                <div class="input-wrapper">
+                    <input 
+                        id="google" 
+                        type="password"
+                        value={config.GOOGLE_API_KEY}
+                        on:input={(e) => handleInput('GOOGLE_API_KEY', e.target.value)}
+                        placeholder="AIza••••••••"
+                    />
+                    {#if dirtyFields.has('GOOGLE_API_KEY')}
+                        <span class="badge-changed" in:fade>Modified</span>
+                    {/if}
+                </div>
             </div>
 
-            <div class="form-group">
-                <label for="google">
-                    Google API Key <span class="optional">(Recommended)</span>
-                </label>
-                <input 
-                    id="google" 
-                    type="password" 
-                    bind:value={googleKey} 
-                    placeholder="AIza..." 
-                />
-                <small>Enables Gemini 2.0 Flash backup. Get at <a href="https://aistudio.google.com/" target="_blank">aistudio.google.com</a></small>
-            </div>
-
-            <!-- User Personalization (V10.2) -->
-            <div class="section-title">👤 User Profile (Optional)</div>
+            <!-- USER PROFILE -->
+            <div class="section-title">👤 User Profile</div>
             
             <div class="form-group">
                 <label for="user-name">Your Name</label>
-                <input id="user-name" type="text" bind:value={userName} placeholder="e.g. Alex" />
+                <input id="user-name" type="text" value={config.USER_NAME} on:input={(e) => handleInput('USER_NAME', e.target.value)} placeholder="e.g. Alex" />
             </div>
             <div class="form-group">
                 <label for="user-location">Location</label>
-                <input id="user-location" type="text" bind:value={userLocation} placeholder="e.g. Bangalore, India" />
+                <input id="user-location" type="text" value={config.USER_LOCATION} on:input={(e) => handleInput('USER_LOCATION', e.target.value)} placeholder="e.g. Bangalore" />
             </div>
             <div class="form-group">
                 <label for="user-bio">Short Bio</label>
-                <input id="user-bio" type="text" bind:value={userBio} placeholder="e.g. AI engineer who loves anime" />
+                <input id="user-bio" type="text" value={config.USER_BIO} on:input={(e) => handleInput('USER_BIO', e.target.value)} placeholder="e.g. AI engineer" />
             </div>
 
             <!-- Advanced Toggle -->
             <button class="toggle-advanced" on:click={() => showAdvanced = !showAdvanced}>
-                {showAdvanced ? '▼ Hide Advanced' : '▶ Show Advanced (Spotify, Mic)'}
+                {showAdvanced ? '▼ Hide Advanced' : '▶ Show Advanced (Spotify, OpenRouter)'}
             </button>
 
             {#if showAdvanced}
                 <div class="advanced-section" transition:fade>
                     <div class="form-group">
-                        <label for="spotify-id">Spotify Client ID</label>
-                        <input id="spotify-id" type="text" bind:value={spotifyClientId} placeholder="Client ID from dashboard" />
+                        <label for="openrouter">OpenRouter Key</label>
+                        <div class="input-wrapper">
+                            <input 
+                                id="openrouter" 
+                                type="password" 
+                                value={config.OPENROUTER_API_KEY}
+                                on:input={(e) => handleInput('OPENROUTER_API_KEY', e.target.value)}
+                                placeholder="sk-or-••••••••" 
+                            />
+                            {#if dirtyFields.has('OPENROUTER_API_KEY')}
+                                <span class="badge-changed" in:fade>Modified</span>
+                            {/if}
+                        </div>
                     </div>
+                    
+                    <div class="form-group">
+                        <label for="spotify-id">Spotify Client ID</label>
+                        <div class="input-wrapper">
+                            <input 
+                                id="spotify-id" 
+                                type="text" 
+                                value={config.SPOTIFY_CLIENT_ID}
+                                on:input={(e) => handleInput('SPOTIFY_CLIENT_ID', e.target.value)}
+                                placeholder="Client ID" 
+                            />
+                            {#if dirtyFields.has('SPOTIFY_CLIENT_ID')}
+                                <span class="badge-changed" in:fade>Modified</span>
+                            {/if}
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label for="spotify-secret">Spotify Client Secret</label>
-                        <input id="spotify-secret" type="password" bind:value={spotifyClientSecret} placeholder="Client Secret" />
-                    </div>
-                    <div class="form-group">
-                        <label for="spotify-device">Spotify Device Name (Optional)</label>
-                        <input id="spotify-device" type="text" bind:value={spotifyDeviceName} placeholder="e.g. DESKTOP-PC or 'My Phone' (Leave empty for auto)" />
-                    </div>
-                    <div class="form-group">
-                        <label for="mic-index">Microphone Index (Optional)</label>
-                        <input id="mic-index" type="number" bind:value={micIndex} placeholder="Default: 1" />
-                        <small>Change only if voice detection fails.</small>
+                        <div class="input-wrapper">
+                            <input 
+                                id="spotify-secret" 
+                                type="password" 
+                                value={config.SPOTIFY_CLIENT_SECRET}
+                                on:input={(e) => handleInput('SPOTIFY_CLIENT_SECRET', e.target.value)}
+                                placeholder="Client Secret (Write-Only)" 
+                            />
+                            {#if dirtyFields.has('SPOTIFY_CLIENT_SECRET')}
+                                <span class="badge-changed" in:fade>Modified</span>
+                            {/if}
+                        </div>
                     </div>
                 </div>
             {/if}
@@ -228,11 +341,15 @@
             {#if isUpdateMode}
                 <button class="cancel-btn" on:click={onClose} disabled={isSubmitting}>Cancel</button>
             {/if}
-            <button class="submit-btn" on:click={handleSubmit} disabled={isSubmitting}>
+            <button 
+                class="submit-btn" 
+                on:click={handleSubmit} 
+                disabled={isSubmitting || dirtyFields.size === 0}
+            >
                 {#if isSubmitting}
-                    Connecting...
+                    Saving...
                 {:else}
-                    {isUpdateMode ? 'Update Configuration' : 'Wake Up Sakura 🌸'}
+                    {isUpdateMode ? (dirtyFields.size > 0 ? 'Save Changes' : 'No Changes') : 'Wake Up Sakura 🌸'}
                 {/if}
             </button>
         </div>
@@ -487,4 +604,52 @@
         color: rgba(255, 255, 255, 0.3);
     }
     .footer p { margin: 0; }
+    
+    /* ===== NEW UI ELEMENTS ===== */
+    .input-wrapper {
+        position: relative;
+        width: 100%;
+    }
+    
+    .badge-changed {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #e67e22;
+        color: white;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: bold;
+        pointer-events: none;
+    }
+    
+    .file-upload-row {
+        display: flex;
+        align-items: center;
+        width: 100%;
+    }
+    
+    .file-input {
+        display: none;
+    }
+    
+    .file-label {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px dashed rgba(255, 255, 255, 0.3);
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-size: 13px;
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+        flex: 1;
+    }
+    
+    .file-label:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: #ffb6c1;
+    }
 </style>

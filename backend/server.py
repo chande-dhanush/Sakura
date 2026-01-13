@@ -529,71 +529,142 @@ async def chat(request: Request):
     async def event_generator():
         global generation_cancelled
         
-        try:
-            # Run LLM in executor to avoid blocking event loop
-            loop = asyncio.get_event_loop()
-            
-            # Emit routing event first
-            yield f"data: {json.dumps({'type': 'thinking'})}\n\n"
-            
-            # Get latest history context
-            from sakura_assistant.memory.faiss_store import get_memory_store
-            store = get_memory_store()
-            current_history = store.conversation_history
-
-            # Execute the assistant (blocking call in thread pool)
-            result = await loop.run_in_executor(
-                None,
-                lambda: assistant.run(query, current_history, image_data=image_data)
-            )
-            
-            if generation_cancelled:
-                yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
-                return
-            
-            # Extract response data
-            content = result.get("content", "")
-            mode = result.get("mode", "")
-            tools_used = result.get("tools_used", "")
-            
-            # SAVE TO HISTORY for persistence
+        # Queue for cross-task communication
+        q = asyncio.Queue()
+        
+        # 1. Setup Flight Recorder Listener
+        from sakura_assistant.utils.flight_recorder import get_recorder
+        
+        def trace_callback(entry):
+            """Push trace events to queue."""
             try:
+                # Filter useful events to reduce noise
+                if entry.get("event") in ["span", "trace_start", "trace_end"]:
+                    q.put_nowait({"type": "timing", "data": entry})
+            except:
+                pass
+                
+        # Register callback (Note: Single user assumption holds)
+        get_recorder().set_callback(trace_callback)
+        
+        # 2. Define runners
+        async def run_pipeline():
+            """Run the actual pipeline and push result to queue."""
+            try:
+                # Get history context
                 from sakura_assistant.memory.faiss_store import get_memory_store
                 store = get_memory_store()
-                # Save user message
-                store.append_to_history({"role": "user", "content": query})
-                # Save assistant response
-                store.append_to_history({"role": "assistant", "content": content})
-                print(f"💾 Saved messages to history (total: {len(store.conversation_history)})")
-            except Exception as save_err:
-                print(f"⚠️ Failed to save to history: {save_err}")
-            
-            # Emit tool events if any
-            if tools_used:
-                for tool in tools_used.split(", "):
-                    if tool:
-                        yield f"data: {json.dumps({'type': 'tool_used', 'tool': tool})}\n\n"
-            
-            # Stream the response (for now, single chunk - can be enhanced later)
-            yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
-            
-            # [V10] Auto-TTS Trigger (Quick Search Mode)
-            tts_enabled = data.get("tts_enabled", False)
-            if tts_enabled and content:
-                try:
-                    from sakura_assistant.utils.tts import speak_async
-                    print(f"🗣️ Auto-TTS (Quick Search): '{content[:30]}...'")
-                    speak_async(content)
-                except Exception as tts_e:
-                    print(f"❌ Auto-TTS Failed: {tts_e}")
+                current_history = store.conversation_history
+                
+                # Execute True Async Pipeline
+                result = await assistant.arun(query, current_history, image_data=image_data)
+                
+                # Push success result
+                q.put_nowait({"type": "pipeline_result", "data": result})
+                
+            except asyncio.CancelledError:
+                print("🛑 Pipeline cancelled")
+                q.put_nowait({"type": "pipeline_cancelled"})
+            except Exception as e:
+                import traceback
+                print(f"❌ Pipeline Error: {e}")
+                traceback.print_exc()
+                q.put_nowait({"type": "pipeline_error", "error": str(e)})
 
-            # Done event
-            yield f"data: {json.dumps({'type': 'done', 'mode': mode})}\n\n"
-            
+        # 3. Start Pipeline Task
+        task = asyncio.create_task(run_pipeline())
+        global current_task
+        current_task = task
+        
+        # 4. Stream Loop
+        yield f"data: {json.dumps({'type': 'thinking'})}\n\n"
+        
+        try:
+            while True:
+                # Wait for next event
+                event = await q.get()
+                
+                if generation_cancelled:
+                    yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
+                    break
+                
+                msg_type = event.get("type")
+                
+                # --- A. Result Handling ---
+                if msg_type == "pipeline_result":
+                    result = event["data"]
+                    content = result.get("content", "")
+                    mode = result.get("mode", "")
+                    
+                    # Persistence
+                    try:
+                        from sakura_assistant.memory.faiss_store import get_memory_store
+                        store = get_memory_store()
+                        store.append_to_history({"role": "user", "content": query})
+                        store.append_to_history({"role": "assistant", "content": content})
+                    except Exception as e:
+                        print(f"⚠️ Save failed: {e}")
+                    
+                    # Tool events (extracted from metadata or result if available)
+                    tool_used = result.get("tool_used", "None")
+                    if tool_used != "None":
+                        yield f"data: {json.dumps({'type': 'tool_used', 'tool': tool_used})}\n\n"
+                        
+                    # Stream Content
+                    yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+                    
+                    # TTS Trigger
+                    if data.get("tts_enabled", False) and content:
+                        try:
+                            from sakura_assistant.utils.tts import speak_async
+                            speak_async(content)
+                        except: pass
+                        
+                    # Done
+                    yield f"data: {json.dumps({'type': 'done', 'mode': mode})}\n\n"
+                    break
+                
+                # --- B. Error/Cancel Handling ---
+                elif msg_type == "pipeline_error":
+                    yield f"data: {json.dumps({'type': 'error', 'message': event['error']})}\n\n"
+                    break
+                
+                elif msg_type == "pipeline_cancelled":
+                    yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
+                    break
+                
+                # --- C. Timing/Observability Events ---
+                elif msg_type == "timing":
+                    entry = event["data"]
+                    # Map Trace Event -> UI Event
+                    if entry["event"] == "span":
+                        # Convert specific log stages to UI-friendly events
+                        stage = entry.get("stage", "")
+                        status = entry.get("status", "")
+                        content = entry.get("content", "")
+                        elapsed = entry.get("elapsed_ms", 0)
+                        
+                        # Yield raw timing event for advanced UI
+                        payload = {
+                            "type": "timing",
+                            "stage": stage,
+                            "status": status,
+                            "ms": elapsed,
+                            "info": content
+                        }
+                        yield f"data: {json.dumps(payload)}\n\n"
+                        
+                    elif entry["event"] == "trace_start":
+                        yield f"data: {json.dumps({'type': 'trace_start', 'id': entry['trace_id']})}\n\n"
+                
+                else:
+                    print(f"⚠️ Unknown queue event: {msg_type}")
+
         except asyncio.CancelledError:
-            yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+             yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
+        finally:
+            # Cleanup listener
+            get_recorder().set_callback(None)
     
     return StreamingResponse(
         event_generator(),

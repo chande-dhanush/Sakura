@@ -115,8 +115,26 @@ def get_google_creds():
                     token.write(creds.to_json())
             except Exception as e:
                 print(f"⚠️ Token refresh failed: {e}")
-        else:
-            # print(f"❌ No valid token found at {token_path}")
-            pass
-            
+                creds = None
+                
+        # Fallback to interactive login if still no valid creds
+        if not creds:
+             cred_path = os.path.join(get_project_root(), 'credentials.json')
+             if os.path.exists(cred_path):
+                 try:
+                     from google_auth_oauthlib.flow import InstalledAppFlow
+                     print(f"🔄 Initiating Google Auth Flow from {cred_path}...")
+                     flow = InstalledAppFlow.from_client_secrets_file(cred_path, SCOPES)
+                     creds = flow.run_local_server(port=0)
+                     # Save the credentials for the next run
+                     with open(token_path, 'w') as token:
+                         token.write(creds.to_json())
+                     print("✅ New token.json saved.")
+                 except Exception as flow_err:
+                     print(f"❌ OAuth Flow failed: {flow_err}")
+                     return None
+             else:
+                 print(f"❌ No credentials.json found at {cred_path}")
+                 return None
+
     return creds

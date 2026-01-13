@@ -230,25 +230,141 @@ class SmartAssistant:
                  "metadata": {"status": "error"}
             }
 
-    def _handle_vision(self, user_input: str, image_data: str, start_time: float):
-        """Handle image inputs using backup vision model."""
-        print("🖼️ Vision Pipeline Active")
-        backup = self.container.get_backup_llm()
-        if not backup:
-             return {"content": "I received an image but don't have a vision-capable model configured."}
+    async def arun(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Async Pipeline (V10.4):
+        1. Vision Check
+        2. Graph Update (Sync - fast)
+        3. Router (Async)
+        4. Executor (Async)
+        5. Responder (Async)
+        """
+        print(f"\U0001f680 [LLM] SmartAssistant.arun() STARTED (Async)")
+        start_time = time.time()
+        state = AgentState()
+        recorder = get_recorder()
+        recorder.start_trace(user_input)
         
+        # 1. Vision Short-Circuit
+        if image_data:
+            # We can use the sync handle_vision for now, or make an async one. 
+            # Ideally wrap it or make async. For now, wrapper.
+            import asyncio
+            return await asyncio.to_thread(self._handle_vision, user_input, image_data, start_time)
+            
         try:
-             msg = HumanMessage(content=[
-                {"type": "text", "text": user_input or "Describe this image."},
-                {"type": "image_url", "image_url": {"url": image_data}}
-             ])
-             response = backup.invoke([msg])
-             return {
-                "content": response.content,
-                "mode": "Vision",
-                "tool_used": "VisionModel",
-                "metadata": {"latency": f"{time.time()-start_time:.2f}s"}
+            # 2. Graph & Context (Keep sync for now as it's pure logic + in-memory mostly)
+            study_mode_active = detect_study_mode(user_input)
+            
+            # Update Graph with User Intent
+            self.world_graph.resolve_reference(user_input)
+            self.world_graph.infer_user_intent(user_input, history)
+            
+            # 3. Routing (Async)
+            state.record_llm_call("routing")
+            with span("Router"):
+                route_result = await self.router.aroute(user_input, history, study_mode_active)
+            recorder.log("Router", f"Decision: {route_result.classification} (hint: {route_result.tool_hint})")
+            print(f"\U0001f6a6 Async Router Decision: {route_result.classification}")
+            
+            state.current_intent = route_result.classification
+            
+            # 4. Execution (Async)
+            tool_outputs = ""
+            tool_used = "None"
+            
+            if route_result.needs_tools or route_result.tool_hint:
+                print(f"⚙️ Async Execution Phase: {route_result.classification}")
+                state.record_llm_call("execution")
+                
+                # Fetch Graph Context
+                graph_context = self.world_graph.get_context_for_planner(user_input)
+                
+                with span("Executor"):
+                    exec_result = await self.executor.aexecute(
+                        user_input,
+                        route_result,
+                        graph_context,
+                        state
+                    )
+                recorder.log("Executor", f"Tool: {exec_result.tool_used}, Success: {exec_result.success}")
+                
+                tool_outputs = exec_result.outputs
+                tool_used = exec_result.tool_used
+                
+                if exec_result.tool_messages:
+                     # Log actions to World Graph (Sync)
+                     for action in exec_result.tool_messages:
+                         try:
+                             # Handle ToolMessage objects (LangChain) or dicts
+                             tool_name = getattr(action, 'name', None) or action.get('tool', 'unknown')
+                             result_content = getattr(action, 'content', None) or action.get('content', '')
+                             
+                             self.world_graph.record_action(
+                                 tool=tool_name,
+                                 args={}, # Args not preserved in ToolMessage, acceptable for Graph history
+                                 result=str(result_content),
+                                 success=True
+                             )
+                         except Exception as wg_err:
+                             print(f"⚠️ World Graph recording failed: {wg_err}")
+            
+            # V10.3: Record turn (Sync)
+            self.summary_memory.add_turn("user", user_input)
+            
+            # 5. Response (Async)
+            state.record_llm_call("responding")
+            print(f"🏁 Async Response Phase")
+            
+            summary_context = self.summary_memory.get_context_injection()
+            
+            from .responder import ResponseContext
+            resp_context = ResponseContext(
+                user_input=user_input,
+                tool_outputs=tool_outputs,
+                history=history,
+                graph_context=self.world_graph.get_context_for_responder(),
+                intent_adjustment=self.world_graph.get_intent_adjustment(),
+                current_mood=self.world_graph.get_current_mood(),
+                study_mode=study_mode_active
+            )
+            
+            with span("Responder"):
+                response_text = await self.responder.agenerate(resp_context)
+            recorder.log("Responder", f"Generated {len(response_text)} chars")
+            
+            # Record assistant response (Sync)
+            self.summary_memory.add_turn("assistant", response_text)
+            
+            # Update Graph Logic
+            self.world_graph.advance_turn()
+            self.world_graph.save()
+            
+            recorder.end_trace(success=True, response_preview=response_text[:80])
+            
+            return {
+                "content": response_text,
+                "mode": route_result.classification,
+                "tool_used": tool_used,
+                "metadata": {
+                    "latency": f"{time.time()-start_time:.2f}s",
+                    "status": "success",
+                    "async": True
+                }
             }
+            
+        except RateLimitExceeded:
+            recorder.end_trace(success=False, response_preview="rate_limited")
+            return {
+                "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+                 "metadata": {"status": "rate_limited"}
+             }
         except Exception as e:
-            print(f"❌ Vision Error: {e}")
-            return {"content": f"Vision analysis failed: {e}"}
+            recorder.end_trace(success=False, response_preview=str(e)[:50])
+            print(f"\u274c Async Pipeline Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "content": f"I encountered an error: {e}",
+                 "metadata": {"status": "error"}
+            }

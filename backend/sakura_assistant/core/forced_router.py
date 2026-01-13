@@ -206,17 +206,6 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "args_extractor": lambda m, text: {"topic": m.group(2).strip()},
         "description": "news about X",
     },
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # FORCE COMPLEX (Don't force specific tool, but ensure LLM planning runs)
-    # ═══════════════════════════════════════════════════════════════════════
-    {
-        "pattern": r"^(what|who|when|where|how|why|is|are|can|could|would|should)\b.+\?$",
-        "tool": None,
-        "args_extractor": None,
-        "description": "Question detected",
-        "force_complex": True,
-    },
 ]
 
 

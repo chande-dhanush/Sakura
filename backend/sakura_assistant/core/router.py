@@ -33,23 +33,14 @@ User: "What is the weather in Tokyo?"
 User: "What time is it?"
 {"classification": "DIRECT", "tool_hint": "get_time", "reason": "Single lookup"}
 
-User: "What's the weather?"
-{"classification": "DIRECT", "tool_hint": "get_weather", "reason": "Single lookup"}
-
-User: "Hi there!"
-{"classification": "CHAT", "tool_hint": null, "reason": "Greeting, no tool needed"}
-
-User: "Thanks for your help"
-{"classification": "CHAT", "tool_hint": null, "reason": "Gratitude, no tool needed"}
-
 User: "Explain quantum physics"
 {"classification": "CHAT", "tool_hint": null, "reason": "Knowledge explanation, no tool"}
 
-User: "Find a recipe for lasagna and add the ingredients to my shopping list"
-{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Search recipe -> Add to list"}
+User: "Who is the CEO of OpenAI?"
+{"classification": "PLAN", "tool_hint": "web_search", "reason": "Fact lookup"}
 
-User: "Who is the CEO of the company that made ChatGPT?"
-{"classification": "PLAN", "tool_hint": null, "reason": "Reasoning required: Identify company -> Identify CEO"}
+User: "Find a recipe for lasagna and add the ingredients to my shopping list"
+{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Search -> Add to list"}
 
 User: "Research quantum computing and summarize the key concepts"
 {"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Research -> Summarize"}
@@ -106,6 +97,30 @@ class IntentRouter:
         """
         self.llm = llm
     
+    async def aroute(self, query: str, context: str = "", history: List[Dict] = None) -> RouteResult:
+        """Async version of route using native ainvoke."""
+        # 1. Action command check (CPU bound, fast enough to keep sync logic)
+        if self._is_action_command(query):
+            print(f"⚡ [Router] Action command detected (Async), forcing DIRECT")
+            tool_hint = self._guess_tool_hint(query)
+            return RouteResult("DIRECT", tool_hint)
+            
+        # 2. LLM classification
+        try:
+            messages = [
+                SystemMessage(content=ROUTER_SYSTEM_PROMPT),
+                HumanMessage(content=f"Context: {context}\n\nQuery: {query}")
+            ]
+            
+            # Use async invoke
+            response = await self.llm.ainvoke(messages)
+            classification, tool_hint = self._parse_response(response.content)
+            return RouteResult(classification, tool_hint)
+            
+        except Exception as e:
+            print(f"⚠️ [Router] Async Error: {e}, defaulting to CHAT")
+            return RouteResult("CHAT")
+
     def route(self, query: str, context: str = "", history: List[Dict] = None) -> RouteResult:
         """
         Classify query and determine processing path.
