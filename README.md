@@ -1,168 +1,131 @@
-# 🌸 Sakura V10
+# 🌸 Sakura V10.4
 
-> An intelligent AI assistant with voice, vision, and tool-use capabilities.
+> A production-grade personal AI assistant with voice, vision, and 46 tools.
 
-![Sakura V10](https://img.shields.io/badge/version-10.0-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-10.4-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)
 
-## ✨ Features
-
-- **💬 Smart Chat** - Powered by Groq LLMs with tiered architecture
-- **🔧 Tool Use** - 47+ tools (Spotify, Gmail, Calendar, Web Search, Notes, etc.)
-- **🛡️ Enterprise Security** - Simple Auth, Path Sandboxing, Safe Math Parsing
-- **🎙️ Voice** - Wake word detection + TTS with Kokoro + Real-time UI Sync
-- **🧠 Emotional Intelligence** - World Graph memory with mood/intent tracking
-- **🖼️ Vision** - Image analysis via OpenRouter
-- **📊 Observability** - Structured logging & Prometheus metrics
-- **🌐 Quick Search** - `Alt+S` for instant omnibox-style search
-- **📍 Bubble Widget** - Always-on floating widget
-- **📎 File Upload** - Attach PDFs, docs, images for RAG ingestion (V10.1)
-
-### 🆕 V10.1 Updates (January 2026)
-- **Terminal Action Deduplication** - Prevents LLM from calling same tool 5x
-- **Window Auto-Show** - Main window now shows automatically after backend ready
-- **Settings UI Fix** - Save button now visible with proper scrolling
-- **Layout Stability** - Fixed app window expanding with message content
+<p align="center">
+  <img src="docs/sakura_demo.gif" alt="Sakura Demo" width="600"/>
+</p>
 
 ---
 
-## 🚀 Installation
+## ✨ What is Sakura?
+
+Sakura is a **desktop AI assistant** that can:
+- 🎵 Control Spotify, YouTube, and system media
+- 📧 Read/send Gmail, manage Calendar & Tasks
+- 🔍 Search the web, scrape websites, take notes
+- 🎙️ Respond to voice commands ("Hey Sakura")
+- 🖼️ Analyze images and screenshots
+- 🧠 Remember context across conversations
+
+**Free to run** — Uses Groq (Llama 3.3 70B) and Google Gemini free tiers.
+
+---
+
+## 🚀 Quick Start (5 Minutes)
 
 ### Prerequisites
-- **Python 3.11+** - [Download](https://www.python.org/downloads/)
-- **Node.js 18+** - [Download](https://nodejs.org/)
-- **Rust** - [Install via rustup](https://rustup.rs/)
 
-### Quick Start (Windows)
+| Requirement | How to Install |
+|-------------|----------------|
+| Python 3.11+ | [python.org/downloads](https://www.python.org/downloads/) |
+| Node.js 18+ | [nodejs.org](https://nodejs.org/) |
+| Rust | [rustup.rs](https://rustup.rs/) |
+| Groq API Key | [console.groq.com](https://console.groq.com) (Free) |
+
+### Windows Setup
+
 ```powershell
-# 1. Clone and enter directory
+# 1. Clone the repo
 git clone https://github.com/chande-dhanush/Sakura_V_9.1.git
 cd Sakura_V_9.1
 
 # 2. Run automated setup (as Administrator)
 .\setup.ps1
 
-# 3. Configure API keys
-notepad .env
+# 3. Create .env file with your API key
+Copy-Item .env.example .env
+notepad .env   # Add your GROQ_API_KEY
 
-# 4. First-time setup (Google Auth + Voice)
+# 4. First-time setup (Google OAuth + Voice templates)
 cd backend
 ..\PA\Scripts\python first_setup.py
 
-# 5. Launch the app
+# 5. Launch!
 cd ..\frontend
 npm run tauri dev
 ```
 
-### 👤 Customization
-You can make Sakura your own! To change the user profile (Name, Role, Interests) or the Assistant's Personality:
+### Linux / macOS Setup
 
-1.  Open `backend/sakura_assistant/config.py`.
-2.  Edit the `USER_DETAILS` block to reflect **YOU**.
-3.  Edit the `SYSTEM_PERSONALITY` block to change how Sakura talks.
-4.  Restart the backend server for changes to take effect.
-
-### Manual Setup (All Platforms)
 ```bash
-# 1. Clone repo
-git clone https://github.com/chande-dhanush/sakura_v_9.1.git
-cd sakura_v_9.1
+# 1. Clone the repo
+git clone https://github.com/chande-dhanush/Sakura_V_9.1.git
+cd Sakura_V_9.1
 
-# 2. Create Python venv
-python -m venv PA
-.\PA\Scripts\activate   # Windows
-source PA/bin/activate  ### ⚡ Automated Setup
-
-**Windows**:
-```powershell
-.\setup.ps1
-```
-
-**Linux / macOS**:
-```bash
+# 2. Run automated setup
 chmod +x setup.sh
 ./setup.sh
-```
 
-This script will:
-1.  Install Python & Node.js (if missing).
-2.  Install System Audio/OCR libraries (ffmpeg, portaudio, tesseract).
-3.  Create a virtual environment (`PA/`).
-4.  Install all dependencies.
-cd ..
-
-# 4. Configure API keys
+# 3. Create .env file
 cp .env.example .env
-# Edit .env with your keys
+nano .env   # Add your GROQ_API_KEY
 
-# 5. First-time setup (Google Auth + Voice)
+# 4. First-time setup
 cd backend
+source ../PA/bin/activate
 python first_setup.py
 
-# 6. Run
+# 5. Launch!
 cd ../frontend
 npm run tauri dev
 ```
 
 ---
 
-## 🔧 First-Time Setup (Important!)
+## 🔑 API Keys
 
-After installation, run the setup wizard:
-```bash
-cd backend
-python first_setup.py
+Create a `.env` file in the project root:
+
+```env
+# REQUIRED (Free)
+GROQ_API_KEY=gsk_your_key_here        # https://console.groq.com
+
+# OPTIONAL (Enhances features)
+OPENROUTER_API_KEY=sk-or-your_key     # Vision - https://openrouter.ai
+TAVILY_API_KEY=tvly-your_key          # Web search - https://tavily.com
+
+# OPTIONAL (Spotify integration)
+SPOTIFY_CLIENT_ID=your_id
+SPOTIFY_CLIENT_SECRET=your_secret
 ```
 
-This configures:
-1. **Google OAuth** - For Gmail/Calendar access
-2. **Wake Word Templates** - Records your voice for "Sakura" activation
-
-### Google OAuth Setup (Optional)
-> **Note:** Google integration (Gmail, Calendar, Tasks) is **optional**. The app works perfectly without it.
-
-To enable Gmail/Calendar/Tasks:
-1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Create a new project (or use existing)
-3. Enable these APIs: `Gmail API`, `Google Calendar API`, `Tasks API`
-4. Go to **OAuth consent screen** → Configure as "External" → Add your email as test user
-5. Go to **Credentials** → Create **OAuth 2.0 Client ID** → Select "Desktop App"
-6. Download the JSON file → Rename to `credentials.json`
-7. Place it in `backend/` folder (or `%APPDATA%/SakuraV10/` for installed version)
-8. Run the app → First Gmail/Calendar request will open browser for authorization
-9. After authentication, `token.json` is created and you're set!
-
-**Troubleshooting:**
-- "Access blocked" → Add your Google account as a test user in OAuth consent screen
-- "credentials.json not found" → Make sure the file is in the correct directory
-
-### Wake Word Setup
-The setup wizard guides you to record 3-5 voice samples saying "Sakura".
-Templates are saved to `data/wake_templates/` in your app data folder.
+| Service | Free Tier | What It Enables |
+|---------|-----------|-----------------|
+| Groq | 30 RPM | Core LLM (Llama 3.3 70B) |
+| Tavily | 1000/mo | Web search tool |
+| OpenRouter | $5 free | Vision analysis |
+| Spotify | Unlimited | Music control |
 
 ---
 
-## 🔐 API Keys & Security
+## 📱 Google Integration (Optional)
 
-### Authentication
-Sakura V10 now enforces simple authentication for the API.
-1. Open `backend/server.py` and set your credentials (default: `sakura / sakura123`).
-2. The frontend automatically handles headers.
+Gmail, Calendar, and Tasks require Google OAuth:
 
-### Environment Variables
-Create `.env` in the project root:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create a project → Enable `Gmail API`, `Calendar API`, `Tasks API`
+3. OAuth consent screen → Add your email as test user
+4. Credentials → Create OAuth 2.0 Client ID → Desktop App
+5. Download JSON → Rename to `credentials.json` → Place in `backend/`
+6. Run `python first_setup.py` → Authorize in browser
 
-```env
-# REQUIRED
-GROQ_API_KEY=gsk_your_key_here        # https://console.groq.com
-
-# OPTIONAL
-OPENROUTER_API_KEY=sk-or-your_key     # Vision (https://openrouter.ai)
-TAVILY_API_KEY=tvly-your_key          # Web search (https://tavily.com)
-SPOTIFY_CLIENT_ID=your_client_id      # Spotify
-SPOTIFY_CLIENT_SECRET=your_secret     # Spotify
-```
+> **Tip:** Google integration is optional. Sakura works fine without it!
 
 ---
 
@@ -170,44 +133,58 @@ SPOTIFY_CLIENT_SECRET=your_secret     # Spotify
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+S` | Toggle Quick Search |
-| `Alt+F` | Force Full Window Mode |
+| `Alt+S` | Toggle Quick Search (Omnibox) |
+| `Alt+F` | Toggle Full Window |
 | `Alt+M` | Hide Mode (for movies) |
 | `Escape` | Stop AI generation |
+| Say "Sakura" | Voice activation |
 
 ---
 
-## 📦 Optional Dependencies
+## 🛠️ Project Structure
 
-| Feature | Install |
-|---------|---------|
-| Screen Reading | `winget install UB-Mannheim.TesseractOCR` |
-| Voice Input | ✅ Included |
-| Voice Output | ✅ Included |
+```
+Sakura_V_9.1/
+├── frontend/           # Tauri + Svelte UI
+│   ├── src/            # Svelte components
+│   └── src-tauri/      # Rust window manager
+├── backend/            # FastAPI + LangChain
+│   ├── server.py       # Main API server
+│   ├── sakura_assistant/
+│   │   ├── core/       # Router, Executor, Planner
+│   │   ├── tools/      # 46 tool implementations
+│   │   └── utils/      # Flight recorder, metrics
+│   └── data/           # World graph, templates
+└── docs/               # Documentation
+```
 
 ---
 
-## 🛠️ Building for Production
+## 🏗️ Building for Production
 
-### One Command Build (Frontend + Backend)
 ```bash
 cd frontend
 npm run tauri build
 ```
 
-This **automatically**:
-1. Compiles the Python backend with PyInstaller
-2. Bundles it as a Tauri sidecar
-3. Builds the complete installer
+**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_10.4.0_x64-setup.exe`
 
-**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_10.0.0_x64-setup.exe`
+This creates a single installer that bundles:
+- Compiled Python backend (PyInstaller)
+- Tauri desktop shell
+- All dependencies
 
-### Development Mode
-```bash
-cd frontend
-npm run tauri dev
-```
-Uses your local Python + venv (no PyInstaller needed).
+---
+
+## 🆕 What's New in V10.4
+
+| Feature | Description |
+|---------|-------------|
+| **Flight Recorder** | JSONL tracing for debugging latency |
+| **Few-Shot Router** | 15 examples for 90%+ routing accuracy |
+| **Async LLM** | Native ainvoke() for parallel tool execution |
+| **Rate Limiter** | Token bucket backpressure (no 429 crashes) |
+| **Audit Suite** | Behavioral verification scripts |
 
 ---
 
@@ -216,25 +193,30 @@ Uses your local Python + venv (no PyInstaller needed).
 | Issue | Solution |
 |-------|----------|
 | "No module named..." | Activate venv: `.\PA\Scripts\activate` |
-| Wake word not working | Run `python first_setup.py` to record templates |
-| Gmail/Calendar errors | Run `python first_setup.py` for OAuth |
-| Bubble not visible | Press `Alt+M` to unhide |
+| Wake word not working | Run `python first_setup.py` |
+| Gmail/Calendar errors | Check `credentials.json` placement |
+| App won't start | Check `backend/data/flight_recorder.jsonl` for errors |
+| Rate limited | Wait 1-2 minutes (free tier limits) |
 
 ---
 
-## 👻 Run in Background
-- **Windows**: Double-click `run_background.vbs`. (Hidden window)
-- **Linux/Mac**: `./run_background.sh`
+## 👤 Customization
 
-## 🗑️ Uninstall
-Removes all data, virtual environments, and dependencies.
-- **Windows**: `.\uninstall.ps1`
-- **Linux/Mac**: `./uninstall.sh`
+Edit `backend/sakura_assistant/config.py`:
 
-## ⚙️ Startup Manager
-Want to change your mind about autostart later?
-- **Windows**: `.\toggle_startup.ps1`
-- **Linux/Mac**: `./toggle_startup.sh`
+```python
+USER_DETAILS = """
+Name: Your Name
+Role: Your Role
+Interests: Your interests
+"""
+
+SYSTEM_PERSONALITY = """
+You are Sakura, a helpful AI assistant...
+"""
+```
+
+---
 
 ## 📝 License
 
@@ -242,4 +224,6 @@ MIT License - See [LICENSE](LICENSE)
 
 ---
 
-Built with ❤️ by Dhanush
+<p align="center">
+  Built with ❤️ by <a href="https://github.com/chande-dhanush">Dhanush</a>
+</p>
