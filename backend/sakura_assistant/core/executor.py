@@ -353,11 +353,14 @@ class ToolExecutor:
                 print(f"⏹️ [Executor] Terminal action '{final_tool_used}' completed - stopping loop.")
                 break
             
+        # Get the last result from the final execution
+        final_last_result = exec_res.last_result if 'exec_res' in dir() and exec_res else None
+        
         return ExecutionResult(
             outputs="\n".join(all_outputs),
             tool_messages=all_tool_messages,
             tool_used=final_tool_used,
-            last_result=None,
+            last_result=final_last_result,  # V13: Pass through for flight recorder
             success=True
         )
     

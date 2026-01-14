@@ -1,11 +1,17 @@
 #!/bin/bash
-# Sakura V10 - Linux/Mac Setup Script
-# Usage: ./setup.sh
+# Sakura V13 - Linux/Mac Setup Script
+# Run from project root: ./scripts/setup.sh
 
 set -e
 
-echo -e "\033[35m🌸 Sakura V10 Setup Script\033[0m"
-echo -e "\033[35m=========================\033[0m"
+# Get project root (parent of scripts/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
+echo -e "\033[35m🌸 Sakura V13 Setup Script\033[0m"
+echo -e "\033[35m==========================\033[0m"
+echo -e "\033[36mProject Root: $PROJECT_ROOT\033[0m"
 
 # 1. Check OS
 OS="$(uname -s)"
@@ -34,30 +40,29 @@ fi
 
 # 3. Create Venv
 echo -e "\n\033[36m🐍 Setting up Python virtual environment...\033[0m"
-if [ ! -d "PA" ]; then
-    python3 -m venv PA
-    echo -e "   ✅ Created venv at ./PA"
+if [ ! -d "$PROJECT_ROOT/PA" ]; then
+    python3 -m venv "$PROJECT_ROOT/PA"
+    echo -e "   ✅ Created venv at $PROJECT_ROOT/PA"
 else
     echo -e "   ✅ Venv already exists"
 fi
 
 # 4. Install Python Deps
 echo -e "\n\033[36m📥 Installing Python dependencies...\033[0m"
-source PA/bin/activate
+source "$PROJECT_ROOT/PA/bin/activate"
 pip install --upgrade pip
-# Use the cross-platform requirements file
-pip install -r backend/requirements.txt
+pip install -r "$PROJECT_ROOT/backend/requirements.txt"
 
 # 5. Frontend Deps
 echo -e "\n\033[36m📥 Installing Frontend dependencies...\033[0m"
-cd frontend
+cd "$PROJECT_ROOT/frontend"
 npm install
-cd ..
+cd "$PROJECT_ROOT"
 
 # 6. Env File
 echo -e "\n\033[36m🔐 Checking .env file...\033[0m"
-if [ ! -f ".env" ]; then
-    cp .env.example .env
+if [ ! -f "$PROJECT_ROOT/.env" ]; then
+    cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
     echo -e "   ⚠️  Created .env from template. Please add your API keys!"
 else
     echo -e "   ✅ .env exists"
@@ -68,11 +73,3 @@ echo -e "\033[32m==================\033[0m"
 echo -e "\033[36mTo run Sakura:\033[0m"
 echo "  cd frontend"
 echo "  npm run tauri dev"
-
-# 7. Startup Prompt
-echo -e "\n\033[36m⚙️  Configuration\033[0m"
-if [ -f "toggle_startup.sh" ]; then
-    chmod +x toggle_startup.sh
-    ./toggle_startup.sh
-fi
-

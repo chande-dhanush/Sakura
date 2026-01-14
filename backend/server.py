@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sakura_assistant.core.memory.reflection import ReflectionEngine # V11.2
 
-from fastapi import FastAPI, Request, BackgroundTasks, WebSocket
+from fastapi import FastAPI, Request, BackgroundTasks, WebSocket, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import hashlib

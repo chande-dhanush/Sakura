@@ -46,11 +46,11 @@ Sakura is a **desktop AI assistant** that can:
 
 ```powershell
 # 1. Clone the repo
-git clone https://github.com/chande-dhanush/Sakura_V_9.1.git
-cd Sakura_V_9.1
+git clone https://github.com/chande-dhanush/Sakura.git
+cd Sakura
 
 # 2. Run automated setup (as Administrator)
-.\setup.ps1
+.\scripts\setup.ps1
 
 # 3. Create .env file with your API key
 Copy-Item .env.example .env
@@ -69,12 +69,12 @@ npm run tauri dev
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/chande-dhanush/Sakura_V_9.1.git
-cd Sakura_V_9.1
+git clone https://github.com/chande-dhanush/Sakura.git
+cd Sakura
 
 # 2. Run automated setup
-chmod +x setup.sh
-./setup.sh
+chmod +x scripts/setup.sh
+./scripts/setup.sh
 
 # 3. Create .env file
 cp .env.example .env
@@ -148,27 +148,40 @@ Gmail, Calendar, and Tasks require Google OAuth:
 ## 🛠️ Project Structure
 
 ```
-Sakura_V_9.1/
-├── frontend/           # Tauri + Svelte UI
-│   ├── src/            # Svelte components
-│   └── src-tauri/      # Rust window manager
-├── backend/            # FastAPI + LangChain
-│   ├── server.py       # Main API server
+Sakura/
+├── frontend/               # Tauri + Svelte UI
+│   ├── src/                # Svelte components
+│   └── src-tauri/          # Rust window manager
+├── backend/                # FastAPI + LangChain
+│   ├── server.py           # Main API server
 │   ├── sakura_assistant/
-│   │   ├── core/       # Router, Executor, Planner
-│   │   ├── tools_libs/ # 54 tool implementations
-│   │   └── utils/      # Flight recorder, metrics
-│   ├── docker/         # Code Interpreter Dockerfile
-│   └── data/           # World graph, templates
-├── V13_AUDIT_REPORT.md # Comprehensive test report
-└── docs/               # Documentation
+│   │   ├── core/           # Router, Executor, Planner
+│   │   └── tools_libs/     # 54 tool implementations
+│   ├── tests/              # All test suites
+│   └── data/               # World graph, templates
+├── scripts/                # Setup & build scripts
+│   ├── setup.ps1           # Windows setup
+│   ├── setup.sh            # Linux/Mac setup
+│   ├── build_bundle.ps1    # Production build
+│   └── toggle_startup.*    # Autostart config
+├── docs/                   # Documentation
+│   ├── DOCUMENTATION.md    # Full API docs
+│   ├── V13_AUDIT_REPORT.md # Test coverage report
+│   └── V13_WALKTHROUGH.md  # Feature walkthrough
+├── audit/                  # Audit scripts
+├── .env                    # Your API keys
+└── README.md               # This file
 ```
 
 ---
 
 ## 🏗️ Building for Production
 
-```bash
+```powershell
+# Option 1: Full automated build
+.\scripts\build_bundle.ps1
+
+# Option 2: Manual build
 cd frontend
 npm run tauri build
 ```
@@ -246,7 +259,20 @@ You are Sakura, a helpful AI assistant...
 
 ---
 
-## 📝 License
+## � Documentation
+
+For those who want to dive deeper:
+
+| Document | Description |
+|----------|-------------|
+| [DOCUMENTATION.md](docs/DOCUMENTATION.md) | Full API documentation & architecture |
+| [V13_AUDIT_REPORT.md](docs/V13_AUDIT_REPORT.md) | Test coverage & certification report |
+| [V13_WALKTHROUGH.md](docs/V13_WALKTHROUGH.md) | Feature walkthrough with code examples |
+| [TEST_AUDIT.md](docs/TEST_AUDIT.md) | Test suite analysis & benchmarks |
+
+---
+
+## �📝 License
 
 MIT License - See [LICENSE](LICENSE)
 

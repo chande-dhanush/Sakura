@@ -489,8 +489,8 @@ pub fn run() {
                     }
                 }
                 tauri::WindowEvent::CloseRequested { api, .. } => {
-                    // Hide main window instead of closing
-                    if window.label() == "main" {
+                    // Hide main and logs windows instead of closing
+                    if window.label() == "main" || window.label() == "logs" {
                         api.prevent_close();
                         let _ = window.hide();
                     }

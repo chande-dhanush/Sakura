@@ -1,9 +1,16 @@
-# Sakura V10 - Windows Setup Script
-# Run as Administrator: .\setup.ps1
+# Sakura V13 - Windows Setup Script
+# Run from project root: .\scripts\setup.ps1
 
 $ErrorActionPreference = "Stop"
-Write-Host "🌸 Sakura V10 Setup Script" -ForegroundColor Magenta
-Write-Host "=========================" -ForegroundColor Magenta
+
+# Get project root (parent of scripts/)
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir
+Set-Location $ProjectRoot
+
+Write-Host "🌸 Sakura V13 Setup Script" -ForegroundColor Magenta
+Write-Host "==========================" -ForegroundColor Magenta
+Write-Host "Project Root: $ProjectRoot" -ForegroundColor Gray
 
 # Check Admin
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -43,7 +50,7 @@ try {
     Write-Host "   ⚠️  Please restart your terminal after Rust installation!" -ForegroundColor Yellow
 }
 
-# --- 4. Optional: Tesseract OCR (for screen reading) ---
+# --- 4. Optional: Tesseract OCR ---
 Write-Host "`n📦 [Optional] Checking Tesseract OCR..." -ForegroundColor Cyan
 $tesseractPath = "C:\Program Files\Tesseract-OCR\tesseract.exe"
 if (Test-Path $tesseractPath) {
@@ -55,7 +62,7 @@ if (Test-Path $tesseractPath) {
 
 # --- 5. Create Virtual Environment ---
 Write-Host "`n🐍 Setting up Python virtual environment..." -ForegroundColor Cyan
-$venvPath = ".\PA"
+$venvPath = Join-Path $ProjectRoot "PA"
 if (-not (Test-Path $venvPath)) {
     python -m venv $venvPath
     Write-Host "   ✅ Created venv at $venvPath" -ForegroundColor Green
@@ -65,20 +72,21 @@ if (-not (Test-Path $venvPath)) {
 
 # --- 6. Install Python Dependencies ---
 Write-Host "`n📥 Installing Python dependencies..." -ForegroundColor Cyan
-& "$venvPath\Scripts\pip.exe" install -r backend\requirements.txt
+& "$venvPath\Scripts\pip.exe" install -r (Join-Path $ProjectRoot "backend\requirements.txt")
 
 # --- 7. Install Frontend Dependencies ---
 Write-Host "`n📥 Installing Frontend dependencies..." -ForegroundColor Cyan
-Set-Location frontend
+Set-Location (Join-Path $ProjectRoot "frontend")
 npm install
-Set-Location ..
+Set-Location $ProjectRoot
 
 # --- 8. Create .env file if missing ---
 Write-Host "`n🔐 Checking .env file..." -ForegroundColor Cyan
-if (-not (Test-Path ".env")) {
-    Copy-Item ".env.example" ".env"
+$envPath = Join-Path $ProjectRoot ".env"
+$envExample = Join-Path $ProjectRoot ".env.example"
+if (-not (Test-Path $envPath)) {
+    Copy-Item $envExample $envPath
     Write-Host "   ⚠️  Created .env from template. Please add your API keys!" -ForegroundColor Yellow
-    Write-Host "   Edit: .env" -ForegroundColor Gray
 } else {
     Write-Host "   ✅ .env exists" -ForegroundColor Green
 }
@@ -91,10 +99,3 @@ Write-Host "  cd frontend" -ForegroundColor White
 Write-Host "  npm run tauri dev" -ForegroundColor White
 Write-Host "`nTo build for production:" -ForegroundColor Cyan
 Write-Host "  npm run tauri build" -ForegroundColor White
-
-# --- 9. Startup Prompt ---
-Write-Host "`n⚙️  Configuration" -ForegroundColor Cyan
-if (Test-Path ".\toggle_startup.ps1") {
-    powershell -ExecutionPolicy Bypass -File ".\toggle_startup.ps1"
-}
-

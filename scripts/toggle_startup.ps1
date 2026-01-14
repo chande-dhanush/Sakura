@@ -1,13 +1,18 @@
-# Sakura V10 - Startup Manager (Windows)
+# Sakura V13 - Startup Manager (Windows)
+# Run from scripts/ folder
+
 $ErrorActionPreference = "Stop"
 
-$ShortcutName = "SakuraV10.lnk"
+# Get paths
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir
+
+$ShortcutName = "SakuraV13.lnk"
 $StartupPath = [Environment]::GetFolderPath("Startup")
 $ShortcutPath = Join-Path $StartupPath $ShortcutName
-$TargetScript = (Get-Item ".\run_background.vbs").FullName
-$IconPath = (Get-Item ".\backend\assets\icon.ico").FullName # Assuming icon exists, else default
+$TargetScript = Join-Path $ScriptDir "run_background.vbs"
 
-Write-Host "🌸 Sakura V10 - Autostart Configuration" -ForegroundColor Magenta
+Write-Host "🌸 Sakura V13 - Autostart Configuration" -ForegroundColor Magenta
 Write-Host "Startup Folder: $StartupPath" -ForegroundColor Gray
 
 if (Test-Path $ShortcutPath) {
@@ -23,13 +28,17 @@ if (Test-Path $ShortcutPath) {
     Write-Host "`n❌ Status: DISABLED (Manual Run Only)" -ForegroundColor Yellow
     $choice = Read-Host "Do you want to ENABLE autostart? (y/n)"
     if ($choice -eq 'y') {
+        # Check if VBS exists
+        if (-not (Test-Path $TargetScript)) {
+            Write-Host "❌ run_background.vbs not found at: $TargetScript" -ForegroundColor Red
+            exit 1
+        }
+        
         $wshShell = New-Object -ComObject WScript.Shell
         $shortcut = $wshShell.CreateShortcut($ShortcutPath)
         $shortcut.TargetPath = $TargetScript
-        $shortcut.WorkingDirectory = (Get-Item ".").FullName
-        $shortcut.Description = "Sakura V10 AI Assistant"
-        # Optional: Set Icon if exists
-        # $shortcut.IconLocation = "$IconPath,0"
+        $shortcut.WorkingDirectory = $ProjectRoot
+        $shortcut.Description = "Sakura V13 AI Assistant"
         $shortcut.Save()
         Write-Host "🚀 Added to startup!" -ForegroundColor Green
     } else {
