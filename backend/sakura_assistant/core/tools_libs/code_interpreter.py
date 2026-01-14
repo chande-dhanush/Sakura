@@ -171,6 +171,7 @@ def execute_python(
             "--network", "none",  # No network access
             "--memory", SANDBOX_MEMORY_LIMIT,
             "--cpus", "1",  # Limit CPU
+            "--pids-limit", "50",  # V13: Prevent fork bombs
             "--read-only",  # Read-only root filesystem
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",  # Writable /tmp
             "-v", f"{tmpdir_path}:/code:rw",  # Mount code directory
