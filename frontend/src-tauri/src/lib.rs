@@ -53,6 +53,34 @@ fn hide_main_window(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+fn open_logs_window(app: tauri::AppHandle) {
+    // Try to get existing logs window
+    if let Some(logs_window) = app.get_webview_window("logs") {
+        let _ = logs_window.show();
+        let _ = logs_window.set_focus();
+    } else {
+        // Create new window if it doesn't exist
+        let config = tauri::WebviewWindowBuilder::new(
+            &app,
+            "logs",
+            tauri::WebviewUrl::App("/logs".into())
+        )
+        .title("Sakura Sight")
+        .inner_size(1200.0, 800.0)
+        .min_inner_size(800.0, 600.0)
+        .decorations(true)
+        .resizable(true);
+        
+        if let Ok(window) = config.build() {
+            let _ = window.set_focus();
+            println!("📊 Opened Sakura Sight logs window");
+        } else {
+            eprintln!("❌ Failed to create logs window");
+        }
+    }
+}
+
+#[tauri::command]
 fn force_quit() {
     println!("💥 Force quitting app and backend...");
     
@@ -284,6 +312,7 @@ pub fn run() {
             toggle_main_window,
             show_main_window,
             hide_main_window,
+            open_logs_window,
             force_quit
         ])
         .setup(|app| {

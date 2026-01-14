@@ -19,7 +19,7 @@ env/
 # ============ Data & Logs ============
 data/chroma_store/
 data/faiss_store/
-logs/
+/logs/
 *.log
 *.db
 *.sqlite

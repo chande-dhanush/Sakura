@@ -235,6 +235,13 @@ class Planner:
         try:
             print("🧠 Planner: Thinking (Async Native Tool Use)...")
             
+            # V12: Broadcast "Thinking" state
+            from .broadcaster import broadcast
+            broadcast("thinking", {
+                "step": "Planning",
+                "details": f"Reviewing {len(tool_history) if tool_history else 0} previous steps..."
+            })
+            
             all_tools = get_all_tools()
             tools = self._filter_tools(all_tools, intent_mode, user_input)
             llm_with_tools = self.llm.bind_tools(tools)

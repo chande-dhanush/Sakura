@@ -8,10 +8,10 @@ METHODOLOGY:
 - Reported average and P99 latency
 
 RESULTS:
-      10 entities: 87.00ns avg, 100.12ns P99
-     100 entities: 85.80ns avg, 100.12ns P99
-    1000 entities: 91.40ns avg, 199.77ns P99
-   10000 entities: 91.81ns avg, 100.12ns P99
+      10 entities: 95.10ns avg, 200.23ns P99
+     100 entities: 129.00ns avg, 200.23ns P99
+    1000 entities: 133.81ns avg, 300.35ns P99
+   10000 entities: 99.60ns avg, 200.23ns P99
 
 VERDICT: O(1) CONFIRMED
-Max/Min Ratio: 1.07x (< 3x = constant time)
+Max/Min Ratio: 1.41x (< 3x = constant time)

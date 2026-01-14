@@ -1,7 +1,8 @@
 import os
 import json
 from dotenv import load_dotenv
-from .utils.pathing import normalize_path, get_project_root
+from dotenv import load_dotenv
+from sakura_assistant.utils.pathing import normalize_path, get_project_root
 
 # Load environment variables
 # Load environment variables
@@ -253,6 +254,7 @@ CRITICAL RULES:
 2. DYNAMIC FACTS: If the user asks for real-time data (prices, news, weather, status), you MUST use a tool.
 3. STATIC FACTS: You may skip tools ONLY for historical/static facts (e.g. "Who was the first president?"), UNLESS the user explicitly said "search".
 4. THOUGHT CAPPING: Keep your internal reasoning under 30 words. Do not "yap". Decide and act.
+5. COREFERENCE RESOLUTION: Resolve vague pronouns. If a user says 'it', 'that', or 'the song', you MUST look at [CHAT HISTORY] and [TOOL OUTPUTS] to replace the pronoun with the specific entity name (e.g., 'Bones by Imagine Dragons') before calling a tool.
 
 Extract arguments EXACTLY as the user stated them. For time ("in 5 mins"), convert to minutes."""
 
@@ -384,7 +386,7 @@ TOOL HINTS (use for DIRECT):
 
 TOOL HINTS (use for PLAN):
 - Questions about people/things/facts → "web_search"
-- Research/find out/who is/what is → "web_search"
+- Research/find out/who is/what is → "research_topic" # V11 Smart Research
 
 Examples:
 {"classification": "DIRECT", "tool_hint": "gmail_read_email"} ← "Check my email"

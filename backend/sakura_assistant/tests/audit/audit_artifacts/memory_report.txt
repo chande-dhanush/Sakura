@@ -11,26 +11,30 @@ METHODOLOGY:
 ----------------------------------------
 RESULTS:
 ----------------------------------------
-  Start Memory: 87.91 MB
-  End Memory: 88.59 MB
-  Total Growth: 0.69 MB
-  Growth %: 0.8%
+  Start Memory: 131.66 MB
+  End Memory: 132.34 MB
+  Total Growth: 0.68 MB
+  Growth %: 0.5%
 
 ----------------------------------------
 MEMORY TIMELINE:
 ----------------------------------------
-       graph iter    0: 87.91 MB
-       graph iter  100: 87.94 MB
-       graph iter  200: 88.06 MB
-       graph iter  300: 88.22 MB
-       graph iter  400: 88.41 MB
-       tools iter    0: 88.59 MB
-       tools iter   25: 88.59 MB
-       tools iter   50: 88.59 MB
-       tools iter   75: 88.59 MB
-     context iter    0: 88.59 MB
-     context iter   50: 88.59 MB
-     context iter  100: 88.59 MB
-     context iter  150: 88.59 MB
+       graph iter    0: 131.66 MB
+       graph iter  100: 131.70 MB
+       graph iter  200: 131.82 MB
+       graph iter  300: 131.99 MB
+       graph iter  400: 132.17 MB
+       tools iter    0: 132.34 MB
+       tools iter   25: 132.34 MB
+       tools iter   50: 132.34 MB
+       tools iter   75: 132.34 MB
+     context iter    0: 132.34 MB
+     context iter   50: 132.34 MB
+     context iter  100: 132.34 MB
+     context iter  150: 132.34 MB
 
+============================================================
+VERDICT: [PASS]
+GRADE: A
+Criteria: Growth < 50MB AND < 10%
 ============================================================

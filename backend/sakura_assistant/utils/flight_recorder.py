@@ -62,7 +62,7 @@ class FlightRecorder:
         return self.trace_id
     
     def log(self, stage: str, content: str, status: str = "INFO", 
-            duration_ms: Optional[float] = None):
+            duration_ms: Optional[float] = None, metadata: Optional[Dict] = None):
         """Log an event within the current trace."""
         elapsed = (time.perf_counter() - self.trace_start) * 1000
         
@@ -77,6 +77,9 @@ class FlightRecorder:
         
         if duration_ms is not None:
             entry["duration_ms"] = round(duration_ms, 2)
+            
+        if metadata:
+            entry["metadata"] = metadata
         
         self._write(entry)
         self.spans.append(entry)
@@ -102,6 +105,147 @@ class FlightRecorder:
         
         self.trace_id = None
         self.spans = []
+        
+        # V10.5: Auto-rotate old logs
+        self._rotate_if_needed()
+    
+    def _rotate_if_needed(self):
+        """Remove logs older than 7 days."""
+        if not self.log_path.exists():
+            return
+        
+        try:
+            from datetime import timedelta
+            cutoff = datetime.now() - timedelta(days=7)
+            
+            # Read all lines
+            with open(self.log_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # Filter to recent logs
+            recent_lines = []
+            for line in lines:
+                try:
+                    entry = json.loads(line)
+                    ts = entry.get('timestamp', '')
+                    if ts:
+                        entry_time = datetime.fromisoformat(ts)
+                        if entry_time >= cutoff:
+                            recent_lines.append(line)
+                    else:
+                        # Keep entries without timestamp (they're part of recent traces)
+                        recent_lines.append(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+            
+            # Only rewrite if we actually removed something
+            if len(recent_lines) < len(lines):
+                with open(self.log_path, 'w', encoding='utf-8') as f:
+                    f.writelines(recent_lines)
+                print(f"[*] Flight recorder rotated: {len(lines)} -> {len(recent_lines)} lines")
+        except Exception as e:
+            print(f"[!] Log rotation failed: {e}")
+    
+    def get_logs_for_api(self, limit: int = 100) -> dict:
+        """
+        Optimized log parser for API endpoint.
+        Returns structured data ready for frontend consumption.
+        """
+        if not self.log_path.exists():
+            return {"traces": [], "stats": {"total_queries": 0, "success_rate": 100, "avg_latency_s": 0}}
+        
+        traces = {}
+        
+        try:
+            # Read file (optimized: reverse iteration not needed for stitching)
+            with open(self.log_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        tid = entry.get('trace_id')
+                        if not tid:
+                            continue
+                        
+                        if tid not in traces:
+                            traces[tid] = {
+                                'id': tid,
+                                'date': '',
+                                'time': '',
+                                'query': '',
+                                'response': '',
+                                'total_ms': 0,
+                                'success': True,
+                                'phases': {'Router': [], 'Executor': [], 'Responder': []},
+                                'error': None
+                            }
+                        
+                        t = traces[tid]
+                        event_type = entry.get('event')
+                        
+                        if event_type == 'trace_start':
+                            t['query'] = entry.get('query', '')
+                            ts = entry.get('timestamp', '')
+                            try:
+                                dt = datetime.fromisoformat(ts)
+                                t['date'] = dt.strftime('%Y-%m-%d')
+                                t['time'] = dt.strftime('%H:%M:%S')
+                            except:
+                                t['date'] = 'Unknown'
+                                t['time'] = ts[11:19] if len(ts) > 19 else '??:??'
+                        
+                        elif event_type == 'trace_end':
+                            t['total_ms'] = entry.get('total_ms', 0)
+                            t['success'] = entry.get('success', True)
+                            t['response'] = entry.get('response_preview', '')
+                        
+                        elif event_type == 'span':
+                            stage = entry.get('stage', 'Other')
+                            span_data = {
+                                'elapsed_s': round(entry.get('elapsed_ms', 0) / 1000, 2),
+                                'content': entry.get('content', ''),
+                                'status': entry.get('status', 'INFO'),
+                                'duration_s': round(entry.get('duration_ms', 0) / 1000, 2) if entry.get('duration_ms') else None,
+                                'metadata': entry.get('metadata')
+                            }
+                            
+                            if stage in t['phases']:
+                                t['phases'][stage].append(span_data)
+                            else:
+                                if 'Other' not in t['phases']:
+                                    t['phases']['Other'] = []
+                                t['phases']['Other'].append(span_data)
+                            
+                            # Capture first error
+                            if entry.get('status') == 'ERROR' and not t['error']:
+                                t['error'] = entry.get('content', 'Unknown error')
+                    
+                    except json.JSONDecodeError:
+                        continue
+            
+            # Convert to list, sort by date/time (newest first), limit
+            result = [t for t in traces.values() if t['date']]
+            result.sort(key=lambda x: f"{x['date']} {x['time']}", reverse=True)
+            result = result[:limit]
+            
+            # Calculate stats
+            total = len(result)
+            success = sum(1 for t in result if t['success'])
+            avg_latency = sum(t['total_ms'] for t in result) / total if total else 0
+            
+            return {
+                "traces": result,
+                "stats": {
+                    "total_queries": total,
+                    "success_rate": round((success / total) * 100, 1) if total else 100,
+                    "avg_latency_s": round(avg_latency / 1000, 2)
+                }
+            }
+        
+        except Exception as e:
+            print(f"[!] get_logs_for_api failed: {e}")
+            return {"traces": [], "stats": {"total_queries": 0, "success_rate": 100, "avg_latency_s": 0}}
     
     @contextmanager
     def span(self, stage: str):

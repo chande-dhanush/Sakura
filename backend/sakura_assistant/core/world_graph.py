@@ -37,6 +37,23 @@ def _get_numpy():
         _np = np
     return _np
 
+# Singleton
+_world_graph_instance = None
+
+def get_world_graph() -> "WorldGraph":
+    """Get or create the global WorldGraph singleton."""
+    global _world_graph_instance
+    if _world_graph_instance is None:
+        from ..config import get_project_root
+        path = os.path.join(get_project_root(), "data", "world_graph.json")
+        _world_graph_instance = WorldGraph(persist_path=path)
+    return _world_graph_instance
+
+def set_world_graph(instance: "WorldGraph"):
+    """Set the global WorldGraph instance manually (e.g. from Server)."""
+    global _world_graph_instance
+    _world_graph_instance = instance
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ENUMS

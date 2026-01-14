@@ -83,6 +83,11 @@
         showMenu = false;
     }
     
+    async function openLogsWindow() {
+        showMenu = false;
+        await invoke('open_logs_window');
+    }
+    
     async function hideWindow() {
         await invoke('hide_main_window');
         // Reset quick search mode when hidden
@@ -186,6 +191,9 @@
                     </button>
                     <button on:click={() => { showMenu = false; showSettings = true; }}>
                         <span class="menu-icon">⚙️</span> Settings
+                    </button>
+                    <button on:click={openLogsWindow}>
+                        <span class="menu-icon">📊</span> Open Logs
                     </button>
                     <div class="menu-divider"></div>
                     <div class="menu-shortcuts">

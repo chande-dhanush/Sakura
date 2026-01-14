@@ -32,6 +32,7 @@ class ResponseContext:
     current_mood: str = "Neutral"
     study_mode: bool = False
     data_reasoning: bool = False
+    session_summary: str = ""  # V10.5 Session Memory Injection
     
     def __post_init__(self):
         if self.history is None:
@@ -140,6 +141,14 @@ class ResponseGenerator:
         
         # 1. Build system prompt with all context blocks
         system_parts = [self.personality, RESPONDER_NO_TOOLS_RULE]
+        
+        # V10.5: inject Session Summary (Short-term memory)
+        if context.session_summary:
+            system_parts.append(f"""
+[CURRENT SESSION CONTEXT]
+The following is a summary of the conversation so far. USE THIS to recall recent events even if they are not in the chat history:
+{context.session_summary}
+""")
         
         # Data reasoning mode instruction
         if context.data_reasoning:

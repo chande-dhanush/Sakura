@@ -1,0 +1,7 @@
+type,query,score
+Memory,What is the project code name?,1.0
+Memory,What is the panic button code?,1.0
+Memory,Does the user like light mode?,0.0
+Web,What is the current price of Bitcoin?,1.0
+Web,Who is the CEO of OpenAI?,1.0
+Web,Latest version of Python?,1.0

@@ -6,3 +6,49 @@
 {"event": "span", "trace_id": "trace_1768293958257", "stage": "Responder", "status": "SUCCESS", "content": "completed", "elapsed_ms": 5685.92, "duration_ms": 434.59}
 {"event": "span", "trace_id": "trace_1768293958257", "stage": "Responder", "status": "INFO", "content": "Generated 9 chars", "elapsed_ms": 5687.62}
 {"event": "trace_end", "trace_id": "trace_1768293958257", "success": true, "total_ms": 5690.18, "response_preview": "02:16 PM.", "span_count": 6}
+{"event": "trace_start", "trace_id": "trace_1768317913805", "query": "Compare the features of the top 5 AI models in 2026.", "timestamp": "2026-01-13T20:55:13.805995"}
+{"event": "span", "trace_id": "trace_1768317913805", "stage": "Router", "status": "SUCCESS", "content": "completed", "elapsed_ms": 1133.41, "duration_ms": 1132.22}
+{"event": "span", "trace_id": "trace_1768317913805", "stage": "Router", "status": "INFO", "content": "Decision: PLAN (hint: None)", "elapsed_ms": 1133.9}
+{"event": "span", "trace_id": "trace_1768317913805", "stage": "Executor", "status": "SUCCESS", "content": "completed", "elapsed_ms": 54458.27, "duration_ms": 53323.34}
+{"event": "span", "trace_id": "trace_1768317913805", "stage": "Executor", "status": "INFO", "content": "Tool: web_search, Success: True", "elapsed_ms": 54459.06, "metadata": {"args": {"query": "top 5 AI models 2026 features comparison"}}}
+{"event": "span", "trace_id": "trace_1768317913805", "stage": "Responder", "status": "SUCCESS", "content": "completed", "elapsed_ms": 55086.36, "duration_ms": 625.9}
+{"event": "span", "trace_id": "trace_1768317913805", "stage": "Responder", "status": "INFO", "content": "Generated 338 chars", "elapsed_ms": 55087.07}
+{"event": "trace_end", "trace_id": "trace_1768317913805", "success": true, "total_ms": 55091.77, "response_preview": "Seems like you're looking for a comparison of the top AI models. Based on the se", "span_count": 6}
+{"event": "trace_start", "trace_id": "trace_1768318106584", "query": "Deep dive into the architecture of Llama 4 rumors.", "timestamp": "2026-01-13T20:58:26.584275"}
+{"event": "span", "trace_id": "trace_1768318106584", "stage": "Router", "status": "SUCCESS", "content": "completed", "elapsed_ms": 435.29, "duration_ms": 434.43}
+{"event": "span", "trace_id": "trace_1768318106584", "stage": "Router", "status": "INFO", "content": "Decision: PLAN (hint: None)", "elapsed_ms": 435.88}
+{"event": "span", "trace_id": "trace_1768318106584", "stage": "Executor", "status": "SUCCESS", "content": "completed", "elapsed_ms": 66920.46, "duration_ms": 66483.43}
+{"event": "span", "trace_id": "trace_1768318106584", "stage": "Executor", "status": "INFO", "content": "Tool: web_search, Success: True", "elapsed_ms": 66921.08, "metadata": {"args": {"query": "Llama 4 architecture rumors debunked"}}}
+{"event": "span", "trace_id": "trace_1768318106584", "stage": "Responder", "status": "SUCCESS", "content": "completed", "elapsed_ms": 67798.04, "duration_ms": 875.17}
+{"event": "span", "trace_id": "trace_1768318106584", "stage": "Responder", "status": "INFO", "content": "Generated 349 chars", "elapsed_ms": 67798.59}
+{"event": "trace_end", "trace_id": "trace_1768318106584", "success": true, "total_ms": 67801.0, "response_preview": "Looks like the rumors are swirling around Llama 4's architecture, with some clai", "span_count": 6}
+{"event": "trace_start", "trace_id": "trace_1768318235436", "query": "What is the time in Tokyo? After that, tell me the time in London.", "timestamp": "2026-01-13T21:00:35.436742"}
+{"event": "span", "trace_id": "trace_1768318235436", "stage": "Router", "status": "SUCCESS", "content": "completed", "elapsed_ms": 911.49, "duration_ms": 910.87}
+{"event": "span", "trace_id": "trace_1768318235436", "stage": "Router", "status": "INFO", "content": "Decision: PLAN (hint: None)", "elapsed_ms": 911.98}
+{"event": "span", "trace_id": "trace_1768318235436", "stage": "Executor", "status": "SUCCESS", "content": "completed", "elapsed_ms": 42146.43, "duration_ms": 41233.69}
+{"event": "span", "trace_id": "trace_1768318235436", "stage": "Executor", "status": "INFO", "content": "Tool: get_system_info, Success: True", "elapsed_ms": 42146.9, "metadata": {"args": {}}}
+{"event": "span", "trace_id": "trace_1768318235436", "stage": "Responder", "status": "SUCCESS", "content": "completed", "elapsed_ms": 42488.18, "duration_ms": 339.8}
+{"event": "span", "trace_id": "trace_1768318235436", "stage": "Responder", "status": "INFO", "content": "Generated 59 chars", "elapsed_ms": 42488.72}
+{"event": "trace_end", "trace_id": "trace_1768318235436", "success": true, "total_ms": 42492.5, "response_preview": "I need to use a tool for that. Let me help you differently.", "span_count": 6}
+{"event": "trace_start", "trace_id": "trace_1768318414309", "query": "What is the time in Tokyo? After that, tell me the time in London.", "timestamp": "2026-01-13T21:03:34.309702"}
+{"event": "span", "trace_id": "trace_1768318414309", "stage": "Router", "status": "SUCCESS", "content": "completed", "elapsed_ms": 427.38, "duration_ms": 426.81}
+{"event": "span", "trace_id": "trace_1768318414309", "stage": "Router", "status": "INFO", "content": "Decision: PLAN (hint: None)", "elapsed_ms": 427.96}
+{"event": "span", "trace_id": "trace_1768318414309", "stage": "Executor", "status": "SUCCESS", "content": "completed", "elapsed_ms": 42483.03, "duration_ms": 42053.98}
+{"event": "span", "trace_id": "trace_1768318414309", "stage": "Executor", "status": "INFO", "content": "Tool: get_system_info, Success: True", "elapsed_ms": 42483.46, "metadata": {"args": {}}}
+{"event": "span", "trace_id": "trace_1768318414309", "stage": "Responder", "status": "SUCCESS", "content": "completed", "elapsed_ms": 42858.37, "duration_ms": 373.77}
+{"event": "span", "trace_id": "trace_1768318414309", "stage": "Responder", "status": "INFO", "content": "Generated 59 chars", "elapsed_ms": 42859.02}
+{"event": "trace_end", "trace_id": "trace_1768318414309", "success": true, "total_ms": 42864.48, "response_preview": "I need to use a tool for that. Let me help you differently.", "span_count": 6}
+{"event": "trace_start", "trace_id": "trace_1768318489713", "query": "What is the time in Tokyo? After that, tell me the time in London.", "timestamp": "2026-01-13T21:04:49.713239"}
+{"event": "span", "trace_id": "trace_1768318489713", "stage": "Router", "status": "SUCCESS", "content": "completed", "elapsed_ms": 582.57, "duration_ms": 582.02}
+{"event": "span", "trace_id": "trace_1768318489713", "stage": "Router", "status": "INFO", "content": "Decision: PLAN (hint: None)", "elapsed_ms": 583.71}
+{"event": "trace_start", "trace_id": "trace_1768318681693", "query": "What is the time in Tokyo? After that, tell me the time in London.", "timestamp": "2026-01-13T21:08:01.693626"}
+{"event": "span", "trace_id": "trace_1768318681693", "stage": "Router", "status": "SUCCESS", "content": "completed", "elapsed_ms": 410.5, "duration_ms": 409.86}
+{"event": "span", "trace_id": "trace_1768318681693", "stage": "Router", "status": "INFO", "content": "Decision: PLAN (hint: None)", "elapsed_ms": 411.66}
+{"event": "span", "trace_id": "trace_1768318681693", "stage": "Executor", "status": "SUCCESS", "content": "completed", "elapsed_ms": 42211.24, "duration_ms": 41797.86}
+{"event": "span", "trace_id": "trace_1768318681693", "stage": "Executor", "status": "INFO", "content": "Tool: get_system_info, Success: True", "elapsed_ms": 42212.14, "metadata": {"args": {}}}
+{"event": "span", "trace_id": "trace_1768318681693", "stage": "Responder", "status": "SUCCESS", "content": "completed", "elapsed_ms": 42511.59, "duration_ms": 295.94}
+{"event": "span", "trace_id": "trace_1768318681693", "stage": "Responder", "status": "INFO", "content": "Generated 59 chars", "elapsed_ms": 42512.16}
+{"event": "trace_end", "trace_id": "trace_1768318681693", "success": true, "total_ms": 42517.65, "response_preview": "I need to use a tool for that. Let me help you differently.", "span_count": 6}
+{"event": "trace_start", "trace_id": "trace_1768318907935", "query": "What is the time in Tokyo? After that, tell me the time in London.", "timestamp": "2026-01-13T21:11:47.935360"}
+{"event": "span", "trace_id": "trace_1768318907935", "stage": "Router", "status": "SUCCESS", "content": "completed", "elapsed_ms": 425.1, "duration_ms": 424.51}
+{"event": "span", "trace_id": "trace_1768318907935", "stage": "Router", "status": "INFO", "content": "Decision: PLAN (hint: None)", "elapsed_ms": 425.54}

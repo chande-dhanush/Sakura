@@ -70,6 +70,24 @@ class PerDocChromaStore:
             print(f"⚠️ Chroma query failed for {self.doc_id}: {e}")
             return None
 
+    def unload(self):
+        """Unload client to release file locks."""
+        if self.client:
+            try:
+                # Explicitly stop the system to release resources
+                if hasattr(self.client, "_system"):
+                    self.client._system.stop()
+                
+                # Clear internal caches
+                self.client.clear_system_cache()
+            except Exception as e:
+                print(f"⚠️ Chroma unload warning: {e}")
+                
+        self.client = None
+        self.collection = None
+        import gc
+        gc.collect()
+
     def delete_store(self) -> bool:
         """Delete this entire store from disk (Robust)."""
         import time
@@ -103,3 +121,11 @@ class PerDocChromaStore:
 # Factory function
 def get_doc_store(doc_id: str) -> PerDocChromaStore:
     return PerDocChromaStore(doc_id)
+
+def get_chroma_client():
+    """Get global Chroma client for caching."""
+    import chromadb
+    # Use a specific cache directory to avoid conflict with per-doc stores
+    cache_dir = os.path.join(get_project_root(), "data", "smart_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return chromadb.PersistentClient(path=cache_dir)

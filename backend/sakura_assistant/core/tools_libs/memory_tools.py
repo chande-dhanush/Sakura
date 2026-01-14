@@ -81,6 +81,18 @@ def trigger_reindex() -> str:
     except Exception as e:
         return f"❌ Error: {e}"
 
+@tool
+def query_ephemeral(ephemeral_id: str, query: str) -> str:
+    """
+    Query a specific ephemeral (temporary) Vector Store.
+    Use this when a previous tool's output was too large and intercepted.
+    """
+    try:
+        from ..ephemeral_manager import get_ephemeral_manager
+        return get_ephemeral_manager().query(ephemeral_id, query)
+    except Exception as e:
+        return f"❌ Query failed: {e}"
+
 # --- Meta Tools ---
 
 @tool

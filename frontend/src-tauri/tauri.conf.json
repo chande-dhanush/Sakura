@@ -46,6 +46,23 @@
         "skipTaskbar": false,
         "shadow": false,
         "focus": true
+      },
+      {
+        "label": "logs",
+        "title": "Sakura Sight",
+        "url": "/logs",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "decorations": true,
+        "transparent": false,
+        "resizable": true,
+        "visible": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "shadow": true,
+        "focus": true
       }
     ],
     "security": {

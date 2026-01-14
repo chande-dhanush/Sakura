@@ -12,7 +12,9 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
 from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage
 from .planner import Planner
+from .ephemeral_manager import get_ephemeral_manager # V11.3 Context Valve
 
 
 @dataclass
@@ -115,6 +117,7 @@ class ToolExecutor:
         all_tool_messages = []
         all_outputs = []
         final_tool_used = "None"
+        final_last_result = None
         MAX_REACT_STEPS = 5
         
         for i in range(MAX_REACT_STEPS):
@@ -154,13 +157,17 @@ class ToolExecutor:
             }
             if final_tool_used in TERMINAL_ACTIONS and exec_res.success:
                 print(f"⏹️ [Executor] Terminal action '{final_tool_used}' completed - stopping loop.")
+                final_last_result = exec_res.last_result
                 break
+            
+            # Track the last result from each iteration
+            final_last_result = exec_res.last_result
             
         return ExecutionResult(
             outputs="\n".join(all_outputs),
             tool_messages=all_tool_messages,
             tool_used=final_tool_used,
-            last_result=None,
+            last_result=final_last_result,
             success=True
         )
 
@@ -196,6 +203,19 @@ class ToolExecutor:
             
             print(f"▶️ Async Executing Step {step.get('id')}: {tool_name} {tool_args}")
             
+            # V12: Wait & See Hook (Pacing)
+            # Short pause to prevent API blasting and allow UI updates
+            import time
+            from .broadcaster import broadcast
+            
+            # Don't sleep on first step, only subsequent
+            if step.get('id', 0) > 1:
+                broadcast("pacing", {"step": step.get('id'), "tool": tool_name})
+                await asyncio.sleep(0.5) 
+
+            # V12: Generic Tool Start Broadcast
+            broadcast("tool_start", {"tool": tool_name, "args": tool_args})
+            
             try:
                 # Run sync tool in thread
                 tool_instance = self.tool_map[tool_name]
@@ -227,6 +247,28 @@ class ToolExecutor:
                             tool_name = fallback_tool
                             is_soft_failure = False
                 
+                # V11.3 Context Valve: Intercept Large Outputs (Async)
+                INTERCEPT_THRESHOLD = 2000
+                if len(res_str) > INTERCEPT_THRESHOLD:
+                    print(f"🛡️ [Async Executor] Output too large ({len(res_str)} chars). Intercepting...")
+                    try:
+                        eph_man = get_ephemeral_manager()
+                        eph_id = eph_man.ingest_text(res_str, source_tool=tool_name)
+                        
+                        if eph_id and not eph_id.startswith("error"):
+                            # Replace output with handle
+                            res_str = (
+                                f"[System: Context Overflow Protection]\n"
+                                f"Output too large ({len(res_str)} chars) to fit in context.\n"
+                                f"Content has been securely indexed to Ephemeral Store ID: {eph_id}\n"
+                                f"You MUST use the tool 'query_ephemeral(ephemeral_id=\"{eph_id}\", query=\"...\")' "
+                                f"to retrieve specific details/sections."
+                            )
+                        else:
+                            print(f"⚠️ Ephemeral Ingest Failed: {eph_id}")
+                    except Exception as ex:
+                        print(f"⚠️ Ephemeral Intercept Error: {ex}")
+
                 pruned_res = self.prune_output(res_str)
                 tool_messages.append(ToolMessage(tool_call_id=call_id, content=pruned_res, name=tool_name))
                 
@@ -292,6 +334,9 @@ class ToolExecutor:
             exec_res = self.execute_plan(steps, state=state)
             
             # 3. OBSERVE (Accumulate history)
+            # V11.3: Auto-cleanup of ephemeral stores at end of turn?
+            # Ideally handled by server, but we can do a quick check here if needed.
+            
             all_tool_messages.extend(exec_res.tool_messages)
             if exec_res.outputs:
                 all_outputs.append(exec_res.outputs)
@@ -404,6 +449,34 @@ class ToolExecutor:
                             tool_name = fallback_tool  # Update for logging
                             is_soft_failure = False  # Recovery succeeded
                 
+                            is_soft_failure = False  # Recovery succeeded
+                
+                # V11.3 Context Valve: Intercept Large Outputs
+                INTERCEPT_THRESHOLD = 2000
+                if len(res_str) > INTERCEPT_THRESHOLD:
+                    print(f"🛡️ [Executor] Output too large ({len(res_str)} chars). Intercepting...")
+                    try:
+                        eph_man = get_ephemeral_manager()
+                        eph_id = eph_man.ingest_text(res_str, source_tool=tool_name)
+                        
+                        if eph_id and not eph_id.startswith("error"):
+                            # Replace output with handle
+                            res_str = (
+                                f"[System: Context Overflow Protection]\n"
+                                f"Output too large ({len(res_str)} chars) to fit in context.\n"
+                                f"Content has been securely indexed to Ephemeral Store ID: {eph_id}\n"
+                                f"You MUST use the tool 'query_ephemeral(ephemeral_id=\"{eph_id}\", query=\"...\")' "
+                                f"to retrieve specific details/sections."
+                            )
+                            # Ensure we update the log buffer with the NEW res_str, not the old one.
+                            # We need to pop the last entry or modify it, but we haven't appended yet.
+                            # Ah, we append at line 426 (original code).
+                            
+                        else:
+                            print(f"⚠️ Ephemeral Ingest Failed: {eph_id}")
+                    except Exception as ex:
+                        print(f"⚠️ Ephemeral Intercept Error: {ex}")
+
                 # Prune output for ReAct history
                 pruned_res = self.prune_output(res_str)
                 

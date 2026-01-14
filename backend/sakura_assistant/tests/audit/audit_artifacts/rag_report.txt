@@ -1,0 +1,48 @@
+============================================================
+SAKURA WAR ROOM: RAG QUALITY AUDIT
+============================================================
+
+METHODOLOGY:
+- Lightweight mode (keyword overlap scoring)
+- For accurate results, install 'ragas' library
+
+----------------------------------------
+AGGREGATE SCORES:
+----------------------------------------
+  Avg Context Precision: 0.22
+  Avg Context Recall: 0.19
+  Avg F1 Score: 0.20
+
+----------------------------------------
+PER-QUESTION RESULTS:
+----------------------------------------
+
+Q: What is the battery warning threshold?...
+  Precision: 0.29
+  Recall: 0.25
+  F1: 0.27
+
+Q: How do I reset the memory?...
+  Precision: 0.33
+  Recall: 0.38
+  F1: 0.35
+
+Q: What models does Sakura use?...
+  Precision: 0.00
+  Recall: 0.00
+  F1: 0.00
+
+Q: How many tools are available?...
+  Precision: 0.25
+  Recall: 0.18
+  F1: 0.21
+
+Q: What is the World Graph?...
+  Precision: 0.22
+  Recall: 0.14
+  F1: 0.17
+
+============================================================
+RAG QUALITY GRADE: F
+Average F1: 0.20 (Target: >0.8)
+============================================================

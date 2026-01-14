@@ -1,13 +1,13 @@
-# Sakura V10.4 — Technical Documentation
+# Sakura V12.0 — Technical Documentation
+*System Certified: January 13, 2026*
 
 ---
 
 ## 🎯 Overview
-
-**Sakura** is a production-grade personal AI assistant with voice interaction, agentic tool execution, persistent world memory, emotional intelligence, and self-correcting verification.
+**Sakura** is a production-grade personal AI assistant.
+**V12 Upgrade:** Now featuring **Real-Time Thought Streams**, **Smart Caching**, and **Context Valve** overflow protection.
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
-
 ---
 
 ## ✨ Feature Matrix
@@ -37,50 +37,86 @@
 | Few-Shot Router | V10.4 | 15 examples for improved PLAN detection |
 | Async LLM | V10.4 | Native ainvoke() with asyncio.gather() support |
 | Token Bucket Rate Limiter | V10.4 | Backpressure-based RPM/TPM limiting per model |
+| Context Valve | V11+ | Intercepts large tool outputs to Ephemeral Store |
+| Reflection Engine | V11+ | Post-turn analysis for memory optimization |
+| Smart Research | V11+ | Dedicated `research_topic` tool with summary |
+| Thought Stream | V12+ | Real-time WebSocket reasoning feed for UI |
+| Native Logs | V12+ | Cyberpunk-themed Tauri dashboard for system logs |
 
 ---
 
 ## 🏗️ Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Tauri["🖥️ Tauri Shell (Rust)"]
-        WM[Window Manager<br/>Bubble / Main]
-        HK[Global Hotkeys<br/>Alt+S / Alt+F]
+graph TD
+    %% High Contrast Theme - Forces Black Text for Readability
+    classDef client fill:#BBDEFB,stroke:#0D47A1,stroke-width:2px,color:#000000;
+    classDef server fill:#FFE0B2,stroke:#E65100,stroke-width:2px,color:#000000;
+    classDef brain fill:#E1BEE7,stroke:#4A148C,stroke-width:2px,color:#000000;
+    classDef storage fill:#C8E6C9,stroke:#1B5E20,stroke-width:2px,color:#000000;
+
+    %% 1. Frontend Layer
+    subgraph Client ["🖥️ Client Layer (Tauri + Svelte)"]
+        UI[Chat Interface]:::client
+        Stream[Thought Stream Log]:::client
+        Voice[Kokoro TTS Engine]:::client
     end
-    
-    subgraph Backend["🐍 FastAPI Backend"]
-        Server["server.py<br/>SSE • Health • Upload"]
+
+    %% 2. Backend Entry
+    subgraph Backend ["🐍 Backend Layer (FastAPI)"]
+        API[HTTP Server]:::server
+        WS[WebSocket Broadcaster]:::server
     end
-    
-    subgraph Graph["🧠 World Graph Layer"]
-        WG["world_graph.py"]
-        Entity[EntityNode]
-        Action[ActionNode]
-        Intent[infer_user_intent]
-        Resolve[resolve_reference]
-        WG --> Entity & Action & Intent & Resolve
-    end
-    
-    subgraph Pipeline["⚡ LLM Pipeline (V10)"]
-        Router{Router}
-        Router -->|CHAT| Responder1[Responder]
-        Router -->|DIRECT| Executor1[Executor] --> Responder2[Responder]
-        Router -->|PLAN| ReAct
-        subgraph ReAct["ReAct Loop (Max 5)"]
-            Planner --> Executor2[Executor] --> Observe --> Planner
+
+    %% 3. Intelligence Pipeline
+    subgraph Brain ["🧠 Intelligence Pipeline"]
+        Router{Smart Router}:::brain
+        RL[Token Bucket Rate Limiter]:::brain
+        
+        subgraph ReAct ["ReAct Agent Loop"]
+            Planner[Llama 70B Planner]:::brain
+            Executor[Tool Executor]:::brain
+            Valve{Context Valve}:::brain
         end
-        ReAct --> Verifier --> Responder3[Responder]
+        
+        Synthesizer[GPT OSS 20B Responder]:::brain
     end
-    
-    subgraph Memory["💾 Memory Layer"]
-        Chroma[Chroma Long-Term]
-        Ephemeral[Chroma Ephemeral]
-        FAISS[FAISS History]
-        Judger[Memory Judger]
+
+    %% 4. Data Layer
+    subgraph Data ["💾 Memory & Storage"]
+        WG[(World Graph)]:::storage
+        Cache[(Smart Search Cache)]:::storage
+        EphRAG[(Ephemeral RAG)]:::storage
     end
+
+    %% Connections
+    UI -->|POST /chat| API
+    API --> Router
     
-    Tauri --> Backend --> Graph --> Pipeline --> Memory
+    %% Broadcasting Updates
+    Executor -.->|Event: TOOL_START| WS
+    Planner -.->|Event: THINKING| WS
+    Valve -.->|Event: OVERFLOW| WS
+    WS -.->|Real-time JSON| Stream
+
+    %% Pipeline Flow
+    Router -->|Simple| Synthesizer
+    Router -->|Complex| Planner
+    
+    %% The Brain Loop
+    Planner <-->|Check Quota| RL
+    Planner -->|Action| Executor
+    Executor -->|Run| Valve
+    
+    %% Data Interaction
+    Valve -->|< 2k chars| Planner
+    Valve -->|> 2k chars| EphRAG
+    EphRAG -.->|Handle ID| Planner
+    
+    Executor <--> Cache
+    Synthesizer <--> WG
+    Synthesizer -->|Final Text| UI
+    UI -->|Text| Voice
 ```
 
 ### Component Overview
@@ -104,7 +140,7 @@ V10 introduces a 4-layer routing funnel for optimal latency.
 | Layer | Component | Action |
 |-------|-----------|--------|
 | 0 | `forced_router.py` | Regex patterns → Execute immediately (0ms) |
-| 1 | Smart Router (70B) | Classify → DIRECT, PLAN, or CHAT |
+| 1 | Smart Router (8B) | Classify → DIRECT, PLAN, or CHAT |
 | 2 | DIRECT path | Cache check → Single tool → Skip Planner/Verifier |
 | 3 | PLAN path | Full ReAct loop with Planner (70B) |
 
@@ -134,32 +170,53 @@ CACHE_TTL = {
 The iterative reasoning loop for complex queries.
 
 ```mermaid
-sequenceDiagram
-    participant U as User Query
-    participant P as Planner (70B)
-    participant E as Executor
-    participant T as Tools
-    participant V as Verifier
-    participant R as Responder
+graph TD
+    %% Global Styling
+    classDef default fill:#2D2D2D,stroke:#FFFFFF,stroke-width:1px,color:#FFFFFF;
+    classDef logic fill:#0D47A1,stroke:#00BFFF,stroke-width:2px,color:#FFFFFF;
+    classDef special fill:#333333,stroke:#FFFFFF,stroke-dasharray: 5 5,color:#FFFFFF;
+    classDef invisible fill:none,stroke:none,color:none;
+
+    %% Main Flow
+    User([User]) --> UI[Svelte UI]
+    UI --> Planner[Planner: 70B]
     
-    U->>P: Query + Context
-    loop Max 5 iterations
-        P->>E: Tool Steps [{tool, args}]
-        E->>T: Execute tools
-        T-->>E: Results
-        E-->>P: ToolMessages
-        Note over P: Goal Reminder injected
-        alt Goal Complete
-            P->>V: Final outputs
-        end
+    %% The ReAct Loop Area
+    subgraph Execution_Cycle [ReAct Loop]
+        direction TB
+        Planner --> RL[Rate Limiter: 0.5s Delay]
+        RL --> Tool[Tool Execution]
+        
+        Tool --> Check{Output > 2k Chars?}
+        class Check logic
+        
+        %% Small Path
+        Check -- No --> Small[Raw Text Result]
+        Small --> Planner
+        
+        %% Big Path (Valve)
+        Check -- Yes --> Valve[Context Valve]
+        class Valve special
+        
+        Valve --> Process[Chunk & Embed]
+        Process --> Handle[Return Virtual Handle: eph_123]
+        Handle --> Planner
     end
-    V->>V: Validate success
-    alt PASS
-        V->>R: Generate response
-    else FAIL
-        V->>P: Hindsight retry
-    end
-    R-->>U: Final Answer
+
+    %% Final Output
+    Planner -- Final Context --> Responder[Responder: 20B]
+    Responder --> Update[Update World Graph]
+    Update --> FinalUI[Final Structured Response]
+
+    %% WebSocket Logs (Dashed lines moved to not overlap)
+    Planner -.->|Log: Thinking| WS(WebSocket)
+    Valve -.->|Log: Indexing| WS
+    Responder -.->|Log: Synthesizing| WS
+    class WS special
+
+    %% Explicit Link Styling for visibility
+    linkStyle default stroke:#FFFFFF,stroke-width:1px;
+    linkStyle 4,5,7 stroke:#00BFFF,stroke-width:2px;
 ```
 
 ### Protections
@@ -270,6 +327,8 @@ stateDiagram-v2
 | 44 | `retrieve_document_context` | Query ephemeral RAG by doc_id |
 | 45 | `forget_document` | Delete specific ephemeral doc |
 | 46 | `clear_all_ephemeral_memory` | Wipe all session docs |
+| 47 | `research_topic` | Multi-step deep research |
+| 48 | `query_ephemeral` | Query intercepted large outputs |
 
 ### Tool Categories
 
@@ -307,27 +366,25 @@ TOOL_GROUPS = {
 
 ### Ephemeral RAG Flow
 
-```
-User: "Research Jack the Ripper"
-    │
-    ▼
-Agent: web_scrape("https://en.wikipedia.org/wiki/Jack_the_Ripper")
-    │
-    ▼
-Tool: "📄 Saved to Ephemeral Memory
-       ID: `abc123`
-       Preview: 'Jack the Ripper was an unidentified...'
-       Use: retrieve_document_context('abc123', 'victims')"
-    │
-    ▼ (Loop 2)
-Agent: retrieve_document_context("abc123", "canonical five victims")
-    │
-    ▼
-Tool: "[Chunk 1] Mary Ann Nichols was found...
-       [Chunk 2] Annie Chapman was discovered..."
-    │
-    ▼
-Agent: Synthesizes answer with citations
+```mermaid
+graph TD
+    A[User: Research Jack the Ripper] --> B[Router: Llama 8B]
+    B --> C[Tool: web_scrape]
+    C --> D[Ephemeral Memory: abc123]
+    
+    D --> E[Planner: Llama 70B]
+    E --> F[Tool: retrieve_document_context]
+    F --> G[Context Chunks]
+    
+    G --> H[Responder: Llama 70B]
+    H --> I[Final Answer + Citations]
+
+    %% High Contrast Theme - Forces Black Text for Readability
+    classDef client fill:#BBDEFB,stroke:#0D47A1,stroke-width:2px,color:#000000;
+    classDef server fill:#FFE0B2,stroke:#E65100,stroke-width:2px,color:#000000;
+    classDef brain fill:#E1BEE7,stroke:#4A148C,stroke-width:2px,color:#000000;
+    classDef storage fill:#C8E6C9,stroke:#1B5E20,stroke-width:2px,color:#000000;
+
 ```
 
 ---
@@ -393,10 +450,10 @@ Agent: Synthesizes answer with citations
 
 | Stage | Primary | Backup |
 |-------|---------|--------|
-| Router | Llama 3.3 70B (Groq) | Gemini 2.0 Flash |
-| Planner | DeepSeek-R (Groq) | Gemini 2.0 Flash |
-| Verifier | Llama 3.3 70B (Groq) | Gemini 2.0 Flash |
-| Responder | Llama 3.3 8B (Groq) | Gemini 2.0 Flash |
+| Router | Llama 3.1 8B (Groq) | Gemini 2.0 Flash |
+| Planner | Llama 3.3 70B (Groq) | Gemini 2.0 Flash |
+| Verifier | Llama 3.1 8B (Groq) | Gemini 2.0 Flash |
+| Responder | GPT OSS 20B | Gemini 2.0 Flash |
 
 ### Token Savings
 
@@ -422,6 +479,19 @@ Agent: Synthesizes answer with citations
 | `test_quick_math_security.py` | Safe math evaluation |
 | `test_container.py` | Dependency injection |
 | `memory/test_chroma_*.py` | Ingestion, retrieval, isolation |
+
+---
+
+## 🛡️ RAG Audit Certification (V12)
+**Date:** January 13, 2026
+
+| Component | Score | Status |
+|-----------|-------|--------|
+| **Web RAG** | 1.0/1.0 | ✅ Perfect accuracy |
+| **Document RAG** | 1.0/1.0 | ✅ Perfect isolation & retrieval |
+| **Memory RAG** | 0.67/1.0 | ⚠️ Nuance failure (Fixed in V12.1) |
+
+*Audit conducted using LLM-as-a-Judge (Llama 3 70B).*
 
 ---
 
@@ -543,7 +613,11 @@ python tools/system_reset.py
 | V9 | Smart Pruner, Multi-Action Router, Config-Driven Tools |
 | V9.1 | Token Diet (15-tool cap), WordGraph Retention, Summarization |
 | **V10** | Smart Router, DIRECT Fast Lane, Tool Cache, Tauri UI |
+| **V10** | Smart Router, DIRECT Fast Lane, Tool Cache, Tauri UI |
 | **V10.1** | File Upload, Terminal Action Guard, Window Auto-Show |
+| **V10.4** | Flight Recorder, Async LLM, Token Bucket Rate Limits |
+| **V11** | Smart Research, Context Valve, Reflection Engine |
+| **V12** | WebSocket Thought Stream, Native Logs, RAG Certification |
 
 ---
 

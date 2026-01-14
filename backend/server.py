@@ -21,7 +21,9 @@ from contextlib import asynccontextmanager
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, Request, BackgroundTasks
+from sakura_assistant.core.memory.reflection import ReflectionEngine # V11.2
+
+from fastapi import FastAPI, Request, BackgroundTasks, WebSocket
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import hashlib
@@ -86,6 +88,12 @@ async def lifespan(app: FastAPI):
     try:
         assistant = SmartAssistant()
         print("✅ SmartAssistant initialized")
+        
+        # V11: Sync WorldGraph singleton for background threads
+        from sakura_assistant.core.world_graph import set_world_graph
+        if hasattr(assistant, 'world_graph'):
+            set_world_graph(assistant.world_graph)
+            
     except Exception as e:
         import traceback
         err = traceback.format_exc()
@@ -119,7 +127,7 @@ async def lifespan(app: FastAPI):
         assistant.world_graph.save()
         print("💾 World Graph saved")
     
-    # Flush conversation history to disk
+    # Flash conversation history to disk
     try:
         from sakura_assistant.memory.faiss_store import get_memory_store
         store = get_memory_store()
@@ -127,6 +135,14 @@ async def lifespan(app: FastAPI):
         print(f"💾 Conversation history saved ({len(store.conversation_history)} messages)")
     except Exception as e:
         print(f"⚠️ Failed to save history: {e}")
+
+    # V11.3 Cleanup Ephemeral Stores
+    try:
+        from sakura_assistant.core.ephemeral_manager import get_ephemeral_manager
+        print("🧹 Cleaning up ephemeral stores...")
+        get_ephemeral_manager().cleanup_old(max_age_minutes=0) # Force delete all
+    except Exception as e:
+        print(f"⚠️ Ephemeral cleanup error: {e}")
 
 
 app = FastAPI(
@@ -143,6 +159,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.websocket("/ws/status")
+async def websocket_status(websocket: WebSocket):
+    """
+    Real-time status stream for V12 features (Thought Stream).
+    """
+    await websocket.accept()
+    from sakura_assistant.core.broadcaster import get_broadcaster
+    import asyncio
+    
+    q = asyncio.Queue()
+    
+    def listener(event, data):
+        q.put_nowait({"event": event, "data": data})
+        
+    broadcaster = get_broadcaster()
+    broadcaster.add_listener(listener)
+    
+    try:
+        while True:
+            item = await q.get()
+            await websocket.send_json(item)
+    except Exception as e:
+        print(f"⚠️ WebSocket disconnect: {e}")
+    finally:
+        # Ideally remove listener, but current simple broadcaster doesn't support removal
+        # For now, it's fine as it's a lightweight callback list.
+        pass
 
 @app.post("/setup")
 async def save_setup(request: Request):
@@ -338,6 +382,29 @@ async def readiness():
         "ready": assistant is not None
     }
 
+
+# ============================================================================
+# OBSERVABILITY API (V10.5)
+# ============================================================================
+
+@app.get("/api/logs")
+async def get_logs(limit: int = 100):
+    """
+    Return parsed flight recorder logs for the dashboard.
+    
+    Response:
+        {
+            "traces": [...],
+            "stats": {
+                "total_queries": int,
+                "success_rate": float,
+                "avg_latency_s": float
+            }
+        }
+    """
+    from sakura_assistant.utils.flight_recorder import get_recorder
+    recorder = get_recorder()
+    return recorder.get_logs_for_api(limit=limit)
 
 # ============================================================================
 # FILE UPLOAD FOR RAG

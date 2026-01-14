@@ -18,6 +18,7 @@ from .tools_libs.web import (
     play_youtube, get_weather,
     web_search, search_wikipedia, search_arxiv, get_news, web_scrape
 )
+from .tools_libs.research import research_topic # V11 Smart Research
 from .tools_libs.system import (
     get_system_info, read_screen, open_app, 
     clipboard_read, clipboard_write, 
@@ -26,7 +27,8 @@ from .tools_libs.system import (
 )
 from .tools_libs.memory_tools import (
     update_user_memory, ingest_document, fetch_document_context,
-    list_uploaded_documents, delete_document, get_rag_telemetry, trigger_reindex
+    list_uploaded_documents, delete_document, get_rag_telemetry, trigger_reindex,
+    query_ephemeral # V11.3
 )
 from .tools_libs.common import log_api_call
 
@@ -181,6 +183,7 @@ def get_all_tools():
         # Web & Media
         spotify_control, play_youtube, get_weather,
         web_search, search_wikipedia, search_arxiv, get_news, web_scrape,
+        research_topic, # V11
         
         # Google
         gmail_read_email, gmail_send_email,
@@ -194,6 +197,7 @@ def get_all_tools():
         # Memory
         update_user_memory, ingest_document, fetch_document_context,
         list_uploaded_documents, delete_document, get_rag_telemetry, trigger_reindex,
+        query_ephemeral, # V11.3
         
         # Meta / Aliases
         execute_actions, retrieve_document_context, forget_document,

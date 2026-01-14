@@ -1,0 +1,6 @@
+question,precision,recall,f1
+"What is the battery warning threshold?",0.286,0.250,0.267
+"How do I reset the memory?",0.333,0.375,0.353
+"What models does Sakura use?",0.000,0.000,0.000
+"How many tools are available?",0.250,0.182,0.211
+"What is the World Graph?",0.222,0.143,0.174

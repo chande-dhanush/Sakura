@@ -188,7 +188,8 @@ class SmartAssistant:
                 graph_context=self.world_graph.get_context_for_responder(),
                 intent_adjustment=self.world_graph.get_intent_adjustment(),
                 current_mood=self.world_graph.get_current_mood(),
-                study_mode=study_mode_active
+                study_mode=study_mode_active,
+                session_summary=summary_context
             )
             
             with span("Responder"):
@@ -287,7 +288,8 @@ class SmartAssistant:
                         graph_context,
                         state
                     )
-                recorder.log("Executor", f"Tool: {exec_result.tool_used}, Success: {exec_result.success}")
+                tool_args = exec_result.last_result.get("args") if exec_result.last_result else {}
+                recorder.log("Executor", f"Tool: {exec_result.tool_used}, Success: {exec_result.success}", metadata={"args": tool_args})
                 
                 tool_outputs = exec_result.outputs
                 tool_used = exec_result.tool_used
@@ -326,7 +328,8 @@ class SmartAssistant:
                 graph_context=self.world_graph.get_context_for_responder(),
                 intent_adjustment=self.world_graph.get_intent_adjustment(),
                 current_mood=self.world_graph.get_current_mood(),
-                study_mode=study_mode_active
+                study_mode=study_mode_active,
+                session_summary=summary_context
             )
             
             with span("Responder"):

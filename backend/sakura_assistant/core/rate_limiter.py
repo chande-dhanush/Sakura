@@ -74,6 +74,15 @@ class TokenBucket:
                     
                     if sleep_time > 0:
                         print(f"⏳ [RateLimiter:{self.name}] TPM limit hit, waiting {sleep_time:.1f}s")
+                        
+                        # V12: Broadcast throttling event
+                        from .broadcaster import broadcast
+                        broadcast("rate_limit", {
+                            "model": self.name,
+                            "wait_time": sleep_time,
+                            "reason": "TPM Limit"
+                        })
+                        
                         self._lock.release()
                         await asyncio.sleep(sleep_time)
                         await self._lock.acquire()
@@ -97,6 +106,14 @@ class TokenBucket:
                 sleep_time = deficit / self.rate
                 
                 print(f"⏳ [RateLimiter:{self.name}] RPM backpressure: waiting {sleep_time:.2f}s")
+                
+                # V12: Broadcast throttling event
+                from .broadcaster import broadcast
+                broadcast("rate_limit", {
+                    "model": self.name,
+                    "wait_time": sleep_time,
+                    "reason": "RPM Limit"
+                })
                 
                 self._lock.release()
                 await asyncio.sleep(sleep_time)
@@ -157,10 +174,10 @@ class GlobalRateLimiter:
     MODEL_LIMITS = {
         # Groq models
         "llama-3.3-70b-versatile": RateLimitConfig(
-            rpm=30, burst=5, tpm=12000, context_window=128000, name="Llama-70B"
+            rpm=30, burst=5, tpm=10000, context_window=128000, name="Llama-70B"
         ),
         "llama-3.1-8b-instant": RateLimitConfig(
-            rpm=30, burst=10, tpm=20000, context_window=128000, name="Llama-8B"
+            rpm=30, burst=10, tpm=16000, context_window=128000, name="Llama-8B"
         ),
         
         # Google Gemini (generous free tier)

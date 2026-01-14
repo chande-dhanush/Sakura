@@ -25,7 +25,7 @@ class LLMConfig:
     # Temperature settings
     router_temp: float = 0.0
     planner_temp: float = 0.1
-    responder_temp: float = 0.6
+    responder_temp: float = 0.4
     
     # Timeout and retry settings
     timeout: int = 60

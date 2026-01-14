@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
-from ..utils.preferences import user_preferences
+import json
 from ..utils.episodic_memory import episodic_memory
+from ..core.world_graph import WorldGraph
 
 class ContextManager:
     """
@@ -14,6 +15,9 @@ class ContextManager:
             "facts": ["who am i", "my name", "my age", "where do i", "what do i do", "job", "work"],
             "episodes": ["remember", "happened", "last time", "when i", "told you", "said before", "recall", "memory", "know about me"]
         }
+        # V10.7: Persistent WorldGraph instance (Singleton pattern)
+        # Avoids reloading JSON on every request
+        self.wg = WorldGraph()
 
     def _detect_intent(self, text: str) -> List[str]:
         text = text.lower()
@@ -28,33 +32,53 @@ class ContextManager:
         Builds a context string containing ONLY relevant info.
         """
         context_parts = []
+        wg = self.wg
         
-        # 1. Always include minimal persona
-        context_parts.append(f"=== USER IDENTITY ===\n{user_preferences.get_minimal_persona()}")
+        # 1. Inject World Graph Identity (Deterministic)
+        identity_str = "=== USER IDENTITY ===\n"
+        
+        # Core Identity
+        # V10.7: Use proper WorldGraph API
+        me_node = wg.get_user_identity()
+        if me_node:
+            name = me_node.name
+            attrs = me_node.attributes or {}
+            loc = attrs.get("location", "Unknown")
+            age = attrs.get("age", "?")
+            identity_str += f"User: {name}, {age}, {loc}.\n"
+            
+            # Interests (Likes)
+            interests = attrs.get("interests", [])
+            if interests:
+                identity_str += f"Interests: {', '.join(interests)}\n"
+        
+        # Preferences (All pref:* entities)
+        identity_str += "Preferences:\n"
+        has_prefs = False
+        for eid, ent in wg.entities.items():
+            if eid.startswith("pref:"):
+                has_prefs = True
+                # EntityNode uses attributes, not .get()
+                summary = ent.summary
+                if summary:
+                    identity_str += f"- {summary}\n"
+                # Also verify attributes specifically for high-value prefs
+                if eid == "pref:ui":
+                     theme = ent.attributes.get("theme", "dark")
+                     identity_str += f"- UI Theme: {theme}\n"
+        
+        if not has_prefs:
+             identity_str += "- No specific output preferences.\n"
+
+        context_parts.append(identity_str)
 
         # 2. Detect what else is needed
         intents = self._detect_intent(user_input)
         
         # 3. Fetch specific data
-        if "likes" in intents:
-            likes = user_preferences.get_likes()
-            if likes:
-                context_parts.append(f"=== RELEVANT LIKES ===\n{', '.join(likes)}")
-                
-        if "dislikes" in intents:
-            dislikes = user_preferences.get_dislikes()
-            if dislikes:
-                context_parts.append(f"=== RELEVANT DISLIKES ===\n{', '.join(dislikes)}")
-        
-        if "facts" in intents:
-            facts = user_preferences.get_facts()
-            if facts:
-                # For facts, we might want to be selective, but for now dumping them is better than nothing if requested
-                # Ideally we'd keyword match facts too, but dictionary structure makes it easy enough to just dump if small
-                # If facts grow large, we'll need a better search here.
-                fact_str = "\n".join([f"- {k}: {v}" for k, v in facts.items()])
-                context_parts.append(f"=== RELEVANT FACTS ===\n{fact_str}")
-
+        # Note: Likes/Dislikes now come from World Graph 'interests' or specific nodes
+        # If specific 'likes' intent is strong, we might search map/nodes more deeply later
+        pass # World Graph handles core identity now.
         if "episodes" in intents:
             # Search episodic memory using the user input as query
             hits = episodic_memory.search_episodes(user_input)

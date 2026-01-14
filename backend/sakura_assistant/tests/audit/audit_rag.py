@@ -1,265 +1,237 @@
 """
-Sakura War Room Audit: RAG Faithfulness Evaluation
-===================================================
-Uses RAGAS framework for retrieval quality metrics.
+Sakura War Room Audit: RAG Faithfulness & Agentic Quality
+==========================================================
+Impartial audit using "LLM-as-a-Judge" methodology.
+Evaluates:
+1. Memory RAG (FAISS Vector Store) - Refined Query
+2. Agentic RAG (Web Search Tool)
+3. Document RAG (Chroma Per-Doc Store)
 
-Tests:
-- Faithfulness (does answer match retrieved context?)
-- Answer Relevancy (does answer address the question?)
-- Context Precision (is the right context retrieved?)
-
-Output: audit_artifacts/ragas_scores.csv
-
-Note: For accurate evaluation, use a strong judge LLM (GPT-4 or Claude).
+Metrics:
+- Context Precision: Is the retrieved info relevant? (0.0 - 1.0)
 """
 import os
 import sys
 import json
+import time
+import asyncio
+import uuid
+from typing import List, Dict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+
+from sakura_assistant.core.container import get_container
+from sakura_assistant.memory.faiss_store.store import get_memory_store
+try:
+    from sakura_assistant.core.tools_libs.web import web_search
+    WEB_AVAILABLE = True
+except ImportError:
+    WEB_AVAILABLE = False
+
+# Document RAG Imports
+try:
+    from sakura_assistant.memory.ingestion.pipeline import get_ingestion_pipeline
+    from sakura_assistant.memory.chroma_store.store import get_doc_store
+    from sakura_assistant.memory.chroma_store.model import get_embedding_model
+    DOC_RAG_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Document RAG imports failed: {e}")
+    DOC_RAG_AVAILABLE = False
 
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "audit_artifacts")
 os.makedirs(ARTIFACTS_DIR, exist_ok=True)
 
+# Judge Prompts
+JUDGE_PROMPT = """
+You are an impartial RAG AI Auditor. Grade the retrieval quality for the given query.
 
-# Gold standard RAG test cases (question, expected_answer, ground_truth_context)
-RAG_TEST_CASES = [
-    {
-        "question": "What is the battery warning threshold?",
-        "ground_truth": "The system warns when battery is below 15%.",
-        "relevant_docs": ["Battery management: System alerts at 15% battery level..."],
-    },
-    {
-        "question": "How do I reset the memory?",
-        "ground_truth": "Run python tools/system_reset.py and type RESET to confirm.",
-        "relevant_docs": ["System Reset: Execute system_reset.py. Type RESET to confirm deletion..."],
-    },
-    {
-        "question": "What models does Sakura use?",
-        "ground_truth": "Sakura uses Llama 3.3 70B for planning and Llama 3.1 8B for routing.",
-        "relevant_docs": ["Model Configuration: planner_model=llama-3.3-70b, router_model=llama-3.1-8b..."],
-    },
-    {
-        "question": "How many tools are available?",
-        "ground_truth": "Sakura has 46 tools across categories like music, search, email, notes.",
-        "relevant_docs": ["Tool Registry: 46 tools total including spotify_control, web_search..."],
-    },
-    {
-        "question": "What is the World Graph?",
-        "ground_truth": "The World Graph is a single source of truth for identity, memory, and context.",
-        "relevant_docs": ["World Graph: Central knowledge store with EntityNode and ActionNode..."],
-    },
-]
+Query: {query}
+Retrieved Context:
+{context}
 
+Task: Rate the **Relevance** of the retrieved context to the query.
+- Score 0.0: Irrelevant, hallucinated, or wrong topic.
+- Score 0.5: Partially relevant, misses key details.
+- Score 1.0: Highly relevant, contains the answer.
 
-def audit_rag_without_ragas():
-    """
-    Lightweight RAG audit without RAGAS dependency.
-    
-    Uses simple keyword matching and overlap scoring.
-    """
-    print("📄 Starting RAG Audit (Lightweight Mode)...")
-    print("   Note: Install 'ragas' for full evaluation\n")
-    
-    results = []
-    
-    try:
-        from sakura_assistant.memory.chroma_store.retrieval import retrieve_context
-        rag_available = True
-    except ImportError:
-        print("   ⚠️ Chroma retrieval not available, using mock evaluation")
-        rag_available = False
-    
-    for i, test in enumerate(RAG_TEST_CASES):
-        print(f"  Test {i+1}: {test['question'][:40]}...")
+Return ONLY the numeric score (e.g., 0.8). Do not explain.
+"""
+
+class RagAuditor:
+    def __init__(self):
+        print("⚖️  Initializing Impartial LLM Judge...")
+        self.container = get_container()
+        self.judge_llm = self.container.get_planner_llm()
+        self.memory = get_memory_store()
         
-        # Simulate retrieval (or use real if available)
-        if rag_available:
+    async def judge_relevance(self, query: str, context: str) -> float:
+        """Use LLM to score context relevance."""
+        if not context or "No relevant" in context:
+            return 0.0
+            
+        prompt = JUDGE_PROMPT.format(query=query, context=context)
+        try:
+            response = self.judge_llm.invoke(prompt)
+            content = response.content if hasattr(response, 'content') else str(response)
+            import re
+            match = re.search(r"0\.\d+|1\.0|0|1", content)
+            if match:
+                return float(match.group(0))
+            return 0.0
+        except Exception as e:
+            print(f"   ⚠️ Judge error: {e}")
+            return 0.0
+
+    async def audit_memory_rag(self):
+        print("\n🧠 Auditing Memory RAG (FAISS)...")
+        
+        # 1. Seed Memory with known facts
+        seed_facts = [
+            ("The project code name is Sakura V10.", "project_code"),
+            ("The panic button code is 1999.", "security_code"),
+            ("Dhanush prefers dark mode interfaces.", "pref_ui")
+        ]
+        
+        print(f"   🌱 Seeding {len(seed_facts)} test memories...")
+        for fact, _ in seed_facts:
+            self.memory.add_message(fact, role="system")
+        time.sleep(1) # Allow indexing
+        
+        test_cases = [
+            "What is the project code name?",
+            "What is the panic button code?",
+            "What does the user like?"  # Refined "Positive" query
+        ]
+        
+        results = []
+        for query in test_cases:
+            print(f"   🔍 Query: {query}")
+            context = self.memory.get_context_for_query(query)
+            score = await self.judge_relevance(query, context)
+            print(f"      Score: {score}/1.0")
+            results.append({"query": query, "score": score, "type": "Memory"})
+            
+        return results
+
+    async def audit_agentic_rag(self):
+        print("\n🌐 Auditing Agentic RAG (Web Search)...")
+        if not WEB_AVAILABLE:
+            print("   ⚠️ Web Search tool not available. Skipping.")
+            return []
+            
+        test_cases = [
+            "What is the current price of Bitcoin?",
+            "Who is the CEO of OpenAI?",
+            "Latest version of Python?"
+        ]
+        
+        results = []
+        for query in test_cases:
+            print(f"   🔍 Query: {query}")
             try:
-                retrieved = retrieve_context(test["question"], top_k=3)
-                retrieved_text = " ".join(retrieved) if retrieved else ""
-            except Exception:
-                retrieved_text = test["relevant_docs"][0]  # Fallback to expected
-        else:
-            retrieved_text = test["relevant_docs"][0]
+                # Use invoke for StructuredTool
+                context = web_search.invoke({"query": query})
+                score = await self.judge_relevance(query, str(context))
+                print(f"      Score: {score}/1.0")
+                results.append({"query": query, "score": score, "type": "Web"})
+            except Exception as e:
+                print(f"      Error: {e}")
+                results.append({"query": query, "score": 0.0, "type": "Web"})
+                
+        return results
+
+    async def audit_document_rag(self):
+        print("\n📄 Auditing Document RAG (Chroma)...")
+        if not DOC_RAG_AVAILABLE:
+            print("   ⚠️ Document RAG modules not available.")
+            return []
+
+        # 1. Create Dummy Doc
+        dummy_path = os.path.join(ARTIFACTS_DIR, "audit_test_doc.txt")
+        secret_fact = "The secret ingredient for the potion is Star-Dust 42."
+        with open(dummy_path, "w", encoding="utf-8") as f:
+            f.write(f"CONFIDENTIAL REPORT\n\nSubject: Project Alchemy\n\n{secret_fact}\n\nEnd of Report.")
+            
+        # 2. Ingest
+        print(f"   📥 Ingesting test document: {dummy_path}")
+        pipeline = get_ingestion_pipeline()
+        res = pipeline.ingest_file_sync(dummy_path)
         
-        # Calculate simple overlap score
-        ground_words = set(test["ground_truth"].lower().split())
-        retrieved_words = set(retrieved_text.lower().split())
+        if res.get("error"):
+            print(f"   ❌ Ingestion failed: {res.get('message')}")
+            return [{"query": "Doc Lookup", "score": 0.0, "type": "Document"}]
+            
+        file_id = res["file_id"]
+        print(f"   ✅ Ingested (ID: {file_id})")
         
-        overlap = len(ground_words & retrieved_words)
-        precision = overlap / len(retrieved_words) if retrieved_words else 0
-        recall = overlap / len(ground_words) if ground_words else 0
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
-        
-        results.append({
-            "question": test["question"],
-            "context_precision": precision,
-            "context_recall": recall,
-            "f1_score": f1,
-        })
-        
-        print(f"    Precision: {precision:.2f}, Recall: {recall:.2f}, F1: {f1:.2f}")
+        # 3. Query
+        try:
+            store = get_doc_store(file_id)
+            model = get_embedding_model()
+            
+            query = "What is the secret ingredient?"
+            print(f"   🔍 Query: {query}")
+            
+            q_emb = model.encode([query]).tolist()
+            retrieval = store.query(query_embeddings=q_emb, n_results=1)
+            
+            if retrieval and retrieval['documents'] and retrieval['documents'][0]:
+                context = retrieval['documents'][0][0] # First doc of first result
+                score = await self.judge_relevance(query, context)
+            else:
+                context = "No results found."
+                score = 0.0
+                
+            print(f"      Score: {score}/1.0")
+            
+            # Clean up
+            store.delete_store()
+            
+            return [{"query": query, "score": score, "type": "Document"}]
+            
+        except Exception as e:
+            print(f"   ⚠️ Doc Query failed: {e}")
+            return [{"query": "Doc Lookup", "score": 0.0, "type": "Document"}]
+
+async def run_audit():
+    auditor = RagAuditor()
     
-    return results
+    # Run Audits
+    mem_results = await auditor.audit_memory_rag()
+    web_results = await auditor.audit_agentic_rag()
+    doc_results = await auditor.audit_document_rag()
+    
+    all_results = mem_results + web_results + doc_results
+    
+    # Calculate Stats
+    avg_mem = sum(r['score'] for r in mem_results) / len(mem_results) if mem_results else 0
+    avg_web = sum(r['score'] for r in web_results) / len(web_results) if web_results else 0
+    avg_doc = sum(r['score'] for r in doc_results) / len(doc_results) if doc_results else 0
+    
+    # Generate Report
+    report_path = os.path.join(ARTIFACTS_DIR, "rag_detailed_report.txt")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("SAKURA V10 IMPARTIAL RAG AUDIT\n")
+        f.write("==============================\n")
+        f.write(f"Judge Model: {auditor.judge_llm.model_name if hasattr(auditor.judge_llm, 'model_name') else 'Llama-70B'}\n\n")
+        
+        f.write("🧠 MEMORY RAG (FAISS)\n")
+        f.write(f"Average Relevance Score: {avg_mem:.2f}/1.0\n")
+        for r in mem_results:
+            f.write(f" - Q: {r['query']}\n   Score: {r['score']}\n")
+            
+        f.write("\n🌐 AGENTIC RAG (WEB)\n")
+        f.write(f"Average Relevance Score: {avg_web:.2f}/1.0\n")
+        for r in web_results:
+            f.write(f" - Q: {r['query']}\n   Score: {r['score']}\n")
+
+        f.write("\n📄 DOCUMENT RAG (CHROMA)\n")
+        f.write(f"Average Relevance Score: {avg_doc:.2f}/1.0\n")
+        for r in doc_results:
+            f.write(f" - Q: {r['query']}\n   Score: {r['score']}\n")
 
 
-def audit_rag_with_ragas():
-    """
-    Full RAG audit using RAGAS library.
-    
-    Requires: pip install ragas datasets
-    """
-    print("📄 Starting RAG Audit (RAGAS Mode)...")
-    
-    try:
-        from ragas import evaluate
-        from ragas.metrics import faithfulness, answer_relevancy, context_precision
-        from datasets import Dataset
-    except ImportError:
-        print("   ⚠️ RAGAS not installed, falling back to lightweight mode")
-        print("   Install with: pip install ragas datasets")
-        return audit_rag_without_ragas()
-    
-    # Prepare dataset
-    data = {
-        "question": [t["question"] for t in RAG_TEST_CASES],
-        "answer": [t["ground_truth"] for t in RAG_TEST_CASES],  # Using ground truth as answer
-        "contexts": [t["relevant_docs"] for t in RAG_TEST_CASES],
-        "ground_truth": [t["ground_truth"] for t in RAG_TEST_CASES],
-    }
-    
-    dataset = Dataset.from_dict(data)
-    
-    try:
-        # Note: RAGAS requires an LLM for evaluation
-        # It will use OpenAI by default, or you can configure alternatives
-        result = evaluate(
-            dataset,
-            metrics=[faithfulness, answer_relevancy, context_precision]
-        )
-        
-        print("\nRAGAS Scores:")
-        print(f"  Faithfulness: {result['faithfulness']:.2f}")
-        print(f"  Answer Relevancy: {result['answer_relevancy']:.2f}")
-        print(f"  Context Precision: {result['context_precision']:.2f}")
-        
-        # Save detailed results
-        result_df = result.to_pandas()
-        csv_path = os.path.join(ARTIFACTS_DIR, "ragas_scores.csv")
-        result_df.to_csv(csv_path, index=False)
-        print(f"\n✅ Detailed scores saved to {csv_path}")
-        
-        return {
-            "faithfulness": result['faithfulness'],
-            "answer_relevancy": result['answer_relevancy'],
-            "context_precision": result['context_precision'],
-        }
-        
-    except Exception as e:
-        print(f"   ⚠️ RAGAS evaluation failed: {e}")
-        print("   Falling back to lightweight mode...")
-        return audit_rag_without_ragas()
-
-
-def generate_rag_report(results):
-    """Generate the evidence report."""
-    
-    report_path = os.path.join(ARTIFACTS_DIR, "rag_report.txt")
-    
-    # Handle both lightweight (list) and RAGAS (dict) results
-    if isinstance(results, list):
-        # Lightweight mode
-        avg_precision = sum(r["context_precision"] for r in results) / len(results)
-        avg_recall = sum(r["context_recall"] for r in results) / len(results)
-        avg_f1 = sum(r["f1_score"] for r in results) / len(results)
-        
-        with open(report_path, "w") as f:
-            f.write("=" * 60 + "\n")
-            f.write("SAKURA WAR ROOM: RAG QUALITY AUDIT\n")
-            f.write("=" * 60 + "\n\n")
-            
-            f.write("METHODOLOGY:\n")
-            f.write("- Lightweight mode (keyword overlap scoring)\n")
-            f.write("- For accurate results, install 'ragas' library\n\n")
-            
-            f.write("-" * 40 + "\n")
-            f.write("AGGREGATE SCORES:\n")
-            f.write("-" * 40 + "\n")
-            f.write(f"  Avg Context Precision: {avg_precision:.2f}\n")
-            f.write(f"  Avg Context Recall: {avg_recall:.2f}\n")
-            f.write(f"  Avg F1 Score: {avg_f1:.2f}\n\n")
-            
-            f.write("-" * 40 + "\n")
-            f.write("PER-QUESTION RESULTS:\n")
-            f.write("-" * 40 + "\n")
-            for r in results:
-                f.write(f"\nQ: {r['question'][:50]}...\n")
-                f.write(f"  Precision: {r['context_precision']:.2f}\n")
-                f.write(f"  Recall: {r['context_recall']:.2f}\n")
-                f.write(f"  F1: {r['f1_score']:.2f}\n")
-            
-            grade = "A" if avg_f1 >= 0.8 else "B" if avg_f1 >= 0.6 else "C" if avg_f1 >= 0.4 else "F"
-            f.write("\n" + "=" * 60 + "\n")
-            f.write(f"RAG QUALITY GRADE: {grade}\n")
-            f.write(f"Average F1: {avg_f1:.2f} (Target: >0.8)\n")
-            f.write("=" * 60 + "\n")
-            
-    else:
-        # RAGAS mode  
-        with open(report_path, "w") as f:
-            f.write("=" * 60 + "\n")
-            f.write("SAKURA WAR ROOM: RAG QUALITY AUDIT (RAGAS)\n")
-            f.write("=" * 60 + "\n\n")
-            
-            f.write("METHODOLOGY:\n")
-            f.write("- Full RAGAS evaluation with LLM-as-judge\n")
-            f.write("- Metrics: Faithfulness, Relevancy, Precision\n\n")
-            
-            f.write("-" * 40 + "\n")
-            f.write("RAGAS SCORES:\n")
-            f.write("-" * 40 + "\n")
-            f.write(f"  Faithfulness: {results.get('faithfulness', 0):.2f}\n")
-            f.write(f"  Answer Relevancy: {results.get('answer_relevancy', 0):.2f}\n")
-            f.write(f"  Context Precision: {results.get('context_precision', 0):.2f}\n")
-            
-            avg_score = sum(results.values()) / len(results)
-            grade = "A" if avg_score >= 0.8 else "B" if avg_score >= 0.6 else "C" if avg_score >= 0.4 else "F"
-            
-            f.write("\n" + "=" * 60 + "\n")
-            f.write(f"RAG QUALITY GRADE: {grade}\n")
-            f.write(f"Average Score: {avg_score:.2f}\n")
-            f.write("=" * 60 + "\n")
-    
-    print(f"\n✅ Report saved to {report_path}")
-    
-    # Save as CSV for structured data
-    csv_path = os.path.join(ARTIFACTS_DIR, "rag_scores.csv")
-    if isinstance(results, list):
-        with open(csv_path, "w") as f:
-            f.write("question,precision,recall,f1\n")
-            for r in results:
-                q = r["question"].replace(",", ";")
-                f.write(f'"{q}",{r["context_precision"]:.3f},{r["context_recall"]:.3f},{r["f1_score"]:.3f}\n')
-        print(f"✅ CSV saved to {csv_path}")
 
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("SAKURA WAR ROOM: RAG QUALITY AUDIT")
-    print("=" * 60)
-    
-    # Try RAGAS first, fallback to lightweight
-    try:
-        import ragas
-        print("✓ RAGAS library available\n")
-        results = audit_rag_with_ragas()
-    except ImportError:
-        print("⚠️ RAGAS not installed, using lightweight evaluation\n")
-        results = audit_rag_without_ragas()
-    
-    generate_rag_report(results)
-    
-    print("\n" + "=" * 60)
-    print("RAG AUDIT COMPLETE - Check audit_artifacts/ for evidence")
-    print("=" * 60)
+    asyncio.run(run_audit())

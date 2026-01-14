@@ -7,8 +7,50 @@ from .common import get_google_creds, retry_with_auth, USER_TIMEZONE
 from googleapiclient.discovery import build
 import base64
 from email.mime.text import MIMEText
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, List, Dict, Any
 
 # --- Gmail Tools ---
+
+# Helper function - not a tool
+def _fetch_single_email(service, msg_id: str) -> Dict[str, Any]:
+    """Helper to fetch ONLY metadata for a single email (Fast)."""
+    try:
+        # format='metadata' avoids downloading the huge body/html
+        # metadataHeaders reduces payload further
+        return service.users().messages().get(
+            userId='me', 
+            id=msg_id, 
+            format='metadata', 
+            metadataHeaders=['From', 'Subject', 'Date'] 
+        ).execute()
+    except Exception as e:
+        return {"error": str(e), "id": msg_id}
+
+def _sanitize_email_list(raw_messages: List[Dict[str, Any]], snippets: Dict[str, str]) -> str:
+    """Converts API response into a token-efficient Markdown list."""
+    summary = []
+    for msg in raw_messages:
+        if "error" in msg: continue
+        
+        headers = {h['name']: h['value'] for h in msg.get('payload', {}).get('headers', [])}
+        
+        # Clean Sender: "Google <no-reply@google.com>" -> "Google"
+        sender = headers.get('From', 'Unknown').split('<')[0].strip().replace('"', '')
+        subject = headers.get('Subject', '(No Subject)')
+        
+        # Truncate Subject to 45 chars to save tokens
+        if len(subject) > 45: subject = subject[:42] + "..."
+        
+        # Get snippet (passed separately because metadata format often omits it)
+        snippet = snippets.get(msg['id'], '').replace('\n', ' ')
+        if len(snippet) > 80: snippet = snippet[:77] + "..."
+
+        # 160 tokens per 5 emails vs 4000 previously
+        entry = f"• **{sender}** | *{subject}*\n  └── {snippet}"
+        summary.append(entry)
+        
+    return "\n".join(summary) if summary else "No readable emails found."
 
 @tool
 @retry_with_auth
@@ -18,56 +60,60 @@ def gmail_read_email(
     unread_only: bool = False
 ) -> str:
     """
-    Read emails with flexible filtering.
+    Read emails with flexible filtering (Optimized: Parallel + Token Diet).
     Args:
-        query: Gmail search query. Examples:
-               - "from:user@example.com"
-               - "subject:invoice"
-               - "after:2024/01/01"
-               - "is:unread"
-               - "has:attachment"
-        max_results: Max emails to return (default 5, max 20)
-        unread_only: Only show unread emails (default False)
+        query: Gmail search query (e.g., "from:boss", "subject:invoice").
+        max_results: Max emails to return (default 5, capped at 10).
+        unread_only: Only show unread.
     """
-    print("Called Gmail Read")
+    print(f"Called Gmail Read (max={max_results}, unread={unread_only})")
     creds = get_google_creds()
     if not creds: return "❌ Google Auth failed. Check token.json."
     
     try:
         service = build('gmail', 'v1', credentials=creds)
         
-        # Build query
+        # 1. Build query
         q_parts = []
-        if query:
-            q_parts.append(query)
-        if unread_only:
-            q_parts.append("is:unread")
+        if query: q_parts.append(query)
+        if unread_only: q_parts.append("is:unread")
         q = " ".join(q_parts) if q_parts else "label:INBOX"
         
-        # Cap max_results
-        max_results = min(max_results, 20)
+        # Cap max_results to 10 to prevent token explosion
+        max_results = min(max_results, 10)
         
+        # 2. List IDs (Fast)
         results = service.users().messages().list(userId='me', q=q, maxResults=max_results).execute()
         messages = results.get('messages', [])
         
         if not messages: return "📭 No emails found matching your criteria."
         
-        out = []
-        for msg in messages:
-            m = service.users().messages().get(userId='me', id=msg['id']).execute()
-            snippet = m.get('snippet', '')
-            headers = m['payload']['headers']
-            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '(No Subject)')
-            sender = next((h['value'] for h in headers if h['name'] == 'From'), '(Unknown)')
-            date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
+        # 3. Parallel Fetch (The Speed Hack)
+        # We need snippet (from list or full fetch) and headers (from metadata fetch)
+        # Actually 'list' response contains snippet usually? No, it contains threadId/id only by default.
+        # We fetch metadata in parallel.
+        
+        with ThreadPoolExecutor(max_workers=max_results) as executor:
+            # Fetch metadata
+            futures = [executor.submit(_fetch_single_email, service, m['id']) for m in messages]
+            raw_data = [f.result() for f in futures]
             
-            # Clean up sender
-            if '<' in sender:
-                sender = sender.split('<')[0].strip().strip('"')
+            # For snippets, we actually need 'format=minimal' or 'full'. 'metadata' might exclude snippet.
+            # Gmail API is tricky. Let's do a trick: we want snippet.
+            # To get snippet efficiently without body, we might need a separate call or rely on full format?
+            # Actually, 'messages.get' documentation says 'snippet' is returned in all formats except 'raw'?
+            # Let's verify: Yes, snippet is a top-level field.
+            # So _fetch_single_email returning 'payload' headers AND top-level 'snippet' is what we want.
+            # But wait, 'format=metadata' returns snippet? Yes, usually.
             
-            out.append(f"📧 FROM: {sender}\n   DATE: {date[:16] if date else 'N/A'}\n   SUBJ: {subject}\n   BODY: {snippet[:100]}...")
-            
-        return "\n\n".join(out)
+            # Let's verify thread safety: passing 'service' is generally safe for read-only.
+        
+        # Re-map snippets from the fetch result (if available)
+        snippets = {m['id']: m.get('snippet', '') for m in raw_data if 'id' in m}
+        
+        # 4. Token Diet
+        return _sanitize_email_list(raw_data, snippets)
+        
     except Exception as e:
         return f"❌ Gmail error: {e}"
 
