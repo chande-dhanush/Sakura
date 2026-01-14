@@ -23,6 +23,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Any, Set, Tuple, Union
 import json
+import math
 import os
 import threading
 import time
@@ -161,10 +162,33 @@ class EntityNode:
     _embedding_cached: bool = False
     
     def touch(self) -> None:
-        """Mark entity as recently referenced."""
+        """Mark entity as recently referenced and boost confidence."""
         self.last_referenced = datetime.now()
         self.reference_count += 1
         self.recency_bucket = RecencyBucket.NOW
+        # V13: Boost confidence on re-reference (capped at 1.0)
+        self.confidence = min(1.0, self.confidence + 0.05)
+    
+    def get_current_confidence(self) -> float:
+        """
+        Calculate confidence with exponential temporal decay.
+        
+        V13: Confidence decays over time using half-life formula.
+        Half-life: 30 days (confidence halves every 30 days of no reference)
+        Minimum: 0.1 (never fully forgotten if promoted)
+        """
+        days_since_ref = (datetime.now() - self.last_referenced).days
+        
+        if days_since_ref <= 0:
+            return self.confidence
+        
+        # Exponential decay: confidence(t) = confidence(0) * e^(-λt)
+        # where λ = ln(2) / half_life
+        half_life_days = 30
+        decay_constant = math.log(2) / half_life_days
+        decayed = self.confidence * math.exp(-decay_constant * days_since_ref)
+        
+        return max(0.1, decayed)  # Minimum 0.1 confidence
     
     def decay(self, current_time: datetime, session_start: datetime) -> None:
         """Update recency bucket based on time elapsed."""
@@ -178,6 +202,34 @@ class EntityNode:
             self.recency_bucket = RecencyBucket.LONG_AGO
         else:
             self.recency_bucket = RecencyBucket.FORGOTTEN
+    
+    def check_lifecycle_demotion(self) -> bool:
+        """
+        Check and apply lifecycle demotion based on decayed confidence.
+        
+        V13: Entities get demoted if their confidence drops too low.
+        - PROMOTED → CANDIDATE if confidence < 0.3
+        - CANDIDATE → EPHEMERAL if confidence < 0.15
+        
+        Returns True if entity was demoted.
+        """
+        # Never demote user identity or system entities
+        if self.type == EntityType.USER or self.source == EntitySource.SYSTEM:
+            return False
+        
+        current_conf = self.get_current_confidence()
+        
+        if self.lifecycle == EntityLifecycle.PROMOTED and current_conf < 0.3:
+            self.lifecycle = EntityLifecycle.CANDIDATE
+            print(f"📉 [WorldGraph] Demoted {self.name}: PROMOTED → CANDIDATE (conf={current_conf:.2f})")
+            return True
+        
+        if self.lifecycle == EntityLifecycle.CANDIDATE and current_conf < 0.15:
+            self.lifecycle = EntityLifecycle.EPHEMERAL
+            print(f"📉 [WorldGraph] Demoted {self.name}: CANDIDATE → EPHEMERAL (conf={current_conf:.2f})")
+            return True
+        
+        return False
     
     def can_be_mutated_by(self, source: EntitySource) -> bool:
         """Check if this source is allowed to update this entity."""

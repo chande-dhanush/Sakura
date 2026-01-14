@@ -9,8 +9,16 @@ Extracted from llm.py as part of SOLID refactoring.
 """
 import json
 from typing import Optional, Tuple, List, Dict, Any
+import re
 
 from langchain_core.messages import SystemMessage, HumanMessage
+
+
+# V13: Urgency detection pattern (compiled once at module load)
+_URGENT_PATTERNS = re.compile(
+    r'\b(urgent(ly)?|asap|emergency|hurry|quick(ly)?|immediately|right now|as soon as possible)\b',
+    re.IGNORECASE
+)
 
 
 # Router prompt for V10 classification with Few-Shot Examples
@@ -67,9 +75,10 @@ Return JSON only:
 class RouteResult:
     """Result of intent routing."""
     
-    def __init__(self, classification: str, tool_hint: Optional[str] = None):
+    def __init__(self, classification: str, tool_hint: Optional[str] = None, urgency: str = "NORMAL"):
         self.classification = classification  # DIRECT, PLAN, or CHAT
         self.tool_hint = tool_hint
+        self.urgency = urgency  # V13: URGENT or NORMAL
     
     @property
     def needs_tools(self) -> bool:
@@ -78,6 +87,20 @@ class RouteResult:
     @property
     def needs_planning(self) -> bool:
         return self.classification == "PLAN"
+    
+    @property
+    def is_urgent(self) -> bool:
+        return self.urgency == "URGENT"
+
+
+def get_urgency(query: str) -> str:
+    """
+    V13: Detect urgency level using pattern matching.
+    
+    Returns:
+        "URGENT" or "NORMAL"
+    """
+    return "URGENT" if _URGENT_PATTERNS.search(query) else "NORMAL"
 
 
 class IntentRouter:
@@ -99,11 +122,16 @@ class IntentRouter:
     
     async def aroute(self, query: str, context: str = "", history: List[Dict] = None) -> RouteResult:
         """Async version of route using native ainvoke."""
+        # V13: Detect urgency first (fast, no LLM)
+        urgency = get_urgency(query)
+        if urgency == "URGENT":
+            print(f"⚡ [Router] URGENT query detected")
+        
         # 1. Action command check (CPU bound, fast enough to keep sync logic)
         if self._is_action_command(query):
             print(f"⚡ [Router] Action command detected (Async), forcing DIRECT")
             tool_hint = self._guess_tool_hint(query)
-            return RouteResult("DIRECT", tool_hint)
+            return RouteResult("DIRECT", tool_hint, urgency)
             
         # 2. LLM classification
         try:
@@ -115,11 +143,11 @@ class IntentRouter:
             # Use async invoke
             response = await self.llm.ainvoke(messages)
             classification, tool_hint = self._parse_response(response.content)
-            return RouteResult(classification, tool_hint)
+            return RouteResult(classification, tool_hint, urgency)
             
         except Exception as e:
             print(f"⚠️ [Router] Async Error: {e}, defaulting to CHAT")
-            return RouteResult("CHAT")
+            return RouteResult("CHAT", None, urgency)
 
     def route(self, query: str, context: str = "", history: List[Dict] = None) -> RouteResult:
         """
@@ -133,11 +161,14 @@ class IntentRouter:
         Returns:
             RouteResult with classification and optional tool hint
         """
+        # V13: Detect urgency first (fast, no LLM)
+        urgency = get_urgency(query)
+        
         # 1. Check for forced action commands (bypass LLM)
         if self._is_action_command(query):
             print(f"⚡ [Router] Action command detected, forcing DIRECT")
             tool_hint = self._guess_tool_hint(query)
-            return RouteResult("DIRECT", tool_hint)
+            return RouteResult("DIRECT", tool_hint, urgency)
         
         # 2. LLM-based classification
         try:
@@ -149,11 +180,11 @@ class IntentRouter:
             response = self.llm.invoke(messages)
             classification, tool_hint = self._parse_response(response.content)
             
-            return RouteResult(classification, tool_hint)
+            return RouteResult(classification, tool_hint, urgency)
             
         except Exception as e:
             print(f"⚠️ [Router] Error: {e}, defaulting to CHAT")
-            return RouteResult("CHAT")
+            return RouteResult("CHAT", None, urgency)
     
     def _is_action_command(self, user_input: str) -> bool:
         """

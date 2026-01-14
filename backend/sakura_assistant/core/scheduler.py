@@ -294,3 +294,45 @@ def schedule_morning_briefing(time_str: str, callback: Callable) -> str:
         schedule_morning_briefing("08:00", lambda: send_briefing())
     """
     return get_scheduler().schedule_daily(time_str, callback, name="morning_briefing")
+
+
+def memory_maintenance() -> int:
+    """
+    V13: Daily memory maintenance - demote stale entities.
+    
+    Returns:
+        Number of entities demoted.
+    """
+    from .world_graph import get_world_graph
+    
+    graph = get_world_graph()
+    demoted = 0
+    
+    for entity in list(graph.entities.values()):
+        if entity.check_lifecycle_demotion():
+            demoted += 1
+    
+    if demoted > 0:
+        graph.save()
+        print(f"🧹 [Memory Maintenance] Demoted {demoted} stale entities")
+    else:
+        print("🧹 [Memory Maintenance] No entities to demote")
+    
+    return demoted
+
+
+def schedule_memory_maintenance(time_str: str = "03:00") -> str:
+    """
+    V13: Schedule daily memory maintenance.
+    
+    Default: 3:00 AM daily
+    
+    Example:
+        schedule_memory_maintenance("03:00")
+    """
+    return get_scheduler().schedule_daily(
+        time_str, 
+        memory_maintenance, 
+        name="memory_maintenance"
+    )
+

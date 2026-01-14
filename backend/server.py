@@ -119,6 +119,16 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Failed to start Voice Engine: {e}")
     
+    # V13: Start Memory Maintenance Scheduler (Temporal Decay)
+    if assistant:
+        try:
+            from sakura_assistant.core.scheduler import schedule_memory_maintenance, start_scheduler
+            start_scheduler()
+            schedule_memory_maintenance("03:00")  # Run at 3 AM daily
+            print("🧹 Memory maintenance scheduler started (3:00 AM daily)")
+        except Exception as e:
+            print(f"⚠️ Scheduler init warning: {e}")
+    
     yield
     
     # Cleanup on shutdown
@@ -345,6 +355,135 @@ async def get_settings():
     }
 
 
+@app.patch("/settings")
+async def update_settings(request: Request):
+    """
+    Update specific settings (V13: Fix for frontend PATCH calls).
+    Only updates provided fields - doesn't overwrite all settings.
+    """
+    from sakura_assistant.utils.pathing import get_project_root
+    
+    try:
+        data = await request.json()
+        
+        # 1. Load existing .env
+        env_path = os.path.join(get_project_root(), ".env")
+        env_lines = []
+        env_dict = {}
+        
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        key, val = line.split("=", 1)
+                        env_dict[key] = val
+                    env_lines.append(line)
+        
+        # 2. Update only provided API keys
+        api_key_fields = {"GROQ_API_KEY", "TAVILY_API_KEY", "OPENROUTER_API_KEY", 
+                          "GOOGLE_API_KEY", "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"}
+        
+        updated_keys = []
+        for key in api_key_fields:
+            if key in data and data[key].strip():
+                env_dict[key] = data[key].strip()
+                updated_keys.append(key)
+        
+        # 3. Write back .env if API keys changed
+        if updated_keys:
+            with open(env_path, "w") as f:
+                for key, val in env_dict.items():
+                    f.write(f"{key}={val}\n")
+            
+            # Reload env
+            from dotenv import load_dotenv
+            load_dotenv(env_path, override=True)
+        
+        # 4. Update user settings
+        user_fields = {"USER_NAME": "user_name", "USER_LOCATION": "user_location", "USER_BIO": "user_bio"}
+        settings_path = os.path.join(get_project_root(), "data", "user_settings.json")
+        
+        user_settings = {}
+        if os.path.exists(settings_path):
+            with open(settings_path, "r") as f:
+                user_settings = json.load(f)
+        
+        updated_user = []
+        for frontend_key, backend_key in user_fields.items():
+            if frontend_key in data:
+                user_settings[backend_key] = data[frontend_key].strip()
+                updated_user.append(frontend_key)
+        
+        if updated_user:
+            os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+            with open(settings_path, "w") as f:
+                json.dump(user_settings, f, indent=2)
+        
+        return {
+            "success": True,
+            "updated_keys": updated_keys + updated_user,
+            "message": f"Updated {len(updated_keys) + len(updated_user)} settings"
+        }
+        
+    except Exception as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
+
+@app.post("/settings/google-auth")
+async def upload_google_auth(file: UploadFile = File(...)):
+    """
+    Upload Google credentials.json for Gmail/Calendar OAuth.
+    V13: Fix for frontend Google Auth upload.
+    """
+    from sakura_assistant.utils.pathing import get_project_root
+    
+    try:
+        # Validate file type
+        if not file.filename.endswith('.json'):
+            return JSONResponse({
+                "success": False, 
+                "message": "File must be a .json file"
+            }, status_code=400)
+        
+        # Save to data/google/credentials.json
+        google_dir = os.path.join(get_project_root(), "data", "google")
+        os.makedirs(google_dir, exist_ok=True)
+        
+        creds_path = os.path.join(google_dir, "credentials.json")
+        
+        contents = await file.read()
+        
+        # Validate JSON structure
+        try:
+            creds_data = json.loads(contents)
+            # Check for required OAuth keys
+            if not ("installed" in creds_data or "web" in creds_data):
+                return JSONResponse({
+                    "success": False,
+                    "message": "Invalid credentials.json - missing 'installed' or 'web' key"
+                }, status_code=400)
+        except json.JSONDecodeError:
+            return JSONResponse({
+                "success": False,
+                "message": "Invalid JSON file"
+            }, status_code=400)
+        
+        # Write file
+        with open(creds_path, "wb") as f:
+            f.write(contents)
+        
+        print(f"✅ Google credentials saved to: {creds_path}")
+        
+        return {
+            "success": True,
+            "message": "Google credentials uploaded! You may need to authorize on first use."
+        }
+        
+    except Exception as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
+
 @app.get("/health")
 async def health_check():
     """Combined health check - returns ready status."""
@@ -437,7 +576,20 @@ async def upload_file(file: UploadFile = File(...)):
         
         print(f"📥 Saved uploaded file: {file_path}")
         
-        # 2. Ingest into RAG
+        # Check if audio file (handled by audio_tools, not RAG)
+        audio_extensions = {'.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac'}
+        file_ext = os.path.splitext(safe_name)[1].lower()
+        
+        if file_ext in audio_extensions:
+            # Audio files: Just save, don't ingest to RAG
+            return {
+                "success": True,
+                "file_id": safe_name,
+                "filename": safe_name,
+                "message": f"✅ Audio file saved: '{safe_name}' (use transcribe_audio or summarize_audio)"
+            }
+        
+        # 2. Ingest into RAG (non-audio files)
         pipeline = get_ingestion_pipeline()
         result = pipeline.ingest_file_sync(file_path)
         

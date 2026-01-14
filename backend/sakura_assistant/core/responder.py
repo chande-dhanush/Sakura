@@ -21,6 +21,25 @@ If you need a tool, respond with: "I need to use a tool for that. Let me help yo
 IMPORTANT: If tool outputs are provided below, the action was ALREADY completed. Acknowledge it naturally (e.g., "Playing now" or "Done") - do NOT tell the user to manually do it."""
 
 
+# V13: Pre-compiled validation patterns (avoid recompiling on every response)
+_TOOL_LEAK_PATTERNS = [
+    re.compile(r'\{\s*"name"\s*:', re.IGNORECASE),
+    re.compile(r'\{\s*"tool"\s*:', re.IGNORECASE),
+    re.compile(r'\{\s*"function"\s*:', re.IGNORECASE),
+    re.compile(r'\{\s*"action"\s*:\s*"', re.IGNORECASE),
+]
+
+_TOOL_SPLIT_PATTERN = re.compile(r'\{\s*"(name|tool|function|action)"\s*:')
+
+_ACTION_CLAIM_PATTERNS = [
+    re.compile(r"\bi (have |just )?(sent|scheduled|created|added|updated|played|opened|deleted|saved)", re.IGNORECASE),
+    re.compile(r"\b(email|event|task|note|file) (has been|was) (sent|created|scheduled|added)", re.IGNORECASE),
+    re.compile(r"\bdone[.!]?\s*$", re.IGNORECASE),
+    re.compile(r"\bplaying now", re.IGNORECASE),
+    re.compile(r"\bsuccessfully (sent|created|scheduled|added|saved)", re.IGNORECASE),
+]
+
+
 @dataclass
 class ResponseContext:
     """Context for generating a response."""
@@ -225,28 +244,21 @@ STUDY MODE ACTIVE:
         Validate and clean responder output.
         
         Strips any tool-call patterns that may have leaked through.
+        V13: Uses pre-compiled patterns for performance.
         
         Returns:
             Tuple of (cleaned_text, had_violation)
         """
-        # Detect tool-call JSON patterns
-        tool_patterns = [
-            r'\{\s*"name"\s*:', 
-            r'\{\s*"tool"\s*:',
-            r'\{\s*"function"\s*:',
-            r'\{\s*"action"\s*:\s*"',
-        ]
-        
         had_violation = False
-        for pattern in tool_patterns:
-            if re.search(pattern, text, re.IGNORECASE):
+        for pattern in _TOOL_LEAK_PATTERNS:
+            if pattern.search(text):
                 had_violation = True
                 break
         
         if had_violation:
             print("⚠️ [GUARDRAIL] Responder attempted tool call - stripping JSON")
             # Extract text before the JSON
-            clean = re.split(r'\{\s*"(name|tool|function|action)"\s*:', text)[0].strip()
+            clean = _TOOL_SPLIT_PATTERN.split(text)[0].strip()
             if not clean or len(clean) < 10:
                 clean = "I apologize, but I encountered an issue processing that request. Could you please rephrase?"
             return clean, True
@@ -259,19 +271,12 @@ STUDY MODE ACTIVE:
         
         Uses regex heuristics to catch confident lies like
         "I sent the email" when no email was actually sent.
+        V13: Uses pre-compiled patterns for performance.
         """
-        action_patterns = [
-            r"\bi (have |just )?(sent|scheduled|created|added|updated|played|opened|deleted|saved)",
-            r"\b(email|event|task|note|file) (has been|was) (sent|created|scheduled|added)",
-            r"\bdone[.!]?\s*$",
-            r"\bplaying now",
-            r"\bsuccessfully (sent|created|scheduled|added|saved)"
-        ]
-        
         response_lower = response.lower()
         
-        for pattern in action_patterns:
-            if re.search(pattern, response_lower, re.IGNORECASE):
+        for pattern in _ACTION_CLAIM_PATTERNS:
+            if pattern.search(response_lower):
                 print("⚠️ [GUARDRAIL] False action claim detected")
                 return "I understand you want me to do something, but I wasn't able to take any action. Could you clarify what you'd like me to do?"
         

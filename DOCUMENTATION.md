@@ -1,11 +1,11 @@
-# Sakura V12.0 — Technical Documentation
-*System Certified: January 13, 2026*
+# Sakura V13.0 — Technical Documentation
+*System Certified: January 14, 2026*
 
 ---
 
 ## 🎯 Overview
-**Sakura** is a production-grade personal AI assistant.
-**V12 Upgrade:** Now featuring **Real-Time Thought Streams**, **Smart Caching**, and **Context Valve** overflow protection.
+**Sakura** is a production-grade personal AI assistant optimized for cost, performance, and CPU-only deployment.
+**V13 Upgrade:** Now featuring **Code Interpreter** (Docker sandbox), **Temporal Decay** (memory aging), **Adaptive Routing** (urgency detection), and **Audio Summarization** (transcribe + summarize).
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
 ---
@@ -22,7 +22,7 @@
 | Hard 4-LLM Call Limit | V5+ | Circuit breaker prevents runaway costs |
 | Multi-LLM Failover | V5+ | Groq → Gemini cascade with timeout protection |
 | Memory Judger | V4+ | LLM-based importance filtering |
-| 46 Tools | V10+ | Gmail, Calendar, Spotify, Notes, Vision, RAG |
+| 54 Tools | V13 | Gmail, Calendar, Spotify, Notes, Vision, RAG, Code, Audio |
 | Kokoro TTS | V10+ | Neural voice synthesis with idle unload |
 | Wake Word Detection | V10+ | Custom DTW-based voice activation |
 | Smart Router | V10+ | DIRECT/PLAN/CHAT classification with tool hints |
@@ -42,6 +42,11 @@
 | Smart Research | V11+ | Dedicated `research_topic` tool with summary |
 | Thought Stream | V12+ | Real-time WebSocket reasoning feed for UI |
 | Native Logs | V12+ | Cyberpunk-themed Tauri dashboard for system logs |
+| **Code Interpreter** | V13 | Execute Python in Docker sandbox (pandas, numpy, matplotlib) |
+| **Temporal Decay** | V13 | Memory confidence decays over time (30-day half-life) |
+| **Adaptive Routing** | V13 | Urgency detection for faster model selection |
+| **Audio Summarization** | V13 | Transcribe and summarize audio files (Google STT) |
+| **Pre-compiled Regex** | V13 | 30+ patterns compiled at module load for performance |
 
 ---
 

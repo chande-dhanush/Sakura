@@ -133,7 +133,7 @@
             type="file" 
             bind:this={fileInput}
             on:change={handleFileSelect}
-            accept=".pdf,.txt,.md,.doc,.docx,.png,.jpg,.jpeg"
+            accept=".pdf,.txt,.md,.doc,.docx,.png,.jpg,.jpeg,.mp3,.wav,.m4a,.ogg,.flac"
             style="display: none"
         />
         <button 

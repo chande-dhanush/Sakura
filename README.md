@@ -1,8 +1,8 @@
-# 🌸 Sakura V10.4
+# 🌸 Sakura V13
 
-> A production-grade personal AI assistant with voice, vision, and 46 tools.
+> A production-grade personal AI assistant with voice, vision, code execution, and 54 tools.
 
-![Version](https://img.shields.io/badge/version-10.4-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-13.0-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)
@@ -19,9 +19,11 @@ Sakura is a **desktop AI assistant** that can:
 - 🎵 Control Spotify, YouTube, and system media
 - 📧 Read/send Gmail, manage Calendar & Tasks
 - 🔍 Search the web, scrape websites, take notes
+- 🎹 **Execute Python code** in a secure Docker sandbox (V13)
+- 🎧 **Transcribe & summarize audio** files (V13)
 - 🎙️ Respond to voice commands ("Hey Sakura")
 - 🖼️ Analyze images and screenshots
-- 🧠 Remember context across conversations
+- 🧠 Remember context with **temporal decay** (V13)
 
 **Free to run** — Uses Groq (Llama 3.3 70B) and Google Gemini free tiers.
 
@@ -36,6 +38,8 @@ Sakura is a **desktop AI assistant** that can:
 | Python 3.11+ | [python.org/downloads](https://www.python.org/downloads/) |
 | Node.js 18+ | [nodejs.org](https://nodejs.org/) |
 | Rust | [rustup.rs](https://rustup.rs/) |
+| Docker Desktop | [docker.com](https://www.docker.com/products/docker-desktop/) (for Code Interpreter) |
+| ffmpeg | `winget install FFmpeg` (for Audio Tools) |
 | Groq API Key | [console.groq.com](https://console.groq.com) (Free) |
 
 ### Windows Setup
@@ -152,9 +156,11 @@ Sakura_V_9.1/
 │   ├── server.py       # Main API server
 │   ├── sakura_assistant/
 │   │   ├── core/       # Router, Executor, Planner
-│   │   ├── tools/      # 46 tool implementations
+│   │   ├── tools_libs/ # 54 tool implementations
 │   │   └── utils/      # Flight recorder, metrics
+│   ├── docker/         # Code Interpreter Dockerfile
 │   └── data/           # World graph, templates
+├── V13_AUDIT_REPORT.md # Comprehensive test report
 └── docs/               # Documentation
 ```
 
@@ -167,7 +173,7 @@ cd frontend
 npm run tauri build
 ```
 
-**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_10.4.0_x64-setup.exe`
+**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_13.0.0_x64-setup.exe`
 
 This creates a single installer that bundles:
 - Compiled Python backend (PyInstaller)
@@ -176,15 +182,35 @@ This creates a single installer that bundles:
 
 ---
 
-## 🆕 What's New in V10.4
+## 🆕 What's New in V13
 
 | Feature | Description |
 |---------|-------------|
-| **Flight Recorder** | JSONL tracing for debugging latency |
-| **Few-Shot Router** | 15 examples for 90%+ routing accuracy |
-| **Async LLM** | Native ainvoke() for parallel tool execution |
-| **Rate Limiter** | Token bucket backpressure (no 429 crashes) |
-| **Audit Suite** | Behavioral verification scripts |
+| **Code Interpreter** | Execute Python in Docker sandbox (pandas, numpy, matplotlib) |
+| **Audio Tools** | Transcribe & summarize audio files (Google STT) |
+| **Temporal Decay** | Memory confidence decays over time (30-day half-life) |
+| **Adaptive Routing** | Urgency detection for faster responses |
+| **54 Tools** | 8 new tools added |
+| **Pre-compiled Regex** | 30% faster routing performance |
+
+### Previous Versions
+
+<details>
+<summary>V12 Features</summary>
+
+- Real-time Thought Streams (WebSocket)
+- Smart Search Cache
+- Context Valve overflow protection
+</details>
+
+<details>
+<summary>V10.4 Features</summary>
+
+- Flight Recorder (JSONL tracing)
+- Few-Shot Router (15 examples)
+- Async LLM (parallel tool execution)
+- Token Bucket Rate Limiter
+</details>
 
 ---
 
@@ -195,6 +221,8 @@ This creates a single installer that bundles:
 | "No module named..." | Activate venv: `.\PA\Scripts\activate` |
 | Wake word not working | Run `python first_setup.py` |
 | Gmail/Calendar errors | Check `credentials.json` placement |
+| Code Interpreter fails | Start Docker Desktop first |
+| Audio tools fail | Install ffmpeg: `winget install FFmpeg` |
 | App won't start | Check `backend/data/flight_recorder.jsonl` for errors |
 | Rate limited | Wait 1-2 minutes (free tier limits) |
 

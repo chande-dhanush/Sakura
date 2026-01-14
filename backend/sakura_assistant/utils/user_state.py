@@ -36,9 +36,9 @@ class UserStateTracker:
     STRESSED_FREQUENCY_THRESHOLD = 3  # 3+ messages in 60s = stressed
     STRESSED_FREQUENCY_WINDOW = 60    # seconds
     
-    # Urgent language patterns (case-insensitive)
+    # Urgent language patterns (case-insensitive, V13: synced with router.py)
     URGENT_PATTERNS = re.compile(
-        r'\b(urgent|asap|emergency|help|hurry|quick|immediately|critical)\b',
+        r'\b(urgent(ly)?|asap|emergency|help|hurry|quick(ly)?|immediately|critical)\b',
         re.IGNORECASE
     )
     

@@ -19,6 +19,8 @@ from .tools_libs.web import (
     web_search, search_wikipedia, search_arxiv, get_news, web_scrape
 )
 from .tools_libs.research import research_topic # V11 Smart Research
+from .tools_libs.code_interpreter import execute_python, check_code_interpreter_status  # V13 Code Interpreter
+from .tools_libs.audio_tools import transcribe_audio, summarize_audio  # V13 Audio Summarization
 from .tools_libs.system import (
     get_system_info, read_screen, open_app, 
     clipboard_read, clipboard_write, 
@@ -198,6 +200,12 @@ def get_all_tools():
         update_user_memory, ingest_document, fetch_document_context,
         list_uploaded_documents, delete_document, get_rag_telemetry, trigger_reindex,
         query_ephemeral, # V11.3
+        
+        # Code Interpreter (V13)
+        execute_python, check_code_interpreter_status,
+        
+        # Audio Tools (V13)
+        transcribe_audio, summarize_audio,
         
         # Meta / Aliases
         execute_actions, retrieve_document_context, forget_document,
