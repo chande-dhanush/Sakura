@@ -146,9 +146,14 @@ def load_all_traces(log_path: str) -> list:
                             'date': None,
                             'time': None,
                             'query': 'Unknown',
-                            'response': '',  # NEW: Store response
+                            'response': '',
                             'total_ms': 0,
-                            'success': True
+                            'success': True,
+                            # V13: Token/Cost tracking
+                            'tokens': {'prompt': 0, 'completion': 0, 'total': 0},
+                            'cost_usd': 0.0,
+                            'llm_calls': 0,
+                            'models_used': [],
                         }
                     
                     traces[tid]['events'].append(entry)
@@ -168,7 +173,12 @@ def load_all_traces(log_path: str) -> list:
                     elif entry.get('event') == 'trace_end':
                         traces[tid]['total_ms'] = entry.get('total_ms', 0)
                         traces[tid]['success'] = entry.get('success', True)
-                        traces[tid]['response'] = entry.get('response_preview', '')  # NEW
+                        traces[tid]['response'] = entry.get('response_preview', '')
+                        # V13: Token/Cost data
+                        traces[tid]['tokens'] = entry.get('tokens', {'prompt': 0, 'completion': 0, 'total': 0})
+                        traces[tid]['cost_usd'] = entry.get('cost_usd', 0.0)
+                        traces[tid]['llm_calls'] = entry.get('llm_calls', 0)
+                        traces[tid]['models_used'] = entry.get('models_used', [])
                         
                 except json.JSONDecodeError:
                     continue
@@ -218,11 +228,25 @@ def render_kpis(traces: list):
     success = sum(1 for t in traces if t['success'])
     avg_latency = sum(t['total_ms'] for t in traces) / total if total else 0
     
+    # V13: Token/Cost aggregation
+    total_tokens = sum(t.get('tokens', {}).get('total', 0) for t in traces)
+    total_cost = sum(t.get('cost_usd', 0) for t in traces)
+    total_llm_calls = sum(t.get('llm_calls', 0) for t in traces)
+    
+    # First row: Classic metrics
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Total Queries", total)
     col2.metric("✅ Success Rate", f"{(success/total)*100:.0f}%")
     col3.metric("⚡ Avg Latency", f"{avg_latency/1000:.2f}s")
     col4.metric("📅 Days Tracked", len(set(t['date'] for t in traces)))
+    
+    # Second row: Token/Cost metrics (V13)
+    st.markdown("---")
+    col5, col6, col7, col8 = st.columns(4)
+    col5.metric("🔤 Total Tokens", f"{total_tokens:,}")
+    col6.metric("💰 Est. Cost", f"${total_cost:.4f}")
+    col7.metric("🤖 LLM Calls", total_llm_calls)
+    col8.metric("📈 Avg Tokens/Query", f"{total_tokens//total:,}" if total else "0")
 
 def render_phase_details(phase_name: str, events: list):
     """Render detailed events for a phase."""
@@ -300,6 +324,20 @@ def render_query_card(trace: dict):
                         label=f"{phase_icons.get(phase, '🔹')} {phase}",
                         value=f"{round(duration/1000, 2)}s"
                     )
+        
+        # V13: Token/Cost metrics for this trace
+        st.markdown("---")
+        tokens = trace.get('tokens', {})
+        token_cols = st.columns(4)
+        with token_cols[0]:
+            st.metric("🔤 Tokens", f"{tokens.get('total', 0):,}")
+        with token_cols[1]:
+            st.metric("💰 Cost", f"${trace.get('cost_usd', 0):.6f}")
+        with token_cols[2]:
+            st.metric("🤖 LLM Calls", trace.get('llm_calls', 0))
+        with token_cols[3]:
+            models = trace.get('models_used', [])
+            st.metric("🧠 Models", ", ".join(models[:2]) if models else "N/A")
         
         st.divider()
         

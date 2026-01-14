@@ -24,6 +24,25 @@ except ImportError:
 DATA_DIR.mkdir(exist_ok=True)
 
 
+# V13: Model cost lookup (per 1M tokens)
+MODEL_COSTS = {
+    # Groq (free tier, but track for awareness)
+    "llama-3.3-70b-versatile": {"input": 0.59, "output": 0.79},
+    "llama-3.1-70b-versatile": {"input": 0.59, "output": 0.79},
+    "llama-3.1-8b-instant": {"input": 0.05, "output": 0.08},
+    "llama3-8b-8192": {"input": 0.05, "output": 0.10},
+    "gemma2-9b-it": {"input": 0.20, "output": 0.20},
+    "mixtral-8x7b-32768": {"input": 0.24, "output": 0.24},
+    # OpenRouter / Others
+    "gpt-4o": {"input": 2.50, "output": 10.00},
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "claude-3-5-sonnet": {"input": 3.00, "output": 15.00},
+    "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
+    # Default fallback
+    "default": {"input": 0.50, "output": 1.00},
+}
+
+
 class FlightRecorder:
     """
     Structured tracing for the Sakura pipeline.
@@ -31,7 +50,7 @@ class FlightRecorder:
     Usage:
         recorder.start_trace("query text")
         recorder.log("Router", "Classified as DIRECT")
-        recorder.log("Tool:spotify", "Playing Neon Blade")
+        recorder.log_llm_call("Responder", model="llama-3.3-70b", tokens={"prompt": 500, "completion": 200})
         recorder.end_trace()
     """
     
@@ -42,15 +61,28 @@ class FlightRecorder:
         self.spans: list = []
         self.callback = None  # V10.4: SSE bridge
         
+        # V13: Token/Cost tracking per trace
+        self.trace_tokens = {"prompt": 0, "completion": 0, "total": 0}
+        self.trace_cost_usd = 0.0
+        self.trace_llm_calls = 0
+        self.trace_models_used = set()
+        
     def set_callback(self, callback):
         """Set a real-time callback for SSE events."""
         self.callback = callback
+
         
     def start_trace(self, query: str) -> str:
         """Start a new trace for a request."""
         self.trace_id = f"trace_{int(time.time() * 1000)}"
         self.trace_start = time.perf_counter()
         self.spans = []
+        
+        # V13: Reset token accumulators
+        self.trace_tokens = {"prompt": 0, "completion": 0, "total": 0}
+        self.trace_cost_usd = 0.0
+        self.trace_llm_calls = 0
+        self.trace_models_used = set()
         
         self._write({
             "event": "trace_start",
@@ -88,6 +120,52 @@ class FlightRecorder:
         status_icon = {"INFO": ".", "SUCCESS": "+", "ERROR": "!", "WARN": "?"}
         print(f"[{status_icon.get(status, '.')}] {stage}: {content[:60]}... ({elapsed:.0f}ms)")
     
+    def log_llm_call(self, stage: str, model: str = "unknown", 
+                     tokens: Optional[Dict[str, int]] = None,
+                     duration_ms: Optional[float] = None,
+                     success: bool = True):
+        """
+        V13: Log an LLM API call with token usage and cost calculation.
+        
+        Args:
+            stage: Pipeline stage (Router, Planner, Responder, etc.)
+            model: Model identifier (e.g., "llama-3.3-70b-versatile")
+            tokens: Dict with "prompt", "completion", "total" keys
+            duration_ms: Time taken for this LLM call
+            success: Whether the call succeeded
+        """
+        # Default tokens if not provided
+        if tokens is None:
+            tokens = {"prompt": 0, "completion": 0, "total": 0}
+        
+        # Calculate cost
+        costs = MODEL_COSTS.get(model, MODEL_COSTS["default"])
+        prompt_cost = (tokens.get("prompt", 0) / 1_000_000) * costs["input"]
+        completion_cost = (tokens.get("completion", 0) / 1_000_000) * costs["output"]
+        call_cost = prompt_cost + completion_cost
+        
+        # Accumulate
+        self.trace_tokens["prompt"] += tokens.get("prompt", 0)
+        self.trace_tokens["completion"] += tokens.get("completion", 0)
+        self.trace_tokens["total"] += tokens.get("total", tokens.get("prompt", 0) + tokens.get("completion", 0))
+        self.trace_cost_usd += call_cost
+        self.trace_llm_calls += 1
+        self.trace_models_used.add(model)
+        
+        # Log as span with metadata
+        self.log(
+            stage=stage,
+            content=f"LLM Call: {model} ({tokens.get('total', 0)} tokens, ${call_cost:.6f})",
+            status="SUCCESS" if success else "ERROR",
+            duration_ms=duration_ms,
+            metadata={
+                "type": "llm_call",
+                "model": model,
+                "tokens": tokens,
+                "cost_usd": round(call_cost, 6),
+            }
+        )
+    
     def end_trace(self, success: bool = True, response_preview: str = ""):
         """End the current trace."""
         total_ms = (time.perf_counter() - self.trace_start) * 1000
@@ -99,9 +177,14 @@ class FlightRecorder:
             "total_ms": round(total_ms, 2),
             "response_preview": response_preview[:100],
             "span_count": len(self.spans),
+            # V13: Token/Cost summary
+            "tokens": self.trace_tokens.copy(),
+            "cost_usd": round(self.trace_cost_usd, 6),
+            "llm_calls": self.trace_llm_calls,
+            "models_used": list(self.trace_models_used),
         })
         
-        print(f"[=] TRACE COMPLETE: {total_ms:.0f}ms total, {len(self.spans)} spans")
+        print(f"[=] TRACE COMPLETE: {total_ms:.0f}ms, {len(self.spans)} spans, {self.trace_tokens['total']} tokens, ${self.trace_cost_usd:.4f}")
         
         self.trace_id = None
         self.spans = []
@@ -350,3 +433,9 @@ def end_trace(success: bool = True, response_preview: str = ""):
 
 def span(stage: str):
     return get_recorder().span(stage)
+
+
+def log_llm_call(stage: str, model: str = "unknown", tokens: dict = None,
+                 duration_ms: float = None, success: bool = True):
+    """V13: Log an LLM API call with token/cost tracking."""
+    return get_recorder().log_llm_call(stage, model, tokens, duration_ms, success)
