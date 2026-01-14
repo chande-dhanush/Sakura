@@ -33,6 +33,8 @@ MODEL_COSTS = {
     "llama3-8b-8192": {"input": 0.05, "output": 0.10},
     "gemma2-9b-it": {"input": 0.20, "output": 0.20},
     "mixtral-8x7b-32768": {"input": 0.24, "output": 0.24},
+    "OpenAI/OSS20b": {"input": 0.05, "output": 0.10},
+    "OpenAI/OSS20b": {"input": 0.1, "output": 0.50},
     # OpenRouter / Others
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
