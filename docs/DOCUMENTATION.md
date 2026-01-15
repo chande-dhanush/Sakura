@@ -1,11 +1,11 @@
-# Sakura V13.0 — Technical Documentation
-*System Certified: January 14, 2026*
+# Sakura V14.0 — Technical Documentation
+*System Certified: January 15, 2026*
 
 ---
 
 ## 🎯 Overview
 **Sakura** is a production-grade personal AI assistant optimized for cost, performance, and CPU-only deployment.
-**V13 Upgrade:** Now featuring **Code Interpreter** (Docker sandbox), **Temporal Decay** (memory aging), **Adaptive Routing** (urgency detection), and **Audio Summarization** (transcribe + summarize).
+**V14 Upgrade:** Now featuring **Unified ReflectionEngine** (background constraint detection), **Sleep Cycle** (startup fact crystallization), **Dream Journal** (/api/dreams visibility), and **World Graph Priority Filter** (constraints bypass vector similarity).
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
 ---
@@ -42,11 +42,15 @@
 | Smart Research | V11+ | Dedicated `research_topic` tool with summary |
 | Thought Stream | V12+ | Real-time WebSocket reasoning feed for UI |
 | Native Logs | V12+ | Cyberpunk-themed Tauri dashboard for system logs |
-| **Code Interpreter** | V13 | Execute Python in Docker sandbox (pandas, numpy, matplotlib) |
-| **Temporal Decay** | V13 | Memory confidence decays over time (30-day half-life) |
-| **Adaptive Routing** | V13 | Urgency detection for faster model selection |
-| **Audio Summarization** | V13 | Transcribe and summarize audio files (Google STT) |
-| **Pre-compiled Regex** | V13 | 30+ patterns compiled at module load for performance |
+| Code Interpreter | V13 | Execute Python in Docker sandbox (pandas, numpy, matplotlib) |
+| Temporal Decay | V13 | Memory confidence decays over time (30-day half-life) |
+| Adaptive Routing | V13 | Urgency detection for faster model selection |
+| Audio Summarization | V13 | Transcribe and summarize audio files (Google STT) |
+| Pre-compiled Regex | V13 | 30+ patterns compiled at module load for performance |
+| **Unified ReflectionEngine** | **V14** | Background constraint detection (saves 1 LLM call) |
+| **Sleep Cycle** | **V14** | Startup fact crystallization with 24h cooldown |
+| **Dream Journal** | **V14** | `/api/dreams` endpoint for visibility |
+| **Constraint Priority** | **V14** | Physical constraints bypass vector similarity |
 
 ---
 

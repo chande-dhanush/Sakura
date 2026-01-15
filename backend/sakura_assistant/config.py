@@ -321,38 +321,50 @@ Example: "yes [9] - user introduced themselves"
 Example: "yes [6] - technical interest in AI topic"
 """
 
-# Reflection Engine: Extracts long-term memories from conversations
-REFLECTION_SYSTEM_PROMPT = """ You are the subconscious memory manager for an AI assistant.
-Your goal is to extract permanent and significant information about the user.
+# Reflection Engine: V14 Unified Memory + Constraint Extractor
+REFLECTION_SYSTEM_PROMPT = """You are the memory processor for an AI assistant. Analyze the conversation and extract:
 
-IMPORTANT:
-- This prompt is NOT used in V5.1.
-- Do NOT assume this logic is active unless explicitly enabled in a future version.
+1. ENTITIES: People, topics, preferences mentioned
+2. CONSTRAINTS: Physical limitations, deadlines, injuries, health issues
+3. RETIREMENTS: Previous constraints that are now resolved
 
-Return a valid JSON object ONLY. No markdown, no explanations.
+=== CONSTRAINT DETECTION ===
+Look for physical/temporal limitations:
+- Health: "surgery", "injury", "sick", "pain", "can't [action]"
+- Deadlines: "due by", "before [date]", "have to finish"
+- Resource: "broke", "can't afford", "low on"
 
-STRICT EXCLUSIONS (Do NOT store):
-- System errors, debugging logs, or troubleshooting steps.
-- Transient states or short-term tasks.
-- Trivial chit-chat or acknowledgements.
+=== RETIREMENT DETECTION ===
+Look for resolution phrases:
+- "healed", "recovered", "better now", "can [action] again"
+- "finished", "submitted", "exam is over"
+- "got paid", "have money now"
 
-INCLUSIONS (Do store):
-- Facts: static identity updates (name, age, job, location, core beliefs).
-- Likes/Dislikes: permanent preferences.
-- Episodes: ONLY significant life events or character-revealing conversations.
-
-JSON Schema:
+=== OUTPUT JSON ===
 {
-  "facts": {},
-  "likes": [],
-  "dislikes": [],
-  "episode": {
-    "summary": "",
-    "tags": []
-  }
+  "entities": [
+    {"id": "pref:coding", "type": "preference", "summary": "User likes Python", "attributes": {}}
+  ],
+  "constraints": [
+    {
+      "id": "constraint:surgery_001",
+      "type": "constraint",
+      "summary": "Cannot walk - leg surgery recovery",
+      "attributes": {
+        "constraint_type": "physical",
+        "implications": ["walking", "exercise", "standing"],
+        "criticality": 0.9
+      }
+    }
+  ],
+  "retirements": ["constraint:old_id_to_archive"]
 }
 
-If nothing new or significant is learned, return empty objects.
+RULES:
+- Return VALID JSON only. No markdown, no explanations.
+- If nothing new, return: {"entities": [], "constraints": [], "retirements": []}
+- constraint_type must be: "physical" | "temporal" | "resource"
+- criticality: 0.0 (minor) to 1.0 (life-threatening)
 """
 
 # Responder guardrail: Prevents tool calling in text-only response

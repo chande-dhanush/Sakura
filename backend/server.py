@@ -21,7 +21,10 @@ from contextlib import asynccontextmanager
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sakura_assistant.core.memory.reflection import ReflectionEngine # V11.2
+from sakura_assistant.core.memory.reflection import get_reflection_engine  # V14: Unified
+
+# V14: Sleep Cycle for startup crystallization
+from sakura_assistant.core.scheduler import run_sleep_cycle_on_startup, get_dream_journal
 
 from fastapi import FastAPI, Request, BackgroundTasks, WebSocket, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -126,6 +129,9 @@ async def lifespan(app: FastAPI):
             start_scheduler()
             schedule_memory_maintenance("03:00")  # Run at 3 AM daily
             print("🧹 Memory maintenance scheduler started (3:00 AM daily)")
+            
+            # V14: Run Sleep Cycle on startup (24h cooldown)
+            run_sleep_cycle_on_startup()
         except Exception as e:
             print(f"⚠️ Scheduler init warning: {e}")
     
@@ -713,6 +719,158 @@ async def record_voice_template():
     return result
 
 
+# =============================================================================
+# V13: ASYNC REFLECTION HELPER
+# =============================================================================
+
+async def _run_async_reflection(user_msg: str, assistant_response: str):
+    """
+    Run V13 reflection engine analysis as a background task.
+    This doesn't block the chat response - user sees result immediately.
+    """
+    try:
+        if assistant and hasattr(assistant, 'reflection_engine'):
+            await assistant.reflection_engine.analyze_turn_async(user_msg, assistant_response)
+            print(f"🔄 [Reflection] Async analysis completed")
+    except Exception as e:
+        print(f"⚠️ [Reflection] Background analysis failed: {e}")
+
+
+# =============================================================================
+# V13: CONSTRAINT STATE API (For Svelte Frontend)
+# =============================================================================
+
+@app.get("/api/constraints")
+async def get_constraints():
+    """
+    Return all active constraints for UI visibility.
+    
+    Response:
+        {
+            "active": [
+                {
+                    "id": "phys_001",
+                    "type": "physical",
+                    "constraint": "Cannot walk - corn removal surgery",
+                    "implications": ["walking", "exercise"],
+                    "criticality": 0.9,
+                    "created_at": "2026-01-15T20:00:00",
+                    "expires_at": "2026-01-22T20:00:00"
+                }
+            ],
+            "count": 1
+        }
+    """
+    try:
+        state_manager = get_state_manager()
+        active_states = state_manager.get_all_active()
+        
+        return {
+            "active": active_states,
+            "count": len(active_states),
+            "token_budget": state_manager.token_budget,
+            "archived_count": len(state_manager.archived_states)
+        }
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/constraints/{constraint_id}/retire")
+async def retire_constraint(constraint_id: str, request: Request):
+    """
+    Manually retire a constraint (user says "Mark as Resolved").
+    
+    Request body (optional):
+        {"reason": "User marked as resolved"}
+    """
+    try:
+        data = {}
+        try:
+            data = await request.json()
+        except:
+            pass
+        
+        reason = data.get("reason", "Manual retirement via UI")
+        
+        state_manager = get_state_manager()
+        success = state_manager.retire_state(constraint_id, reason=reason)
+        
+        if success:
+            return {"success": True, "message": f"Constraint {constraint_id} retired"}
+        else:
+            return JSONResponse(
+                {"success": False, "message": f"Constraint {constraint_id} not found"},
+                status_code=404
+            )
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/constraints/add")
+async def add_constraint(request: Request):
+    """
+    Manually add a constraint (emergency override / user-facing API).
+    
+    Request body:
+        {
+            "type": "physical|temporal|emotional|social|resource",
+            "constraint": "Description of constraint",
+            "implications": ["action1", "action2"],
+            "criticality": 0.8,
+            "duration_days": 7  (optional)
+        }
+    """
+    from datetime import datetime, timedelta
+    
+    try:
+        data = await request.json()
+        
+        # Validate required fields
+        if not data.get("constraint"):
+            return JSONResponse(
+                {"success": False, "message": "constraint field is required"},
+                status_code=400
+            )
+        
+        # Generate unique ID
+        state_id = f"manual_{datetime.now().strftime('%H%M%S')}"
+        
+        # Calculate expiry
+        expires_at = None
+        if data.get("duration_days"):
+            expires_at = datetime.now() + timedelta(days=int(data["duration_days"]))
+        
+        # Create constraint
+        state = ConstraintState(
+            id=state_id,
+            type=StateType(data.get("type", "physical")),
+            status=StateStatus.ACTIVE,
+            constraint=data.get("constraint", "")[:100],
+            implications=data.get("implications", [])[:10],
+            created_at=datetime.now(),
+            expires_at=expires_at,
+            last_mentioned=datetime.now(),
+            criticality=min(1.0, max(0.0, float(data.get("criticality", 0.8)))),
+            user_emphasis=1.0,  # Max priority for manual additions
+            auto_expire=expires_at is not None
+        )
+        
+        state_manager = get_state_manager()
+        success = state_manager.add_state(state)
+        
+        if success:
+            return {"success": True, "id": state_id, "message": "Constraint added"}
+        else:
+            return JSONResponse(
+                {"success": False, "message": "Failed to add constraint (duplicate ID?)"},
+                status_code=400
+            )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
 @app.post("/chat")
 async def chat(request: Request):
     """
@@ -838,6 +996,13 @@ async def chat(request: Request):
                             from sakura_assistant.utils.tts import speak_async
                             speak_async(content)
                         except: pass
+                        
+                    # V13: Schedule async reflection (BackgroundTask - doesn't block response)
+                    try:
+                        if assistant and hasattr(assistant, 'reflection_engine'):
+                            asyncio.create_task(_run_async_reflection(query, content))
+                    except Exception as e:
+                        print(f"⚠️ Reflection scheduling failed: {e}")
                         
                     # Done
                     yield f"data: {json.dumps({'type': 'done', 'mode': mode})}\n\n"
@@ -1097,6 +1262,74 @@ async def get_state():
         "recent_actions": recent_actions,
         "focus_entity": getattr(graph, 'focus_entity', None),
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V14: DREAM JOURNAL API
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/dreams")
+async def get_dreams(limit: int = 10):
+    """
+    V14: Get recent Dream Journal entries.
+    Shows what Sakura "learned" during sleep cycles.
+    """
+    try:
+        dreams = get_dream_journal(limit)
+        
+        if not dreams:
+            return {
+                "dreams": [],
+                "message": "No dreams yet. Check back after app restart!",
+                "tip": "Dreams are crystallized from conversation summaries on startup (24h cooldown)."
+            }
+        
+        return {
+            "dreams": dreams,
+            "total": len(dreams),
+            "description": "Each entry represents a 'sleep cycle' where facts were extracted from conversations."
+        }
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+
+@app.get("/api/constraints")
+async def get_active_constraints():
+    """
+    V14: Get active constraints from World Graph.
+    """
+    if not assistant:
+        return {"constraints": [], "error": "Assistant not initialized"}
+    
+    try:
+        wg = assistant.world_graph
+        constraints = [
+            {
+                "id": e.id,
+                "summary": e.summary,
+                "type": e.attributes.get("constraint_type", "unknown"),
+                "implications": e.attributes.get("implications", []),
+                "criticality": e.attributes.get("criticality", 0.5),
+                "lifecycle": e.lifecycle.value if hasattr(e.lifecycle, 'value') else str(e.lifecycle)
+            }
+            for e in wg.entities.values()
+            if e.id.startswith("constraint:")
+        ]
+        
+        return {
+            "constraints": sorted(constraints, key=lambda x: x["criticality"], reverse=True),
+            "total": len(constraints)
+        }
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
 
 if __name__ == "__main__":

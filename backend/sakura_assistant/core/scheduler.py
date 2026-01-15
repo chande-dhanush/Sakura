@@ -336,3 +336,313 @@ def schedule_memory_maintenance(time_str: str = "03:00") -> str:
         name="memory_maintenance"
     )
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# V14: SLEEP CYCLE - FACT CRYSTALLIZATION & DREAM JOURNAL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import json
+import os
+import re
+from datetime import date
+
+# Configuration
+DREAM_JOURNAL_PATH = "data/dream_journal.jsonl"
+CRYSTALLIZATION_COOLDOWN_PATH = "data/.last_crystallization"
+COOLDOWN_HOURS = 24
+
+
+def _log_dream(data: dict):
+    """Append entry to Dream Journal for UI visibility."""
+    try:
+        from ..config import get_project_root
+        
+        path = os.path.join(get_project_root(), DREAM_JOURNAL_PATH)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "date": date.today().isoformat(),
+            **data
+        }
+        
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+            
+    except Exception as e:
+        print(f"⚠️ [Dream Journal] Log failed: {e}")
+
+
+def _should_crystallize() -> bool:
+    """Check if cooldown period has passed since last crystallization."""
+    try:
+        from ..config import get_project_root
+        
+        cooldown_file = os.path.join(get_project_root(), CRYSTALLIZATION_COOLDOWN_PATH)
+        
+        if not os.path.exists(cooldown_file):
+            return True
+        
+        with open(cooldown_file, "r") as f:
+            last_run = float(f.read().strip())
+        
+        hours_elapsed = (time.time() - last_run) / 3600
+        return hours_elapsed >= COOLDOWN_HOURS
+        
+    except Exception:
+        return True  # Default to allowing crystallization
+
+
+def _mark_crystallization_done():
+    """Record that crystallization was just performed."""
+    try:
+        from ..config import get_project_root
+        
+        cooldown_file = os.path.join(get_project_root(), CRYSTALLIZATION_COOLDOWN_PATH)
+        os.makedirs(os.path.dirname(cooldown_file), exist_ok=True)
+        
+        with open(cooldown_file, "w") as f:
+            f.write(str(time.time()))
+            
+    except Exception as e:
+        print(f"⚠️ [Sleep Cycle] Cooldown mark failed: {e}")
+
+
+async def crystallize_facts() -> int:
+    """
+    V14: Extract hard facts from summary and write to World Graph.
+    
+    Features:
+    - Runs on startup (not 3 AM - laptop may be offline)
+    - 24-hour cooldown to prevent spam
+    - Logs to Dream Journal for /api/dreams endpoint
+    - Robust JSON parsing per Red Team audit
+    
+    Returns:
+        Number of facts/constraints crystallized
+    """
+    # Check cooldown
+    if not _should_crystallize():
+        print("💤 [Sleep Cycle] Cooldown active, skipping crystallization")
+        return 0
+    
+    from .world_graph import get_world_graph, EntityType, EntitySource, EntityLifecycle
+    from ..memory.summary_memory import get_summary_memory
+    
+    wg = get_world_graph()
+    sm = get_summary_memory()
+    
+    # Check if there's anything to crystallize
+    if not sm.summary or len(sm.summary) < 50:
+        _log_dream({
+            "status": "skipped",
+            "reason": "No summary to process"
+        })
+        return 0
+    
+    print(f"🌙 [Sleep Cycle] Crystallizing facts from {len(sm.summary)} char summary...")
+    
+    # Get LLM for crystallization
+    try:
+        from .container import get_container
+        llm = get_container().get_router_llm()  # Use fast 8B model
+    except Exception as e:
+        _log_dream({"status": "error", "error": f"LLM init failed: {e}"})
+        return 0
+    
+    CRYSTALLIZE_PROMPT = f"""Extract ONLY hard FACTS from this conversation summary.
+Discard opinions, small talk, and transient requests.
+
+Summary:
+{sm.summary[:2000]}
+
+Output JSON:
+{{
+  "facts": [
+    {{"category": "preference|health|schedule|relationship|interest", "fact": "...", "confidence": 0.9}}
+  ],
+  "constraints": [
+    {{"type": "physical|temporal|resource", "constraint": "...", "implications": [], "criticality": 0.8}}
+  ]
+}}
+
+RULES:
+- Return VALID JSON only
+- If nothing significant, return: {{"facts": [], "constraints": []}}
+- Focus on things the user would want remembered long-term
+"""
+    
+    try:
+        from langchain_core.messages import HumanMessage
+        response = await llm.ainvoke([HumanMessage(content=CRYSTALLIZE_PROMPT)])
+        content = response.content.strip()
+        
+        # Robust JSON parsing
+        data = _safe_parse_crystallize_json(content)
+        if not data:
+            _log_dream({"status": "error", "error": "JSON parse failed"})
+            return 0
+        
+        facts_added = 0
+        constraints_added = 0
+        
+        # Process facts
+        for fact in data.get("facts", []):
+            fact_text = fact.get("fact", "")
+            if not fact_text or len(fact_text) < 5:
+                continue
+            
+            node = wg.get_or_create_entity(
+                type=EntityType.TOPIC,
+                name=fact_text[:100],
+                source=EntitySource.MEMORY_RECALLED,
+                attributes={
+                    "category": fact.get("category", "general"),
+                    "crystallized": True,
+                    "confidence": fact.get("confidence", 0.7)
+                }
+            )
+            # Promote crystallized facts
+            node.lifecycle = EntityLifecycle.PROMOTED
+            facts_added += 1
+        
+        # Process constraints
+        for constraint in data.get("constraints", []):
+            constraint_text = constraint.get("constraint", "")
+            if not constraint_text or len(constraint_text) < 5:
+                continue
+            
+            # Generate constraint ID
+            slug = re.sub(r'[^a-z0-9]+', '_', constraint_text.lower())[:30]
+            constraint_id = f"constraint:crystallized_{slug}"
+            
+            node = wg.get_or_create_entity(
+                type=EntityType.TOPIC,
+                name=constraint_text[:100],
+                source=EntitySource.USER_STATED,
+                attributes={
+                    "constraint_type": constraint.get("type", "physical"),
+                    "implications": constraint.get("implications", []),
+                    "criticality": constraint.get("criticality", 0.8),
+                    "crystallized": True
+                }
+            )
+            
+            # Force constraint ID and promote
+            if node.id in wg.entities:
+                wg.entities[constraint_id] = wg.entities.pop(node.id)
+                wg.entities[constraint_id].id = constraint_id
+                wg.entities[constraint_id].lifecycle = EntityLifecycle.PROMOTED
+            
+            constraints_added += 1
+        
+        # Save World Graph
+        wg.save()
+        
+        # Mark cooldown
+        _mark_crystallization_done()
+        
+        # Log to Dream Journal
+        _log_dream({
+            "status": "success",
+            "facts_crystallized": facts_added,
+            "constraints_learned": constraints_added,
+            "summary_chars_processed": len(sm.summary),
+            "facts_detail": [f.get("fact", "")[:50] for f in data.get("facts", [])[:3]],
+            "constraints_detail": [c.get("constraint", "")[:50] for c in data.get("constraints", [])[:3]]
+        })
+        
+        print(f"✨ [Sleep Cycle] Crystallized: {facts_added} facts, {constraints_added} constraints")
+        
+        # Clear processed summary
+        sm.clear()
+        
+        return facts_added + constraints_added
+        
+    except Exception as e:
+        _log_dream({"status": "error", "error": str(e)})
+        print(f"❌ [Sleep Cycle] Crystallization failed: {e}")
+        return 0
+
+
+def _safe_parse_crystallize_json(content: str) -> Optional[dict]:
+    """Robust JSON parsing with fallbacks (Red Team requirement)."""
+    # Strategy 1: Clean markdown
+    if "```json" in content:
+        content = content.replace("```json", "").replace("```", "")
+    elif "```" in content:
+        content = re.sub(r'```\w*\n?', '', content)
+    
+    content = content.strip()
+    
+    # Strategy 2: Direct parse
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+    
+    # Strategy 3: Fix trailing commas
+    try:
+        fixed = re.sub(r',\s*([}\]])', r'\1', content)
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+    
+    # Strategy 4: Extract JSON object
+    try:
+        match = re.search(r'\{.*\}', content, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+    except json.JSONDecodeError:
+        pass
+    
+    return None
+
+
+def run_sleep_cycle_on_startup():
+    """
+    V14: Run crystallization on app startup if cooldown passed.
+    Call this from server.py startup.
+    """
+    import asyncio
+    
+    print("🌙 [Sleep Cycle] Checking for pending crystallization...")
+    
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(crystallize_facts())
+        else:
+            loop.run_until_complete(crystallize_facts())
+    except RuntimeError:
+        # No event loop, create one
+        asyncio.run(crystallize_facts())
+    except Exception as e:
+        print(f"⚠️ [Sleep Cycle] Startup run failed: {e}")
+
+
+def get_dream_journal(limit: int = 10) -> list:
+    """
+    V14: Read recent Dream Journal entries for /api/dreams.
+    """
+    try:
+        from ..config import get_project_root
+        
+        path = os.path.join(get_project_root(), DREAM_JOURNAL_PATH)
+        
+        if not os.path.exists(path):
+            return []
+        
+        dreams = []
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            for line in lines[-limit:]:
+                try:
+                    dreams.append(json.loads(line.strip()))
+                except json.JSONDecodeError:
+                    continue
+        
+        return list(reversed(dreams))
+        
+    except Exception:
+        return []

@@ -697,8 +697,37 @@ class WorldGraph:
         return context
     
     def get_context_for_responder(self) -> str:
-        """Generate context for responder injection."""
+        """
+        V14: Generate context for responder injection.
+        
+        Priority order:
+        1. Active constraints (MUST NOT be violated)
+        2. User identity
+        3. Preferences
+        4. Last action
+        """
         parts = []
+        
+        # V14: CONSTRAINTS FIRST (bypass vector similarity entirely)
+        constraints = [
+            e for e in self.entities.values()
+            if e.id.startswith("constraint:")
+            and e.lifecycle in (EntityLifecycle.PROMOTED, EntityLifecycle.CANDIDATE)
+        ]
+        
+        if constraints:
+            # Sort by criticality (highest first)
+            constraints.sort(
+                key=lambda x: x.attributes.get("criticality", 0.5),
+                reverse=True
+            )
+            
+            parts.append("[ACTIVE CONSTRAINTS - DO NOT VIOLATE]")
+            for c in constraints[:3]:  # Max 3 constraints
+                implications = c.attributes.get("implications", [])
+                impl_str = f" (Avoid: {', '.join(implications[:5])})" if implications else ""
+                parts.append(f"⚠️ {c.summary}{impl_str}")
+            parts.append("")  # Blank line separator
         
         # User identity (always)
         user = self.get_user_identity()

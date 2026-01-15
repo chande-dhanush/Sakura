@@ -28,6 +28,9 @@ from ..utils.flight_recorder import get_recorder, span
 
 from langchain_core.messages import HumanMessage
 
+# V14: Background ReflectionEngine (constraint detection moved to cold path)
+from .memory.reflection import get_reflection_engine
+
 class SmartAssistant:
     """
     Sakura V10 Facade
@@ -80,7 +83,13 @@ class SmartAssistant:
         # V10.3: Summary Memory (compresses old turns for long-context)
         self.summary_memory = get_summary_memory(planner_llm)
         
-        print("✅ SmartAssistant Initialized (Modular V10 Architecture)")
+        # V14: Background ReflectionEngine (constraint detection runs after response)
+        self.reflection_engine = get_reflection_engine()
+        
+        # Store last response for async reflection (picked up by server.py BackgroundTask)
+        self._last_turn_data = {"user_msg": "", "assistant_response": ""}
+        
+        print("✅ SmartAssistant Initialized (V14 - Unified Architecture)")
 
     def run(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -263,6 +272,9 @@ class SmartAssistant:
             self.world_graph.resolve_reference(user_input)
             self.world_graph.infer_user_intent(user_input, history)
             
+            # V14: Constraint detection moved to background ReflectionEngine
+            # (happens after response, not in hot path)
+            
             # 3. Routing (Async)
             state.record_llm_call("routing")
             with span("Router"):
@@ -322,12 +334,15 @@ class SmartAssistant:
             
             summary_context = self.summary_memory.get_context_injection()
             
-            from .responder import ResponseContext
+            # V14: Inject active constraints from World Graph (no separate StateManager)
+            # World Graph priority filter already includes constraints
+            graph_context = self.world_graph.get_context_for_responder()
+            
             resp_context = ResponseContext(
                 user_input=user_input,
                 tool_outputs=tool_outputs,
                 history=history,
-                graph_context=self.world_graph.get_context_for_responder(),
+                graph_context=graph_context,
                 intent_adjustment=self.world_graph.get_intent_adjustment(),
                 current_mood=self.world_graph.get_current_mood(),
                 study_mode=study_mode_active,
@@ -340,6 +355,9 @@ class SmartAssistant:
             
             # Record assistant response (Sync)
             self.summary_memory.add_turn("assistant", response_text)
+            
+            # V13: Store turn data for async reflection (server.py BackgroundTask picks this up)
+            self._last_turn_data = {"user_msg": user_input, "assistant_response": response_text}
             
             # Update Graph Logic
             self.world_graph.advance_turn()
