@@ -646,3 +646,159 @@ def get_dream_journal(limit: int = 10) -> list:
         
     except Exception:
         return []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# V15: COGNITIVE ARCHITECTURE - PROACTIVE FEATURES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+PLANNED_INITIATIONS_PATH = "data/planned_initiations.json"
+
+
+async def precompute_initiations() -> int:
+    """
+    V15: Generate tomorrow's proactive messages at 3 AM.
+    Uses idle night capacity so daytime initiation is zero-cost.
+    
+    Returns:
+        Number of messages generated
+    """
+    print("🌙 [Sleep Cycle] Pre-computing tomorrow's icebreakers...")
+    
+    from .world_graph import get_world_graph
+    from .cognitive.proactive import get_proactive_scheduler
+    from ..config import get_project_root
+    
+    wg = get_world_graph()
+    
+    # Gather context for icebreakers
+    context_parts = []
+    
+    # 1. Active constraints
+    constraints = [
+        e.summary for e in wg.entities.values()
+        if e.id.startswith("constraint:") and e.confidence > 0.5
+    ]
+    if constraints:
+        context_parts.append(f"Active constraints: {', '.join(constraints[:3])}")
+    
+    # 2. Recent topics
+    recent_topics = [
+        e.name for e in wg.entities.values()
+        if e.type.value == "topic" and e.reference_count >= 2
+    ][:5]
+    if recent_topics:
+        context_parts.append(f"Recent topics: {', '.join(recent_topics)}")
+    
+    # 3. User identity
+    user = wg.get_user_identity()
+    if user.summary:
+        context_parts.append(f"User: {user.summary}")
+    
+    context = "\n".join(context_parts) if context_parts else "No special context."
+    
+    PROMPT = f"""Generate 3 short, friendly check-in messages for tomorrow.
+    
+Context about user:
+{context}
+
+Rules:
+- Each message < 60 characters
+- Reference specific things user cares about
+- Vary tone: caring, curious, playful
+- Be natural, not robotic
+
+Output JSON only:
+{{"messages": ["msg1", "msg2", "msg3"]}}
+"""
+    
+    try:
+        from .container import get_container
+        llm = get_container().get_router_llm()  # Fast 8B
+        
+        from langchain_core.messages import HumanMessage
+        response = await llm.ainvoke([HumanMessage(content=PROMPT)])
+        content = response.content.strip()
+        
+        # Parse JSON
+        data = _safe_parse_crystallize_json(content)
+        if not data or "messages" not in data:
+            print("⚠️ [Sleep Cycle] Failed to parse icebreakers")
+            return 0
+        
+        messages = data["messages"]
+        
+        # Save via ProactiveScheduler
+        scheduler = get_proactive_scheduler()
+        scheduler.initiations_path = os.path.join(get_project_root(), PLANNED_INITIATIONS_PATH)
+        scheduler.save_planned_initiations(messages)
+        
+        # Log to dream journal
+        _log_dream({
+            "type": "initiations",
+            "status": "success",
+            "messages_generated": len(messages),
+            "context_used": context[:200]
+        })
+        
+        print(f"✨ [Sleep Cycle] Generated {len(messages)} icebreakers for tomorrow")
+        return len(messages)
+        
+    except Exception as e:
+        print(f"❌ [Sleep Cycle] Pre-computation failed: {e}")
+        _log_dream({"type": "initiations", "status": "error", "error": str(e)})
+        return 0
+
+
+def run_hourly_desire_tick():
+    """
+    V15: Hourly tick for DesireSystem.
+    Updates loneliness, social battery decay.
+    """
+    try:
+        from .cognitive.desire import get_desire_system
+        desire = get_desire_system()
+        desire.on_hourly_tick()
+    except Exception as e:
+        print(f"⚠️ [DesireSystem] Hourly tick failed: {e}")
+
+
+async def run_hourly_proactive_check():
+    """
+    V15: Hourly check for proactive initiation.
+    """
+    try:
+        from .cognitive.proactive import get_proactive_scheduler
+        scheduler = get_proactive_scheduler()
+        await scheduler.check_and_initiate()
+    except Exception as e:
+        print(f"⚠️ [ProactiveScheduler] Hourly check failed: {e}")
+
+
+def schedule_cognitive_tasks():
+    """
+    V15: Schedule all cognitive background tasks.
+    Call this from server.py startup.
+    """
+    scheduler = get_scheduler()
+    
+    # Hourly tick for desire decay
+    scheduler.schedule_interval(
+        interval_seconds=3600,  # 1 hour
+        callback=run_hourly_desire_tick,
+        name="desire_tick"
+    )
+    
+    print("🧠 [Cognitive] Scheduled hourly desire tick")
+
+
+async def run_full_sleep_cycle():
+    """
+    V15: Complete sleep cycle (crystallization + pre-computation).
+    Run on startup with cooldown.
+    """
+    # 1. Crystallize facts (V14)
+    await crystallize_facts()
+    
+    # 2. Pre-compute initiations (V15)
+    await precompute_initiations()

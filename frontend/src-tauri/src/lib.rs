@@ -86,7 +86,7 @@ fn force_quit() {
     
     // Try graceful shutdown first (saves conversation history)
     let client = reqwest::blocking::Client::new();
-    if let Ok(_) = client.post("http://localhost:8000/shutdown")
+    if let Ok(_) = client.post("http://localhost:3210/shutdown")
         .timeout(std::time::Duration::from_millis(500))
         .send() 
     {
@@ -142,75 +142,79 @@ fn find_backend_dir() -> Option<PathBuf> {
 }
 
 fn start_backend(app: &tauri::App) -> Result<(), String> {
-    // PRODUCTION MODE: Use bundled sidecar
-    // Robust Discovery: Check multiple locations and names
-    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
-    let res_dir = app.path().resource_dir().ok();
-    
-    // Possible Filenames
-    let suffixes = if cfg!(windows) {
-        vec!["sakura-backend-x86_64-pc-windows-msvc.exe", "sakura-backend.exe"]
-    } else {
-        vec!["sakura-backend"]
-    };
-    
-    // Possible Directories
-    let mut dirs = vec![];
-    if let Some(d) = &exe_dir { dirs.push(d.clone()); } // Check root (flattened)
-    if let Some(d) = &res_dir { dirs.push(d.clone()); } // Check resources/
-    if let Some(d) = &res_dir { dirs.push(d.join("binaries")); } // Check resources/binaries/
-    
-    // Find first match
-    let mut sidecar_path: Option<PathBuf> = None;
-    for dir in dirs {
-        for name in &suffixes {
-            let candidate = dir.join(name);
-            if candidate.exists() {
-                println!("✅ Found sidecar at: {:?}", candidate);
-                sidecar_path = Some(candidate);
-                break;
-            }
-        }
-        if sidecar_path.is_some() { break; }
-    }
-
-    if let Some(path) = sidecar_path {
-        println!("🚀 Starting bundled backend sidecar...");
-        println!("   Path: {:?}", path);
+    // V15.2: In DEV MODE (debug builds), ALWAYS use Python directly
+    // This avoids stale sidecar binaries from previous builds
+    #[cfg(not(debug_assertions))]
+    {
+        // PRODUCTION MODE: Use bundled sidecar
+        // Robust Discovery: Check multiple locations and names
+        let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+        let res_dir = app.path().resource_dir().ok();
         
-        let mut cmd = Command::new(&path);
-        // HIDE CONSOLE WINDOW on Windows (Crucial for polished feel)
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
+        // Possible Filenames
+        let suffixes = if cfg!(windows) {
+            vec!["sakura-backend-x86_64-pc-windows-msvc.exe", "sakura-backend.exe"]
+        } else {
+            vec!["sakura-backend"]
+        };
         
-        // Output handling
-        cmd.stdout(Stdio::inherit());
-        cmd.stderr(Stdio::inherit());
+        // Possible Directories
+        let mut dirs = vec![];
+        if let Some(d) = &exe_dir { dirs.push(d.clone()); }
+        if let Some(d) = &res_dir { dirs.push(d.clone()); }
+        if let Some(d) = &res_dir { dirs.push(d.join("binaries")); }
         
-        // Set working directory to resource dir (or exe dir) for data access checks
-        if let Some(wd) = res_dir.or(exe_dir) {
-            cmd.current_dir(wd);
-        }
-        
-        match cmd.spawn() {
-            Ok(child) => {
-                if let Ok(mut guard) = BACKEND.lock() {
-                    *guard = Some(child);
+        // Find first match
+        let mut sidecar_path: Option<PathBuf> = None;
+        for dir in dirs {
+            for name in &suffixes {
+                let candidate = dir.join(name);
+                if candidate.exists() {
+                    println!("✅ Found sidecar at: {:?}", candidate);
+                    sidecar_path = Some(candidate);
+                    break;
                 }
-                println!("✅ Sidecar backend started on port 8000");
-                return Ok(());
             }
-            Err(e) => {
-                eprintln!("⚠️ Sidecar failed to spawn: {}", e);
+            if sidecar_path.is_some() { break; }
+        }
+
+        if let Some(path) = sidecar_path {
+            println!("🚀 Starting bundled backend sidecar...");
+            println!("   Path: {:?}", path);
+            
+            let mut cmd = Command::new(&path);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                const CREATE_NO_WINDOW: u32 = 0x08000000;
+                cmd.creation_flags(CREATE_NO_WINDOW);
+            }
+            
+            cmd.stdout(Stdio::inherit());
+            cmd.stderr(Stdio::inherit());
+            
+            if let Some(wd) = res_dir.or(exe_dir) {
+                cmd.current_dir(wd);
+            }
+            
+            match cmd.spawn() {
+                Ok(child) => {
+                    if let Ok(mut guard) = BACKEND.lock() {
+                        *guard = Some(child);
+                    }
+                    println!("✅ Sidecar backend started on port 3210");
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("⚠️ Sidecar failed to spawn: {}", e);
+                }
             }
         }
     }
     
-    // DEV MODE: Use Python with venv
+    // DEV MODE (or sidecar fallback): Use Python with venv
+    #[cfg(debug_assertions)]
+    println!("🐍 DEV MODE: Skipping sidecar, using Python directly...");
     let backend_dir = find_backend_dir()
         .ok_or_else(|| "Could not find backend/server.py".to_string())?;
     
@@ -237,6 +241,7 @@ fn start_backend(app: &tauri::App) -> Result<(), String> {
     cmd.arg("--voice"); // Enable Voice Mode by default
     cmd.current_dir(&backend_dir);
     cmd.env("PYTHONPATH", &backend_dir);
+    cmd.env("SAKURA_PORT", "3210"); // V15.2: Explicit port for dev mode
     cmd.stdout(Stdio::inherit());
     cmd.stderr(Stdio::inherit());
     
@@ -245,7 +250,7 @@ fn start_backend(app: &tauri::App) -> Result<(), String> {
             if let Ok(mut guard) = BACKEND.lock() {
                 *guard = Some(child);
             }
-            println!("✅ Backend started on port 8000");
+            println!("✅ Backend started on port 3210");
             Ok(())
         }
         Err(e) => {
@@ -260,7 +265,7 @@ fn graceful_shutdown() {
     println!("🛑 Shutting down backend...");
     
     let client = reqwest::blocking::Client::new();
-    let _ = client.post("http://localhost:8000/shutdown")
+    let _ = client.post("http://localhost:3210/shutdown")
         .timeout(std::time::Duration::from_millis(500))
         .send();
     
@@ -457,7 +462,7 @@ pub fn run() {
             let mut ready = false;
             
             for _ in 0..45 { // Try for 45 seconds
-                if let Ok(resp) = client.get("http://127.0.0.1:8000/health").send() {
+                if let Ok(resp) = client.get("http://127.0.0.1:3210/health").send() {
                     if resp.status().is_success() {
                         println!("✅ Backend ready!");
                         ready = true;

@@ -26,6 +26,9 @@ from sakura_assistant.core.memory.reflection import get_reflection_engine  # V14
 # V14: Sleep Cycle for startup crystallization
 from sakura_assistant.core.scheduler import run_sleep_cycle_on_startup, get_dream_journal
 
+# V15: Cognitive Architecture
+from sakura_assistant.core.scheduler import schedule_cognitive_tasks
+
 from fastapi import FastAPI, Request, BackgroundTasks, WebSocket, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -132,6 +135,12 @@ async def lifespan(app: FastAPI):
             
             # V14: Run Sleep Cycle on startup (24h cooldown)
             run_sleep_cycle_on_startup()
+            
+            # V15: Schedule cognitive tasks (hourly desire tick)
+            schedule_cognitive_tasks()
+            
+            # V15: Wire up proactive WebSocket callback
+            setup_proactive_callback()
         except Exception as e:
             print(f"⚠️ Scheduler init warning: {e}")
     
@@ -1332,6 +1341,271 @@ async def get_active_constraints():
         )
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# V15: PROACTIVE NOTIFICATION SYSTEM
+# ══════════════════════════════════════════════════════════════════════════════
+
+from datetime import datetime
+
+# Connected WebSocket clients for proactive messages
+proactive_clients: list = []
+
+
+@app.websocket("/ws/proactive")
+async def proactive_websocket(websocket: WebSocket):
+    """
+    V15: WebSocket for proactive notifications.
+    Frontend connects here to receive Sakura's check-in messages.
+    """
+    await websocket.accept()
+    proactive_clients.append(websocket)
+    print(f"💌 [Proactive] Client connected ({len(proactive_clients)} total)")
+    
+    try:
+        while True:
+            # Keep connection alive, wait for disconnect
+            await websocket.receive_text()
+    except Exception:
+        pass
+    finally:
+        if websocket in proactive_clients:
+            proactive_clients.remove(websocket)
+        print(f"💌 [Proactive] Client disconnected ({len(proactive_clients)} total)")
+
+
+async def send_proactive_message(message: str):
+    """
+    V15: Broadcast proactive message to all connected clients.
+    Also triggers TTS if available.
+    """
+    if not proactive_clients:
+        print("⚠️ [Proactive] No clients connected, message lost")
+        return False
+    
+    payload = {
+        "type": "proactive_message",
+        "content": message,
+        "timestamp": datetime.now().isoformat(),
+        "action": "focus_window"
+    }
+    
+    # Broadcast to all connected clients
+    disconnected = []
+    for client in proactive_clients:
+        try:
+            await client.send_json(payload)
+        except Exception:
+            disconnected.append(client)
+    
+    for client in disconnected:
+        if client in proactive_clients:
+            proactive_clients.remove(client)
+    
+    print(f"💌 [Proactive] Sent to {len(proactive_clients)} clients: {message[:50]}...")
+    
+    # V15: Speak with Kokoro TTS, then offload
+    await speak_and_offload(message)
+    
+    return True
+
+
+async def speak_and_offload(message: str):
+    """
+    V15.2.1: Speak message with Kokoro TTS, then offload to conserve CPU.
+    Includes CPU Guard to skip TTS when system is under heavy load.
+    """
+    try:
+        # V15.2.1: CPU Guard - Skip TTS if system is under heavy load
+        try:
+            import psutil
+            cpu_usage = psutil.cpu_percent(interval=0.1)
+            if cpu_usage > 80:
+                print(f"🛡️ [TTS] CPU Guard: {cpu_usage:.0f}% > 80%, skipping TTS")
+                return
+        except ImportError:
+            pass  # psutil not available, proceed without guard
+        
+        from sakura_assistant.core.tts import get_tts_engine
+        
+        tts = get_tts_engine()
+        if tts is None:
+            print("🔇 [TTS] Not available, skipping voice")
+            return
+        
+        print(f"🔊 [TTS] Speaking: {message[:50]}...")
+        await tts.speak_async(message)
+        
+        tts.offload()
+        print("💾 [TTS] Offloaded to conserve CPU")
+        
+    except ImportError:
+        print("🔇 [TTS] Module not available")
+    except Exception as e:
+        print(f"⚠️ [TTS] Speak failed: {e}")
+
+
+@app.get("/api/desire")
+async def get_desire_state():
+    """V15.2.1: Get current DesireSystem state with reactive theme."""
+    try:
+        from sakura_assistant.core.cognitive.desire import get_desire_system
+        from sakura_assistant.core.cognitive.state import get_proactive_state
+        
+        ds = get_desire_system()
+        pstate = get_proactive_state()
+        state = ds.get_state()
+        mood = ds.get_mood()
+        should_initiate, reason = ds.should_initiate()
+        
+        # V15.2.1: Get theme for current mood
+        theme = MOOD_THEMES.get(mood.value, MOOD_THEMES["content"])
+        
+        return {
+            "state": {
+                "social_battery": round(state.social_battery, 2),
+                "loneliness": round(state.loneliness, 2),
+                "curiosity": round(state.curiosity, 2),
+                "duty": round(state.duty, 2),
+                "messages_today": state.messages_today,
+                "initiations_today": state.initiations_today
+            },
+            "mood": mood.value,
+            "theme": theme,  # V15.2.1: Reactive UI theme
+            "ui_visible": pstate.ui_visible,  # V15.2.1: Bubble state
+            "would_initiate": should_initiate,
+            "initiation_reason": reason
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/api/proactive/test")
+async def test_proactive_message():
+    """V15: Test endpoint to trigger a proactive message."""
+    from sakura_assistant.core.cognitive.proactive import get_proactive_scheduler
+    
+    scheduler = get_proactive_scheduler()
+    message = scheduler.pop_initiation()
+    
+    if not message:
+        return {"status": "no_messages", "tip": "Run sleep cycle to generate icebreakers"}
+    
+    success = await send_proactive_message(message)
+    return {
+        "status": "sent" if success else "no_clients",
+        "message": message,
+        "clients_connected": len(proactive_clients)
+    }
+
+
+def setup_proactive_callback():
+    """V15: Wire up the proactive scheduler to use WebSocket sender."""
+    try:
+        from sakura_assistant.core.cognitive.proactive import get_proactive_scheduler
+        scheduler = get_proactive_scheduler()
+        scheduler.websocket_callback = send_proactive_message
+        print("🔗 [Proactive] WebSocket callback wired")
+    except Exception as e:
+        print(f"⚠️ [Proactive] Callback setup failed: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V15.2.1: BUBBLE-GATE VISIBILITY API
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/ui/visibility")
+async def set_ui_visibility(request: Request):
+    """
+    V15.2.1: Set UI visibility state (Bubble-Gate).
+    
+    When visibility becomes True and there's a pending message,
+    it will be immediately delivered (if not expired by TTL).
+    """
+    try:
+        body = await request.json()
+        visible = body.get("visible", True)
+        
+        from sakura_assistant.core.cognitive.state import get_proactive_state
+        state = get_proactive_state()
+        
+        # Update visibility and check for pending messages
+        pending_message = state.set_visibility(visible)
+        
+        response = {
+            "status": "ok",
+            "ui_visible": state.ui_visible,
+            "had_pending": pending_message is not None
+        }
+        
+        # If there was a pending message, send it now
+        if pending_message:
+            success = await send_proactive_message(pending_message)
+            response["message_sent"] = success
+            response["message_preview"] = pending_message[:50] + "..." if len(pending_message) > 50 else pending_message
+        
+        return response
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/ui/state")
+async def get_ui_state():
+    """V15.2.1: Get current UI visibility state for debugging."""
+    try:
+        from sakura_assistant.core.cognitive.state import get_proactive_state
+        state = get_proactive_state()
+        
+        return {
+            "ui_visible": state.ui_visible,
+            "has_pending": state.pending_initiation is not None,
+            "pending_age_seconds": (
+                time.time() - state.pending_initiation["timestamp"]
+                if state.pending_initiation else None
+            )
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V15.2.1: MOOD THEME PALETTES
+# ══════════════════════════════════════════════════════════════════════════════
+
+MOOD_THEMES = {
+    "energetic": {
+        "primary": "#ff69b4",      # Hot Pink
+        "bg": "#1e1e24",           # Dark
+        "glow": "rgba(255, 105, 180, 0.4)",
+        "accent": "#ffd700"        # Gold
+    },
+    "content": {
+        "primary": "#ffb7b2",      # Soft Pink
+        "bg": "#1e1e24",
+        "glow": "rgba(255, 183, 178, 0.3)",
+        "accent": "#8888ff"
+    },
+    "tired": {
+        "primary": "#a89f91",      # Muted
+        "bg": "#18181c",           # Darker
+        "glow": "rgba(168, 159, 145, 0.2)",
+        "accent": "#666666"
+    },
+    "melancholic": {
+        "primary": "#7b9eb8",      # Blue-Gray
+        "bg": "#1a1a22",           # Slightly blue-dark
+        "glow": "rgba(123, 158, 184, 0.3)",
+        "accent": "#5588aa"
+    },
+    "curious": {
+        "primary": "#00e6cc",      # Teal
+        "bg": "#1e1e24",
+        "glow": "rgba(0, 230, 204, 0.3)",
+        "accent": "#00ffcc"
+    }
+}
+
+
 if __name__ == "__main__":
     import uvicorn
     import argparse
@@ -1341,7 +1615,7 @@ if __name__ == "__main__":
     parser.add_argument("--voice", action="store_true", help="Enable Voice Engine (Wake Word)")
     args = parser.parse_args()
     
-    port = int(os.getenv("SAKURA_PORT", "8000"))
+    port = int(os.getenv("SAKURA_PORT", "3210"))
     print(f"🚀 Sakura Backend starting on port {port}")
     
     # Start Voice Engine if requested

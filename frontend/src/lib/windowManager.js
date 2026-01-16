@@ -33,7 +33,7 @@ export async function hideMainWindow() {
 export async function quitApp() {
     try {
         // Shutdown backend first
-        await fetch('http://localhost:8000/shutdown', {
+        await fetch('http://localhost:3210/shutdown', {
             method: 'POST',
             signal: AbortSignal.timeout(1000)
         });

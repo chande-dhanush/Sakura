@@ -17,7 +17,7 @@
     let cooldownInterval = null;
     const COOLDOWN_SECONDS = 10;
     
-    const BACKEND_URL = "http://localhost:8000";
+    const BACKEND_URL = "http://localhost:3210";
     
     function startCooldown() {
         cooldownRemaining = COOLDOWN_SECONDS;

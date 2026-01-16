@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "Good morning yuki : )"
+  },
+  {
+    "role": "assistant",
+    "content": "Morning, TestUser! ☀️ Ready to conquer the day or just need a coffee? Let me know what’s on the agenda—I'll keep it sharp and sweet."
+  }
+]

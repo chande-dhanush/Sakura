@@ -11,7 +11,7 @@ from ..core.model_wrapper import ReliableLLM
 # V10 Modular Components
 from .router import IntentRouter
 from .executor import ToolExecutor
-from .responder import ResponseGenerator
+from .responder import ResponseGenerator, ResponseContext
 from .tools import get_all_tools
 
 # V7: World Graph
@@ -86,10 +86,17 @@ class SmartAssistant:
         # V14: Background ReflectionEngine (constraint detection runs after response)
         self.reflection_engine = get_reflection_engine()
         
+        # V15: DesireSystem (CPU-based mood tracking)
+        from .cognitive.desire import get_desire_system
+        self.desire_system = get_desire_system()
+        self.desire_system.initialize(
+            persist_path=os.path.join(get_project_root(), "data", "desire_state.json")
+        )
+        
         # Store last response for async reflection (picked up by server.py BackgroundTask)
         self._last_turn_data = {"user_msg": "", "assistant_response": ""}
         
-        print("✅ SmartAssistant Initialized (V14 - Unified Architecture)")
+        print("✅ SmartAssistant Initialized (V15 - Cognitive Architecture)")
 
     def run(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -334,15 +341,18 @@ class SmartAssistant:
             
             summary_context = self.summary_memory.get_context_injection()
             
-            # V14: Inject active constraints from World Graph (no separate StateManager)
-            # World Graph priority filter already includes constraints
+            # V14: Inject active constraints from World Graph
             graph_context = self.world_graph.get_context_for_responder()
+            
+            # V15: Inject mood from DesireSystem (zero-cost consciousness)
+            mood_prompt = self.desire_system.get_mood_prompt()
+            enhanced_graph_context = f"{mood_prompt}\n\n{graph_context}"
             
             resp_context = ResponseContext(
                 user_input=user_input,
                 tool_outputs=tool_outputs,
                 history=history,
-                graph_context=graph_context,
+                graph_context=enhanced_graph_context,
                 intent_adjustment=self.world_graph.get_intent_adjustment(),
                 current_mood=self.world_graph.get_current_mood(),
                 study_mode=study_mode_active,
@@ -353,10 +363,14 @@ class SmartAssistant:
                 response_text = await self.responder.agenerate(resp_context)
             recorder.log("Responder", f"Generated {len(response_text)} chars")
             
+            # V15: Update desire state on messages
+            self.desire_system.on_user_message(user_input)
+            self.desire_system.on_assistant_message(response_text)
+            
             # Record assistant response (Sync)
             self.summary_memory.add_turn("assistant", response_text)
             
-            # V13: Store turn data for async reflection (server.py BackgroundTask picks this up)
+            # V13: Store turn data for async reflection
             self._last_turn_data = {"user_msg": user_input, "assistant_response": response_text}
             
             # Update Graph Logic

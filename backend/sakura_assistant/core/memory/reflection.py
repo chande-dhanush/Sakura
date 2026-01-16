@@ -46,6 +46,19 @@ class ReflectionEngine:
         Fire-and-forget background task to analyze conversation delta.
         """
         asyncio.create_task(self._analyze_delta(history))
+    
+    async def analyze_turn_async(self, user_msg: str, assistant_response: str):
+        """
+        V15: Async wrapper for server.py to call after each turn.
+        Converts the two messages into history format and runs analysis.
+        """
+        # Build mini-history from the turn
+        history = [
+            {"role": "user", "content": user_msg},
+            {"role": "assistant", "content": assistant_response}
+        ]
+        # Run delta analysis directly (not as background task since we're already async)
+        await self._analyze_delta(history)
 
     async def _analyze_delta(self, history: List[Dict[str, Any]]):
         """

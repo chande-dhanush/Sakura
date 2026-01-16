@@ -1,8 +1,8 @@
-# 🌸 Sakura V13
+# 🌸 Sakura V15.2
 
-> A production-grade personal AI assistant with voice, vision, code execution, and 54 tools.
+> A production-grade personal AI assistant with voice, vision, code execution, cognitive architecture, and 54 tools.
 
-![Version](https://img.shields.io/badge/version-13.0-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-15.2.1-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)
@@ -19,11 +19,14 @@ Sakura is a **desktop AI assistant** that can:
 - 🎵 Control Spotify, YouTube, and system media
 - 📧 Read/send Gmail, manage Calendar & Tasks
 - 🔍 Search the web, scrape websites, take notes
-- 🎹 **Execute Python code** in a secure Docker sandbox (V13)
-- 🎧 **Transcribe & summarize audio** files (V13)
+- 🎹 **Execute Python code** in a secure Docker sandbox
+- 🎧 **Transcribe & summarize audio** files
 - 🎙️ Respond to voice commands ("Hey Sakura")
 - 🖼️ Analyze images and screenshots
-- 🧠 Remember context with **temporal decay** (V13)
+- 🧠 Remember context with **temporal decay**
+- 💓 **Feel moods** — tracks social battery & loneliness (V15)
+- 💌 **Reach out when lonely** — proactive check-ins (V15)
+- 🛡️ **Respects your focus** — won't interrupt when hidden (V15.2)
 
 **Free to run** — Uses Groq (Llama 3.3 70B) and Google Gemini free tiers.
 
@@ -156,20 +159,12 @@ Sakura/
 │   ├── server.py           # Main API server
 │   ├── sakura_assistant/
 │   │   ├── core/           # Router, Executor, Planner
+│   │   │   └── cognitive/  # V15: DesireSystem, ProactiveScheduler
 │   │   └── tools_libs/     # 54 tool implementations
 │   ├── tests/              # All test suites
 │   └── data/               # World graph, templates
 ├── scripts/                # Setup & build scripts
-│   ├── setup.ps1           # Windows setup
-│   ├── setup.sh            # Linux/Mac setup
-│   ├── build_bundle.ps1    # Production build
-│   └── toggle_startup.*    # Autostart config
 ├── docs/                   # Documentation
-│   ├── DOCUMENTATION.md    # Full API docs
-│   ├── V13_AUDIT_REPORT.md # Test coverage report
-│   └── V13_WALKTHROUGH.md  # Feature walkthrough
-├── audit/                  # Audit scripts
-├── .env                    # Your API keys
 └── README.md               # This file
 ```
 
@@ -186,43 +181,40 @@ cd frontend
 npm run tauri build
 ```
 
-**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_13.0.0_x64-setup.exe`
-
-This creates a single installer that bundles:
-- Compiled Python backend (PyInstaller)
-- Tauri desktop shell
-- All dependencies
+**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_15.2.1_x64-setup.exe`
 
 ---
 
-## 🆕 What's New in V13
+## 🆕 What's New in V15.2
 
 | Feature | Description |
 |---------|-------------|
-| **Code Interpreter** | Execute Python in Docker sandbox (pandas, numpy, matplotlib) |
-| **Audio Tools** | Transcribe & summarize audio files (Google STT) |
-| **Temporal Decay** | Memory confidence decays over time (30-day half-life) |
-| **Adaptive Routing** | Urgency detection for faster responses |
-| **54 Tools** | 8 new tools added |
-| **Pre-compiled Regex** | 30% faster routing performance |
+| **Cognitive Architecture** | DesireSystem tracks mood, loneliness, social battery |
+| **Proactive Check-ins** | Sakura reaches out when lonely (0 LLM cost) |
+| **Bubble-Gate UX** | Respects your focus — won't interrupt when hidden |
+| **Message Queue (2h TTL)** | Queues messages when you're away, delivers on return |
+| **CPU Guard** | Skips TTS when CPU > 80% to prevent stutter |
+| **Reactive Themes** | UI colors shift based on mood (5 palettes) |
+| **Pre-Computed Initiations** | 3 AM icebreaker generation for next-day use |
 
 ### Previous Versions
 
 <details>
-<summary>V12 Features</summary>
+<summary>V14 Features</summary>
 
-- Real-time Thought Streams (WebSocket)
-- Smart Search Cache
-- Context Valve overflow protection
+- Unified ReflectionEngine (background constraint detection)
+- Sleep Cycle (startup fact crystallization)
+- Dream Journal endpoint
+- Physical constraints bypass vector similarity
 </details>
 
 <details>
-<summary>V10.4 Features</summary>
+<summary>V13 Features</summary>
 
-- Flight Recorder (JSONL tracing)
-- Few-Shot Router (15 examples)
-- Async LLM (parallel tool execution)
-- Token Bucket Rate Limiter
+- Code Interpreter (Docker sandbox)
+- Audio Tools (transcribe & summarize)
+- Temporal Decay (30-day half-life)
+- 54 Tools
 </details>
 
 ---

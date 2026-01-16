@@ -4,7 +4,7 @@
     import { backendStatus } from '$lib/stores/chat.js';
     
     // BACKEND_URL logic
-    const BACKEND_URL = "http://localhost:8000"; 
+    const BACKEND_URL = "http://localhost:3210"; 
     
     // Configuration State
     let config = {

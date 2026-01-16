@@ -38,6 +38,54 @@
                 // Check voice status
                 await checkVoiceStatus();
                 
+                // V15.2.1: Sync visibility state on mount (Bubble-Gate)
+                try {
+                    await fetch('http://localhost:3210/api/ui/visibility', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ visible: true })
+                    });
+                    console.log('👁️ [Visibility] Synced on mount: true');
+                } catch (e) {
+                    console.error('[Visibility] Mount sync failed:', e);
+                }
+                
+                // V15: Connect to Proactive WebSocket
+                const ws = new WebSocket('ws://localhost:3210/ws/proactive');
+                
+                ws.onopen = () => {
+                    console.log('💌 [Proactive] Connected to backend');
+                };
+                
+                ws.onmessage = async (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'proactive_message') {
+                            console.log('💌 [Proactive] Received:', data.content);
+                            
+                            // 1. Auto-open window
+                            const appWindow = getCurrentWindow();
+                            await appWindow.show();
+                            await appWindow.setFocus();
+                            
+                            // 2. Add message to chat
+                            messages.update(msgs => [...msgs, {
+                                role: 'assistant',
+                                content: data.content,
+                                timestamp: new Date().toISOString()
+                            }]);
+                            
+                            // 3. Optional: Play chime sound (if file exists)
+                            // const audio = new Audio('/sounds/chime.mp3');
+                            // audio.play().catch(() => {});
+                        }
+                    } catch (e) {
+                        console.error('[Proactive] Error handling message:', e);
+                    }
+                };
+                
+                ws.onerror = (e) => console.error('[Proactive] WebSocket error:', e);
+                
                 // Listen for Quick Search Trigger (Shift+S global)
                 await listen('quick_search_trigger', async () => {
                     console.log('⚡ Quick Search Mode Triggered');
@@ -88,7 +136,24 @@
         await invoke('open_logs_window');
     }
     
+    // V15.2.1: Report visibility state to backend
+    async function reportVisibility(visible) {
+        try {
+            await fetch('http://localhost:3210/api/ui/visibility', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ visible })
+            });
+            console.log(`👁️ [Visibility] Reported: ${visible}`);
+        } catch (e) {
+            console.error('[Visibility] Failed to report:', e);
+        }
+    }
+    
     async function hideWindow() {
+        // V15.2.1: Report that UI is now hidden (Bubble-Gate)
+        await reportVisibility(false);
+        
         await invoke('hide_main_window');
         // Reset quick search mode when hidden
         isQuickSearch = false; 

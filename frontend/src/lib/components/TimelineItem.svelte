@@ -21,7 +21,7 @@
     async function handleSpeak() {
         if (!message.content) return;
         try {
-            await fetch('http://localhost:8000/voice/speak', {
+            await fetch('http://localhost:3210/voice/speak', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: message.content })

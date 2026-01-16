@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import { slide } from 'svelte/transition';
     
-    const BACKEND_URL = "http://localhost:8000";
+    const BACKEND_URL = "http://localhost:3210";
     
     let logs = { traces: [], stats: { total_queries: 0, success_rate: 100, avg_latency_s: 0 } };
     let loading = true;

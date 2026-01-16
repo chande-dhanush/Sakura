@@ -4,7 +4,7 @@
  */
 import { writable, derived, get } from 'svelte/store';
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = 'http://localhost:3210';
 
 // Stores
 // Stores

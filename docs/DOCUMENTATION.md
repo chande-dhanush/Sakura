@@ -1,13 +1,14 @@
-# Sakura V14.0 — Technical Documentation
-*System Certified: January 15, 2026*
+# Sakura V15.2.1 — Technical Documentation
+*System Certified: January 16, 2026*
 
 ---
 
 ## 🎯 Overview
 **Sakura** is a production-grade personal AI assistant optimized for cost, performance, and CPU-only deployment.
-**V14 Upgrade:** Now featuring **Unified ReflectionEngine** (background constraint detection), **Sleep Cycle** (startup fact crystallization), **Dream Journal** (/api/dreams visibility), and **World Graph Priority Filter** (constraints bypass vector similarity).
+**V15.2.1 Upgrade:** Now featuring **Cognitive Architecture** (DesireSystem, ProactiveScheduler), **Bubble-Gate UX** (socially aware interruptions), **Zero-Cost Mood Injection**, and **Reactive UI Themes**.
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
+
 ---
 
 ## ✨ Feature Matrix
@@ -30,27 +31,19 @@
 | Tool Cache | V10+ | TTL-based cache for weather, search, etc. |
 | Tauri UI | V10+ | Native desktop app with Svelte frontend |
 | SSE Streaming | V10+ | Real-time token streaming via FastAPI |
-| File Upload | V10.1 | Attach files for RAG ingestion |
-| Terminal Action Guard | V10.1 | Prevents duplicate tool calls |
-| Window Auto-Show | V10.1 | Main window auto-shows after backend ready |
-| Flight Recorder | V10.4 | JSONL tracing with per-stage latency breakdown |
-| Few-Shot Router | V10.4 | 15 examples for improved PLAN detection |
-| Async LLM | V10.4 | Native ainvoke() with asyncio.gather() support |
-| Token Bucket Rate Limiter | V10.4 | Backpressure-based RPM/TPM limiting per model |
-| Context Valve | V11+ | Intercepts large tool outputs to Ephemeral Store |
-| Reflection Engine | V11+ | Post-turn analysis for memory optimization |
-| Smart Research | V11+ | Dedicated `research_topic` tool with summary |
 | Thought Stream | V12+ | Real-time WebSocket reasoning feed for UI |
-| Native Logs | V12+ | Cyberpunk-themed Tauri dashboard for system logs |
-| Code Interpreter | V13 | Execute Python in Docker sandbox (pandas, numpy, matplotlib) |
+| Code Interpreter | V13 | Execute Python in Docker sandbox |
 | Temporal Decay | V13 | Memory confidence decays over time (30-day half-life) |
-| Adaptive Routing | V13 | Urgency detection for faster model selection |
-| Audio Summarization | V13 | Transcribe and summarize audio files (Google STT) |
-| Pre-compiled Regex | V13 | 30+ patterns compiled at module load for performance |
-| **Unified ReflectionEngine** | **V14** | Background constraint detection (saves 1 LLM call) |
-| **Sleep Cycle** | **V14** | Startup fact crystallization with 24h cooldown |
-| **Dream Journal** | **V14** | `/api/dreams` endpoint for visibility |
-| **Constraint Priority** | **V14** | Physical constraints bypass vector similarity |
+| Unified ReflectionEngine | V14 | Background constraint detection (saves 1 LLM call) |
+| Sleep Cycle | V14 | Startup fact crystallization with 24h cooldown |
+| DesireSystem | V15 | CPU-based mood tracking (social_battery, loneliness) |
+| ProactiveScheduler | V15 | Autonomous check-ins when lonely (0 daytime LLM cost) |
+| Mood Injection | V15 | Responder adapts tone based on internal state |
+| Pre-Computed Initiations | V15 | 3 AM icebreaker generation for next-day use |
+| **Bubble-Gate** | **V15.2** | Respects UI visibility — won't interrupt when hidden |
+| **Message Queue (TTL)** | **V15.2** | Queues proactive messages for 2h when hidden |
+| **CPU Guard** | **V15.2** | Skips TTS when CPU > 80% to prevent stutter |
+| **Reactive Themes** | **V15.2** | UI colors shift based on mood (5 palettes) |
 
 ---
 
