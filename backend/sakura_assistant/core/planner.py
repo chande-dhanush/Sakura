@@ -72,12 +72,34 @@ class Planner:
         """
         self.llm = llm
 
-    def _filter_tools(self, all_tools: list, intent: str, user_input: str = "") -> list:
+    def _filter_tools(self, all_tools: list, intent: str, user_input: str = "", hindsight: str = None, tool_history: list = None) -> list:
         """
         V9.1: Token Diet - ALWAYS filter tools to stay under 8K TPM limit.
-        Never returns all 48 tools - always filters down to ~10-15 max.
+        V16: Try micro-toolsets first for common intents.
+        V16.1: Unlock fallback tools if hindsight present or tool history exists (Search Cascade).
         """
         from ..config import TOOL_GROUPS, TOOL_GROUPS_UNIVERSAL
+        
+        # V16: Try micro-toolset first with semantic gating
+        try:
+            from .micro_toolsets import get_micro_toolset, detect_semantic_intent
+            detected_intent, tool_hint = detect_semantic_intent(user_input)
+            
+            # V16.1 Fix: Use fallback mode if retrying (hindsight) OR if we are deep in a loop (tool_history)
+            # This ensures that if the primary tool returns "No results", we unlock the full set for the next step.
+            use_fallback = bool(hindsight) or bool(tool_history)
+            
+            micro_tools = get_micro_toolset(
+                detected_intent, 
+                all_tools, 
+                tool_hint=tool_hint,
+                fallback_mode=use_fallback
+            )
+            
+            if micro_tools:
+                return micro_tools
+        except Exception as e:
+            print(f"⚠️ Micro-toolset fallback: {e}")
         
         # --- Step 1: Extract keywords from user input ---
         user_lower = user_input.lower()
@@ -243,7 +265,7 @@ class Planner:
             })
             
             all_tools = get_all_tools()
-            tools = self._filter_tools(all_tools, intent_mode, user_input)
+            tools = self._filter_tools(all_tools, intent_mode, user_input, hindsight=hindsight, tool_history=tool_history)
             llm_with_tools = self.llm.bind_tools(tools)
             
             from .context_governor import get_context_governor

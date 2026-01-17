@@ -8,6 +8,7 @@ Extracted from llm.py as part of SOLID refactoring.
 - Open/Closed: New routes can be added via classification logic
 """
 import json
+from datetime import datetime
 from typing import Optional, Tuple, List, Dict, Any
 import re
 
@@ -22,7 +23,10 @@ _URGENT_PATTERNS = re.compile(
 
 
 # Router prompt for V10 classification with Few-Shot Examples
-ROUTER_SYSTEM_PROMPT = """You are a query classifier for a personal AI assistant.
+# V15.2: Temporal grounding added dynamically in IntentRouter.route()
+ROUTER_SYSTEM_PROMPT_TEMPLATE = """You are a query classifier for a personal AI assistant.
+
+CURRENT DATE/TIME: {current_datetime}
 
 Classify the user's query into ONE of these categories:
 
@@ -33,42 +37,33 @@ CHAT - Pure conversation, no tools needed.
 === FEW-SHOT EXAMPLES ===
 
 User: "Play Numb by Linkin Park"
-{"classification": "DIRECT", "tool_hint": "spotify_control", "reason": "Single media action"}
+{{"classification": "DIRECT", "tool_hint": "spotify_control", "reason": "Single media action"}}
 
 User: "What is the weather in Tokyo?"
-{"classification": "DIRECT", "tool_hint": "get_weather", "reason": "Single lookup"}
+{{"classification": "DIRECT", "tool_hint": "get_weather", "reason": "Single lookup"}}
 
 User: "What time is it?"
-{"classification": "DIRECT", "tool_hint": "get_time", "reason": "Single lookup"}
+{{"classification": "DIRECT", "tool_hint": "get_time", "reason": "Single lookup"}}
 
 User: "Explain quantum physics"
-{"classification": "CHAT", "tool_hint": null, "reason": "Knowledge explanation, no tool"}
+{{"classification": "CHAT", "tool_hint": null, "reason": "Knowledge explanation, no tool"}}
 
 User: "Who is the CEO of OpenAI?"
-{"classification": "PLAN", "tool_hint": "web_search", "reason": "Fact lookup"}
+{{"classification": "PLAN", "tool_hint": "web_search", "reason": "Fact lookup"}}
 
-User: "Find a recipe for lasagna and add the ingredients to my shopping list"
-{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Search -> Add to list"}
+User: "Set a reminder for tomorrow at 3pm"
+{{"classification": "DIRECT", "tool_hint": "set_reminder", "reason": "Single reminder action"}}
+
+User: "Create a calendar event for tomorrow at 12pm"
+{{"classification": "DIRECT", "tool_hint": "calendar_create_event", "reason": "Single calendar action"}}
 
 User: "Research quantum computing and summarize the key concepts"
-{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Research -> Summarize"}
-
-User: "Compare Python and JavaScript for web development"
-{"classification": "PLAN", "tool_hint": null, "reason": "Comparison requires research on both"}
-
-User: "Who is the president of France and what are they known for?"
-{"classification": "PLAN", "tool_hint": null, "reason": "Multi-part question requiring lookup + synthesis"}
-
-User: "What happened in the news today?"
-{"classification": "PLAN", "tool_hint": null, "reason": "Requires news search + summarization"}
-
-User: "Look up the best restaurants nearby and check their reviews"
-{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Search -> Check reviews"}
+{{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Research -> Summarize"}}
 
 === END EXAMPLES ===
 
 Return JSON only:
-{"classification": "DIRECT|PLAN|CHAT", "tool_hint": "tool_name or null"}
+{{"classification": "DIRECT|PLAN|CHAT", "tool_hint": "tool_name or null"}}
 """
 
 
@@ -135,8 +130,12 @@ class IntentRouter:
             
         # 2. LLM classification
         try:
+            # V15.2: Inject current datetime for temporal grounding
+            current_dt = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+            prompt = ROUTER_SYSTEM_PROMPT_TEMPLATE.format(current_datetime=current_dt)
+            
             messages = [
-                SystemMessage(content=ROUTER_SYSTEM_PROMPT),
+                SystemMessage(content=prompt),
                 HumanMessage(content=f"Context: {context}\n\nQuery: {query}")
             ]
             
@@ -172,8 +171,12 @@ class IntentRouter:
         
         # 2. LLM-based classification
         try:
+            # V15.2: Inject current datetime for temporal grounding
+            current_dt = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+            prompt = ROUTER_SYSTEM_PROMPT_TEMPLATE.format(current_datetime=current_dt)
+            
             messages = [
-                SystemMessage(content=ROUTER_SYSTEM_PROMPT),
+                SystemMessage(content=prompt),
                 HumanMessage(content=f"Context: {context}\n\nQuery: {query}")
             ]
             

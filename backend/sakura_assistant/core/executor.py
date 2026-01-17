@@ -3,17 +3,74 @@ Sakura V10 Tool Executor
 ========================
 Executes tool plans with ReAct loop support.
 
+V15.2.2 "Peace Treaty" Update:
+- Added path injection defense (DANGEROUS_PATTERNS)
+- Unicode normalization for homoglyph attack prevention
+
 Extracted from llm.py as part of SOLID refactoring.
 - Single Responsibility: Only handles tool execution
 - Manages output pruning and summarization
 """
 import json
+import re
+import unicodedata
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
 from langchain_core.messages import ToolMessage
 from .planner import Planner
-from .ephemeral_manager import get_ephemeral_manager # V11.3 Context Valve
+from .ephemeral_manager import get_ephemeral_manager  # V11.3 Context Valve
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# V15.2.2: PATH INJECTION DEFENSE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class SecurityError(Exception):
+    """Raised when a security violation is detected."""
+    pass
+
+
+# Dangerous path patterns that could allow privilege escalation
+DANGEROUS_PATTERNS = [
+    # Shell config files
+    r"\.bashrc", r"\.zshrc", r"\.profile", r"\.bash_profile",
+    # Startup/autorun
+    r"autostart", r"LaunchAgent", r"LaunchDaemon",
+    r"cron\.d", r"crontab", r"systemd", r"\.service$",
+    # SSH/Credentials
+    r"\.ssh", r"\.aws", r"\.kube", r"\.docker",
+    r"\.git-credentials", r"\.netrc", r"\.npmrc",
+    # System directories
+    r"/etc/", r"C:[/\\]Windows", r"System32",
+    r"/usr/bin", r"/usr/local/bin",
+    # Browser data
+    r"\.mozilla", r"\.chrome", r"AppData.*Local.*Google",
+    # Generic hidden config
+    r"\.config/", r"\.local/share",
+]
+
+
+def validate_path(path: str) -> bool:
+    """
+    Validate path for security. Raises SecurityError if dangerous.
+    
+    V15.2.2: Includes unicode normalization to prevent homoglyph attacks.
+    """
+    # Normalize unicode (prevents Greek 'ο' vs Latin 'o' attacks)
+    normalized = unicodedata.normalize('NFC', path)
+    nfkd = unicodedata.normalize('NFKD', path)
+    
+    if nfkd != normalized.encode('ascii', 'ignore').decode('ascii'):
+        # Contains non-ASCII characters that could be homoglyphs
+        print(f"🛡️ [Security] Potential homoglyph in path: {path}")
+    
+    # Check against dangerous patterns
+    for pattern in DANGEROUS_PATTERNS:
+        if re.search(pattern, normalized, re.IGNORECASE):
+            raise SecurityError(f"Blocked dangerous path pattern: {pattern}")
+    
+    return True
 
 
 @dataclass

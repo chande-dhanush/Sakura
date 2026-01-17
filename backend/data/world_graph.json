@@ -1,15 +1,91 @@
 {
   "version": "v7",
-  "current_turn": 2,
-  "current_session": "0dfa3445-d49f-4790-9094-615c86fe73d4",
+  "current_turn": 6,
+  "current_session": "7a51d110-236e-4cba-9c6b-c57f779532dd",
   "entities": {
     "user:self": {
       "id": "user:self",
       "type": "user",
-      "name": "User",
+      "name": "Dhanush",
       "attributes": {
-        "role": "user",
-        "created_after_reset": true
+        "age": 22,
+        "birthday": "29 October",
+        "location": "Bangalore, India",
+        "interests": [
+          "AI",
+          "Anime",
+          "Travelling"
+        ]
+      },
+      "lifecycle": "promoted",
+      "source": "system",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-01-16T19:29:27.308607",
+      "last_referenced": "2026-01-16T19:29:27.308607",
+      "reference_count": 0,
+      "confidence": 1.0,
+      "not_claims": [
+        "NOT the actor Dhanush",
+        "NOT a public figure"
+      ],
+      "summary": "Dhanush, 22, from Bangalore, India. Interests: AI, Anime, Travelling."
+    },
+    "pref:communication": {
+      "id": "pref:communication",
+      "type": "preference",
+      "name": "Communication Preferences",
+      "attributes": {
+        "style": "practical, direct",
+        "enjoys": "being roasted",
+        "prefers": "minimal responses"
+      },
+      "lifecycle": "promoted",
+      "source": "system",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-01-16T19:29:27.308607",
+      "last_referenced": "2026-01-16T19:29:27.308607",
+      "reference_count": 0,
+      "confidence": 1.0,
+      "not_claims": [],
+      "summary": "Prefers practical, direct replies. Enjoys being teased."
+    },
+    "entity:topic:the_user_greeted_the_assistant_with_a_good_morning_message,_addressing_it_as_'yuki'_and_then_'sakura": {
+      "id": "entity:topic:the_user_greeted_the_assistant_with_a_good_morning_message,_addressing_it_as_'yuki'_and_then_'sakura",
+      "type": "topic",
+      "name": "The user greeted the assistant with a good morning message, addressing it as 'yuki' and then 'Sakura",
+      "attributes": {
+        "category": "relationship",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-01-16T14:40:22.025199",
+      "last_referenced": "2026-01-16T14:40:22.025199",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The user greeted the assistant with a good morning message, addressing it as 'yuki' and then 'Sakura (topic)"
+    },
+    "constraint:crystallized_the_user_mentioned_hoping_thei": {
+      "id": "constraint:crystallized_the_user_mentioned_hoping_thei",
+      "type": "topic",
+      "name": "The user mentioned hoping their edits to the assistant's V15 work.",
+      "attributes": {
+        "constraint_type": "temporal",
+        "implications": [],
+        "criticality": 0.8,
+        "crystallized": true
       },
       "lifecycle": "promoted",
       "source": "user_stated",
@@ -17,13 +93,71 @@
         "user_confirmed",
         "user_stated"
       ],
-      "created_at": "2026-01-16T11:30:19.245059",
-      "last_referenced": "2026-01-16T11:30:19.245059",
+      "created_at": "2026-01-16T14:40:22.025199",
+      "last_referenced": "2026-01-16T14:40:22.025199",
       "reference_count": 0,
-      "confidence": 0.5,
+      "confidence": 0.9,
       "not_claims": [],
-      "summary": ""
+      "summary": "The user mentioned hoping their edits to the assistant's V15 work. (topic)"
     }
   },
-  "actions": []
+  "actions": [
+    {
+      "id": "action:t-3",
+      "turn": 3,
+      "timestamp": "2026-01-16T14:41:16.303414",
+      "action_type": "tool",
+      "tool": "set_reminder",
+      "args": {},
+      "result": "\u2705 Reminder set for 5.0 mins.",
+      "success": true,
+      "focus_entity": null,
+      "entities_involved": [],
+      "depends_on": null,
+      "user_intent": "casual",
+      "user_satisfaction": null,
+      "significance": 0.5,
+      "key_facts": [],
+      "summary": "set_reminder() \u2713",
+      "session_id": "12ccc231-36b6-4772-8a3c-4b2dfbc6c013"
+    },
+    {
+      "id": "action:t-4",
+      "turn": 4,
+      "timestamp": "2026-01-16T14:42:31.921519",
+      "action_type": "tool",
+      "tool": "calendar_create_event",
+      "args": {},
+      "result": "\u26a0\ufe0f Date appears to be in the past (2024-03-16T12:00:00). Did you mean 2026 instead of 2024? Please try again with the correct year.",
+      "success": true,
+      "focus_entity": null,
+      "entities_involved": [],
+      "depends_on": null,
+      "user_intent": "casual",
+      "user_satisfaction": null,
+      "significance": 0.5,
+      "key_facts": [],
+      "summary": "calendar_create_event() \u2713",
+      "session_id": "12ccc231-36b6-4772-8a3c-4b2dfbc6c013"
+    },
+    {
+      "id": "action:t-5",
+      "turn": 5,
+      "timestamp": "2026-01-16T14:43:13.403011",
+      "action_type": "tool",
+      "tool": "calendar_create_event",
+      "args": {},
+      "result": "\u2705 Event created: https://www.google.com/calendar/event?eid=ZWNjZzdtcGo0MG9kbGo2ZzFuNDUxMzBkcm8gZGhhbnVzaHBjaGFuZGVAbQ",
+      "success": true,
+      "focus_entity": null,
+      "entities_involved": [],
+      "depends_on": null,
+      "user_intent": "casual",
+      "user_satisfaction": null,
+      "significance": 0.5,
+      "key_facts": [],
+      "summary": "calendar_create_event() \u2713",
+      "session_id": "12ccc231-36b6-4772-8a3c-4b2dfbc6c013"
+    }
+  ]
 }

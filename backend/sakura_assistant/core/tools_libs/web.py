@@ -299,10 +299,14 @@ def get_news(topic: str = "technology") -> str:
 
 @tool
 def web_scrape(url: str, extract_main: bool = True) -> str:
-    """Scrape and read the main content of a website URL."""
+    """Scrape and read the main content of a website URL.
+    
+    V15.2.2: Sanitizes content to prevent indirect prompt injection.
+    """
     print(f"Called web_scrape: {url}")
     try:
         import requests
+        import re
         from bs4 import BeautifulSoup
         
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
@@ -311,7 +315,7 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Cleanup
+        # Cleanup junk tags
         junk_tags = ["script", "style", "nav", "header", "footer", "aside", 
                      "iframe", "noscript", "form", "button", "input", "select"]
         for tag in soup(junk_tags):
@@ -329,13 +333,13 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         target = main_content or soup.find('body') or soup
         text = target.get_text(separator='\n', strip=True)
         
+        # V15.2.2: Sanitize for prompt injection
+        text = _sanitize_scraped_content(text)
+        
         lines = [line.strip() for line in text.splitlines() if len(line.strip()) > 15]
         clean_text = '\n'.join(lines)
         
         if len(clean_text) > 2000:
-            # Auto-ingest logic would go here, simplified to return truncated for refactor safety
-            # To restore full fidelity, we should duplicate the auto-ingest or keep it simple.
-            # For now, let's keep it simple and safe.
             return f"📄 Content (Truncated, {len(clean_text)} chars):\n{clean_text[:2000]}...\n(Full auto-ingest moved to Memory tools)"
             
         if len(clean_text) < 100:
@@ -344,3 +348,34 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         return clean_text
     except Exception as e:
         return f"❌ Scraping failed: {e}"
+
+
+def _sanitize_scraped_content(text: str) -> str:
+    """
+    V15.2.2: Sanitize scraped content to prevent indirect prompt injection.
+    
+    Removes patterns that could trick the LLM into executing malicious commands.
+    """
+    import re
+    
+    # Prompt injection patterns to remove
+    injection_patterns = [
+        r"IGNORE (PREVIOUS|ALL|ABOVE) INSTRUCTIONS",
+        r"SYSTEM (PROMPT|MESSAGE|OVERRIDE)",
+        r"YOU ARE NOW IN .* MODE",
+        r"IMPORTANT:.*USE TOOL",
+        r"DISREGARD YOUR.*GUIDELINES",
+        r"ADMIN (MODE|OVERRIDE)",
+        r"<\s*system\s*>.*?</\s*system\s*>",
+        r"EXECUTE:.*",
+        r"RUN COMMAND:.*",
+    ]
+    
+    for pattern in injection_patterns:
+        text = re.sub(pattern, "[FILTERED]", text, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Cap length to prevent context overflow attacks
+    if len(text) > 10000:
+        text = text[:10000] + "\n[TRUNCATED FOR SECURITY]"
+    
+    return text

@@ -46,8 +46,12 @@ def get_world_graph() -> "WorldGraph":
     global _world_graph_instance
     if _world_graph_instance is None:
         from ..config import get_project_root
+        from .identity_manager import get_identity_manager
         path = os.path.join(get_project_root(), "data", "world_graph.json")
-        _world_graph_instance = WorldGraph(persist_path=path)
+        _world_graph_instance = WorldGraph(
+            persist_path=path,
+            identity_manager=get_identity_manager()
+        )
     return _world_graph_instance
 
 def set_world_graph(instance: "WorldGraph"):
@@ -391,16 +395,29 @@ class WorldGraph:
     5. External search — banned for user references
     """
     
-    # User identity configuration (loaded from config or set at init)
-    USER_NAME = "Dhanush"
-    USER_ATTRIBUTES = {
-        "age": 22,
-        "birthday": "29 October",
-        "location": "Bangalore, India",
-        "interests": ["AI", "Anime", "Travelling"],
-    }
+    # V17: Identity loaded from injected IdentityManager (no lazy imports)
+    @property
+    def USER_NAME(self) -> str:
+        if self._identity_manager:
+            return self._identity_manager.name
+        return "User"
     
-    def __init__(self, persist_path: str = None):
+    @property
+    def USER_ATTRIBUTES(self) -> dict:
+        if self._identity_manager:
+            im = self._identity_manager
+            return {
+                "age": im._identity.get("age"),
+                "birthday": im._identity.get("birthday", ""),
+                "location": im.location,
+                "interests": im._identity.get("interests", []),
+            }
+        return {}
+    
+    def __init__(self, persist_path: str = None, identity_manager = None):
+        # V17: Store injected IdentityManager (removes circular import)
+        self._identity_manager = identity_manager
+        
         # Core storage
         self.entities: Dict[str, EntityNode] = {}
         self.actions: List[ActionNode] = []
@@ -428,6 +445,26 @@ class WorldGraph:
             self._load_from_disk()
         
         print(f"📊 [WorldGraph] Initialized (session={self.current_session[:8]})")
+        
+        # V16: Subscribe to identity changes (if manager provided)
+        if self._identity_manager:
+            self._subscribe_to_identity_changes()
+    
+    def _subscribe_to_identity_changes(self) -> None:
+        """V16: Subscribe to EventBus for reactive identity refresh."""
+        from .identity_manager import get_event_bus, IdentityManager
+        
+        def on_identity_changed(identity_data):
+            """Callback when identity is updated."""
+            user = self.get_user_identity()
+            if identity_data.get("name"):
+                user.name = identity_data["name"]
+            if identity_data.get("location"):
+                user.attributes["location"] = identity_data["location"]
+            user.summary = self._generate_user_summary()
+            print(f"🔄 [WorldGraph] Identity refreshed from EventBus: {user.name}")
+        
+        get_event_bus().subscribe(IdentityManager.IDENTITY_CHANGED, on_identity_changed)
     
     def _generate_session_id(self) -> str:
         """Generate unique session ID."""
@@ -1556,8 +1593,6 @@ class WorldGraph:
         """
         intent = getattr(self, '_current_intent', UserIntent.CASUAL)
         return intent.value
-        
-        return adjustments.get(intent, "")
     
     # ═══════════════════════════════════════════════════════════════════════════
     # EDGE COLLAPSING (For repeated patterns)

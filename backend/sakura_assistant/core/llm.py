@@ -3,7 +3,7 @@ import time
 import re
 from typing import List, Dict, Any, Optional
 
-from ..core.context_manager import get_smart_context
+from ..core.context_manager import ContextManager, get_smart_context
 from ..config import SYSTEM_PERSONALITY
 from ..core.container import get_container
 from ..core.model_wrapper import ReliableLLM
@@ -75,13 +75,22 @@ class SmartAssistant:
         )
         
         # V7: World Graph (Single Source of Truth)
+        # V17: Inject IdentityManager to remove circular imports
         from ..config import get_project_root
+        from .identity_manager import get_identity_manager
         self.world_graph = WorldGraph(
-            persist_path=os.path.join(get_project_root(), "data", "world_graph.json")
+            persist_path=os.path.join(get_project_root(), "data", "world_graph.json"),
+            identity_manager=get_identity_manager()
         )
         
         # V10.3: Summary Memory (compresses old turns for long-context)
         self.summary_memory = get_summary_memory(planner_llm)
+        
+        # V15.4: Centralized ContextManager (Single Source of Truth for Context Hygiene)
+        self.context_manager = ContextManager(
+            world_graph=self.world_graph,
+            summary_memory=self.summary_memory
+        )
         
         # V14: Background ReflectionEngine (constraint detection runs after response)
         self.reflection_engine = get_reflection_engine()
@@ -96,7 +105,7 @@ class SmartAssistant:
         # Store last response for async reflection (picked up by server.py BackgroundTask)
         self._last_turn_data = {"user_msg": "", "assistant_response": ""}
         
-        print("✅ SmartAssistant Initialized (V15 - Cognitive Architecture)")
+        print("✅ SmartAssistant Initialized (V15.4 - Context Router)")
 
     def run(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -110,6 +119,9 @@ class SmartAssistant:
         print(f"\U0001f680 [LLM] SmartAssistant.run() STARTED")
         start_time = time.time()
         state = AgentState()
+        # V16.1: Initialize turn context variable (avoid locals() hack)
+        turn_ctx = None
+        
         recorder = get_recorder()
         recorder.start_trace(user_input)
         
@@ -147,14 +159,19 @@ class SmartAssistant:
                 print(f"⚙️ Execution Phase: {route_result.classification}")
                 state.record_llm_call("execution")
                 
-                # Fetch Graph Context for Executor
-                graph_context = self.world_graph.get_context_for_planner(user_input)
+                # V16: Single context retrieval per turn (reused for Responder)
+                turn_ctx = self.context_manager.get_context_for_llm(
+                    user_input, 
+                    mode=route_result.classification, 
+                    history=history
+                )
+                planner_ctx = turn_ctx["planner_context"]
                 
                 with span("Executor"):
                     exec_result = self.executor.execute(
                         user_input,
                         route_result,
-                        graph_context,
+                        planner_ctx,
                         state
                     )
                 tool_args = exec_result.last_result.get("args") if exec_result.last_result else {}
@@ -194,8 +211,17 @@ class SmartAssistant:
             state.record_llm_call("responding")
             print(f"🏁 Response Phase")
             
-            # V10.3: Get compressed summary for context injection
-            summary_context = self.summary_memory.get_context_injection()
+            # V16: Reuse cached context if available, otherwise fetch
+            if turn_ctx is None:
+                turn_ctx = self.context_manager.get_context_for_llm(
+                    user_input, 
+                    mode=route_result.classification, 
+                    history=history
+                )
+            
+            # V15: Inject mood from DesireSystem
+            mood_prompt = self.desire_system.get_mood_prompt()
+            responder_context = f"{mood_prompt}\n\n{turn_ctx['responder_context']}"
             
             # Prepare Responder Context
             from .responder import ResponseContext
@@ -203,16 +229,20 @@ class SmartAssistant:
                 user_input=user_input,
                 tool_outputs=tool_outputs,
                 history=history,
-                graph_context=self.world_graph.get_context_for_responder(),
-                intent_adjustment=self.world_graph.get_intent_adjustment(),
-                current_mood=self.world_graph.get_current_mood(),
+                graph_context=responder_context,
+                intent_adjustment=turn_ctx["intent_adjustment"],
+                current_mood=turn_ctx["current_mood"],
                 study_mode=study_mode_active,
-                session_summary=summary_context
+                session_summary=turn_ctx["summary_context"]
             )
             
             with span("Responder"):
                 response_text = self.responder.generate(resp_context)
             recorder.log("Responder", f"Generated {len(response_text)} chars")
+            
+            # V15: Update desire state on messages
+            self.desire_system.on_user_message(user_input)
+            self.desire_system.on_assistant_message(response_text)
             
             # V10.3: Record assistant response in Summary Memory
             self.summary_memory.add_turn("assistant", response_text)
@@ -222,6 +252,7 @@ class SmartAssistant:
             self.world_graph.save()
             
             recorder.end_trace(success=True, response_preview=response_text[:80])
+
             
             return {
                 "content": response_text,
@@ -299,14 +330,19 @@ class SmartAssistant:
                 print(f"⚙️ Async Execution Phase: {route_result.classification}")
                 state.record_llm_call("execution")
                 
-                # Fetch Graph Context
-                graph_context = self.world_graph.get_context_for_planner(user_input)
+                # V15.4: Centralized context via ContextManager
+                ctx = self.context_manager.get_context_for_llm(
+                    user_input,
+                    mode=route_result.classification,
+                    history=history
+                )
+                planner_ctx = ctx["planner_context"]
                 
                 with span("Executor"):
                     exec_result = await self.executor.aexecute(
                         user_input,
                         route_result,
-                        graph_context,
+                        planner_ctx,
                         state
                     )
                 tool_args = exec_result.last_result.get("args") if exec_result.last_result else {}
@@ -339,24 +375,27 @@ class SmartAssistant:
             state.record_llm_call("responding")
             print(f"🏁 Async Response Phase")
             
-            summary_context = self.summary_memory.get_context_injection()
+            # V15.4: Get unified context from ContextManager
+            resp_ctx = self.context_manager.get_context_for_llm(
+                user_input,
+                mode=route_result.classification,
+                history=history
+            )
             
-            # V14: Inject active constraints from World Graph
-            graph_context = self.world_graph.get_context_for_responder()
-            
-            # V15: Inject mood from DesireSystem (zero-cost consciousness)
+            # V15: Inject mood from DesireSystem
             mood_prompt = self.desire_system.get_mood_prompt()
-            enhanced_graph_context = f"{mood_prompt}\n\n{graph_context}"
+            # Hygiene: Use descriptive variable name for responder-specific context
+            responder_context = f"{mood_prompt}\n\n{resp_ctx['responder_context']}"
             
             resp_context = ResponseContext(
                 user_input=user_input,
                 tool_outputs=tool_outputs,
                 history=history,
-                graph_context=enhanced_graph_context,
-                intent_adjustment=self.world_graph.get_intent_adjustment(),
-                current_mood=self.world_graph.get_current_mood(),
+                graph_context=responder_context,
+                intent_adjustment=resp_ctx["intent_adjustment"],
+                current_mood=resp_ctx["current_mood"],
                 study_mode=study_mode_active,
-                session_summary=summary_context
+                session_summary=resp_ctx["summary_context"]
             )
             
             with span("Responder"):

@@ -13,7 +13,7 @@ import requests
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "http://localhost:3210"
 RESULTS = {"passed": 0, "failed": 0, "errors": []}
 
 def test(name):

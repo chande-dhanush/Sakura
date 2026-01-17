@@ -47,7 +47,7 @@ except ImportError:
 
 # =============================================================================
 # NOTE: Auth removed - this is a localhost-only desktop app
-# The frontend and backend communicate only via localhost:8000
+# The frontend and backend communicate only via localhost:3210
 # =============================================================================
 
 # Lazy import to avoid loading models at import time
@@ -189,7 +189,24 @@ app.add_middleware(
 async def websocket_status(websocket: WebSocket):
     """
     Real-time status stream for V12 features (Thought Stream).
+    
+    V15.2.2: Origin validation to prevent WebSocket hijacking.
     """
+    # V15.2.2: Security - Validate origin to prevent hijacking from malicious websites
+    origin = websocket.headers.get("origin", "")
+    allowed_origins = [
+        "tauri://localhost",
+        "http://localhost:1420",  # Tauri dev server
+        "http://127.0.0.1:1420",
+        "http://localhost:3210",  # Backend (for debugging)
+        "http://127.0.0.1:3210",
+    ]
+    
+    if origin and origin not in allowed_origins:
+        print(f"🛡️ [Security] Rejected WebSocket from origin: {origin}")
+        await websocket.close(code=1008, reason="Invalid origin")
+        return
+    
     await websocket.accept()
     from sakura_assistant.core.broadcaster import get_broadcaster
     import asyncio
@@ -210,7 +227,6 @@ async def websocket_status(websocket: WebSocket):
         print(f"⚠️ WebSocket disconnect: {e}")
     finally:
         # Ideally remove listener, but current simple broadcaster doesn't support removal
-        # For now, it's fine as it's a lightweight callback list.
         pass
 
 @app.post("/setup")
@@ -295,6 +311,14 @@ async def save_setup(request: Request):
         
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump(existing_settings, f, indent=2)
+        
+        # V16: Refresh IdentityManager and broadcast via EventBus
+        try:
+            from sakura_assistant.core.identity_manager import get_identity_manager
+            get_identity_manager().refresh()
+            print("✅ [V16] Identity refreshed and broadcasted")
+        except Exception as e:
+            print(f"⚠️ Identity refresh warning: {e}")
             
         # 6. Reload Env (Update os.environ from merged values)
         for key, val in merged.items():

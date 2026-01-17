@@ -235,21 +235,70 @@ def calendar_get_events(
 
 @tool
 @retry_with_auth
-def calendar_create_event(title: str, start_time: str, end_time: str) -> str:
-    """Create a calendar event. Times must be ISO format (YYYY-MM-DDTHH:MM:SS)."""
+def calendar_create_event(
+    title: str, 
+    start_time: str, 
+    end_time: str,
+    recurrence: Optional[str] = None
+) -> str:
+    """
+    Create a calendar event with optional recurrence.
+    
+    Args:
+        title: Event title/name
+        start_time: Start time in ISO format (YYYY-MM-DDTHH:MM:SS).
+        end_time: End time in ISO format (YYYY-MM-DDTHH:MM:SS).
+        recurrence: Optional recurrence rule. Use one of:
+                   - "daily" or "everyday" for daily events
+                   - "weekly" for weekly events
+                   - "monthly" for monthly events
+                   - "RRULE:..." for custom iCal RRULE
+    
+    CRITICAL: Always use the current year from system context!
+    """
     creds = get_google_creds()
     if not creds: return "❌ Google Auth failed."
     
     try:
-        print("Called Calendar create")
+        print(f"Called Calendar create (recurrence={recurrence})")
+        
+        # V15.2: Stale date guard - reject dates more than 1 year in the past
+        try:
+            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            now = datetime.now(start_dt.tzinfo) if start_dt.tzinfo else datetime.now()
+            days_diff = (now - start_dt).days
+            if days_diff > 365:
+                current_year = now.year
+                return f"⚠️ Date appears to be in the past ({start_time}). Did you mean {current_year} instead of {start_dt.year}? Please try again with the correct year."
+        except Exception:
+            pass  # If parsing fails, let Google API handle it
+        
         service = build('calendar', 'v3', credentials=creds)
         event = {
             'summary': title,
             'start': {'dateTime': start_time, 'timeZone': USER_TIMEZONE},
             'end': {'dateTime': end_time, 'timeZone': USER_TIMEZONE},
         }
+        
+        # V15.2: Normalize recurrence into RRULE
+        if recurrence:
+            recurrence_lower = recurrence.lower().strip()
+            if recurrence_lower in ("daily", "everyday", "every day"):
+                event['recurrence'] = ['RRULE:FREQ=DAILY']
+            elif recurrence_lower == "weekly":
+                event['recurrence'] = ['RRULE:FREQ=WEEKLY']
+            elif recurrence_lower == "monthly":
+                event['recurrence'] = ['RRULE:FREQ=MONTHLY']
+            elif recurrence_lower.startswith("rrule:"):
+                event['recurrence'] = [recurrence]
+            else:
+                # Try to be helpful
+                print(f"⚠️ Unknown recurrence: {recurrence}, creating one-time event")
+        
         event = service.events().insert(calendarId='primary', body=event).execute()
-        return f"✅ Event created: {event.get('htmlLink')}"
+        
+        recurrence_note = " (recurring)" if recurrence else ""
+        return f"✅ Event created{recurrence_note}: {event.get('htmlLink')}"
     except Exception as e:
         return f"❌ Create event failed: {e}"
 

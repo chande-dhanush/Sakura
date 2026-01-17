@@ -34,7 +34,7 @@ COPY . .
 RUN mkdir -p data Notes
 
 # Expose API port
-EXPOSE 8000
+EXPOSE 3210
 
 # Run commands
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "3210"]
