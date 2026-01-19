@@ -18,7 +18,8 @@ import asyncio
 import uuid
 from typing import List, Dict
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from sakura_assistant.core.container import get_container
 from sakura_assistant.memory.faiss_store.store import get_memory_store

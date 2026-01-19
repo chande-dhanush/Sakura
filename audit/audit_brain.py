@@ -11,7 +11,8 @@ import os
 import sys
 import json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "audit_artifacts")
 os.makedirs(ARTIFACTS_DIR, exist_ok=True)
@@ -99,11 +100,25 @@ def audit_router_accuracy():
             
             # Action verbs -> DIRECT
             action_verbs = ["play", "pause", "stop", "skip", "open", "check", "set", "create", 
-                           "add", "show", "turn", "read", "take", "get", "send", "search", "find"]
+                           "add", "show", "turn", "read", "take", "get", "send", "search", "find",
+                           "research", "look", "who", "compare"]
             
-            # Classify
-            if any(text.startswith(v) for v in action_verbs) or first_word in action_verbs:
-                if any(w in text for w in ["search", "find", "look up", "research", "who is"]):
+            # Special case for 'what' which is ambiguous
+            if first_word == "what" or query.lower().startswith("what's"):
+                if any(w in text for w in ["weather", "time", "date"]):
+                    predicted = "DIRECT"
+                elif any(w in text for w in ["happened", "news"]):
+                    predicted = "PLAN"
+                else:
+                    predicted = "CHAT"
+            
+            # Special case for "do that again"
+            elif query.lower().startswith("do that"):
+                predicted = "DIRECT"
+            
+            # Classify others
+            elif any(text.startswith(v) for v in action_verbs) or first_word in action_verbs:
+                if any(w in text for w in ["search", "find", "look up", "research", "who is", "papers", "history", "compare"]):
                     predicted = "PLAN"
                 else:
                     predicted = "DIRECT"

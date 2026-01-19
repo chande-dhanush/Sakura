@@ -3,47 +3,25 @@ SAKURA ROUTER ACCURACY AUDIT
 ============================================================
 
 Total Test Cases: 45
-Correct: 36
-Overall Accuracy: 80.0%
+Correct: 45
+Overall Accuracy: 100.0%
 
 ----------------------------------------
 CONFUSION MATRIX:
 ----------------------------------------
                  DIRECT       CHAT       PLAN
-DIRECT               14          3          0
+DIRECT               17          0          0
 CHAT                  0         17          0
-PLAN                  0          6          5
+PLAN                  0          0         11
 
 ----------------------------------------
 PER-CLASS METRICS:
 ----------------------------------------
 Class         Precision     Recall         F1    Support
-DIRECT             1.00       0.82       0.90         17
-CHAT               0.65       1.00       0.79         17
-PLAN               1.00       0.45       0.62         11
-
-----------------------------------------
-MISCLASSIFICATIONS:
-----------------------------------------
-  'what's the weather'
-    Expected: DIRECT, Got: CHAT
-  'what time is it'
-    Expected: DIRECT, Got: CHAT
-  'research quantum computing and summarize'
-    Expected: PLAN, Got: CHAT
-  'who is the president of France and what are they known for'
-    Expected: PLAN, Got: CHAT
-  'compare Python and JavaScript'
-    Expected: PLAN, Got: CHAT
-  'what happened in the news today'
-    Expected: PLAN, Got: CHAT
-  'research the history of the internet'
-    Expected: PLAN, Got: CHAT
-  'look up the best restaurants nearby'
-    Expected: PLAN, Got: CHAT
-  'do that again'
-    Expected: DIRECT, Got: CHAT
+DIRECT             1.00       1.00       1.00         17
+CHAT               1.00       1.00       1.00         17
+PLAN               1.00       1.00       1.00         11
 
 ============================================================
-ROUTER GRADE: B (80.0%)
+ROUTER GRADE: A (100.0%)
 ============================================================

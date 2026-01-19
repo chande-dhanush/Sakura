@@ -325,6 +325,23 @@
                             {/if}
                         </div>
                     </div>
+                    
+                    <div class="form-group">
+                        <label for="spotify-device">Spotify Device Name <span class="optional">(Auto-Launch)</span></label>
+                        <div class="input-wrapper">
+                            <input 
+                                id="spotify-device" 
+                                type="text" 
+                                value={config.SPOTIFY_DEVICE_NAME}
+                                on:input={(e) => handleInput('SPOTIFY_DEVICE_NAME', e.target.value)}
+                                placeholder="e.g. Levos, My Laptop" 
+                            />
+                            {#if dirtyFields.has('SPOTIFY_DEVICE_NAME')}
+                                <span class="badge-changed" in:fade>Modified</span>
+                            {/if}
+                        </div>
+                        <small>If set, Sakura will auto-launch Spotify and target this device for playback</small>
+                    </div>
                 </div>
             {/if}
         </div>

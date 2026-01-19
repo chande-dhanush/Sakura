@@ -1,11 +1,11 @@
-# Sakura V15.2.1 — Technical Documentation
-*System Certified: January 16, 2026*
+# Sakura V16.2 — Technical Documentation
+*System Certified: January 17, 2026*
 
 ---
 
 ## 🎯 Overview
 **Sakura** is a production-grade personal AI assistant optimized for cost, performance, and CPU-only deployment.
-**V15.2.1 Upgrade:** Now featuring **Cognitive Architecture** (DesireSystem, ProactiveScheduler), **Bubble-Gate UX** (socially aware interruptions), **Zero-Cost Mood Injection**, and **Reactive UI Themes**.
+**V16.2 "Polished Soul":** Featuring **Stable Soul Architecture** (Reactive Identity, EventBus), **Dependency Injection Refactor**, **Search Cascade**, and **Deterministic Hallucination Blocks**. Includes **V15.4** unified context and cognitive systems.
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
 
@@ -44,10 +44,95 @@
 | **Message Queue (TTL)** | **V15.2** | Queues proactive messages for 2h when hidden |
 | **CPU Guard** | **V15.2** | Skips TTS when CPU > 80% to prevent stutter |
 | **Reactive Themes** | **V15.2** | UI colors shift based on mood (5 palettes) |
+| **Temporal Grounding** | **V15.2.1** | Router injects current date/time to prevent 2024 hallucinations |
+| **Tool Result Assertion** | **V15.2.1** | Dev guard catches "tool succeeded but responder denied" bug |
+| **RRULE Recurrence** | **V15.2.1** | "everyday" → RRULE:FREQ=DAILY for proper recurring events |
+| **Stale Date Guard** | **V15.2.1** | Calendar rejects dates >1 year in past |
+| **Dev Mode Sidecar Bypass** | **V15.2.1** | Debug builds use Python directly, not bundled sidecar |
+| **Port 3210** | **V15.2.1** | Changed from 8000 to avoid conflicts with other apps |
+| **WebSocket Origin Validation** | **V15.2.2** | Prevents hijacking attacks from malicious websites |
+| **Path Injection Defense** | **V15.2.2** | DANGEROUS_PATTERNS + Unicode normalization |
+| **Scraped Content Sanitization** | **V15.2.2** | Filters prompt injection from web content |
+| **RLock Thread Safety** | **V15.2.2** | Prevents TOCTOU race conditions in ProactiveState |
+| **Backoff Persistence** | **V15.2.2** | Failed initiation count survives app restarts |
+| **Deterministic Context Router** | **V15.4** | Unified `ContextManager.get_context_for_llm()` for all context injection |
+| **ContextSignals** | **V15.4** | Dataclass-driven regex signals for deterministic routing (Identity, Location, Temporal) |
+| **Mode-Based Pruning** | **V15.4** | Planner gets compact context, Responder gets full context |
+| **Unified Context API** | **V15.4** | Single source of truth returns 5 blocks (planner, responder, summary, intent, mood) |
+| **Sync/Async Parity** | **V15.4** | DesireSystem mood injection verified in both `run()` and `arun()` paths |
+| **Reactive Identity** | **V16.0** | `IdentityManager` + `EventBus` broadcasts identity changes instantly (Zombie Fix) |
+| **Micro-Toolsets** | **V16.0** | Intent-based minimal toolsets with `UNIVERSAL_TOOLS` safety net |
+| **Deterministic Hallucination Block** | **V16.0** | Regex-based self-check in `Responder` prevents identity lies (< 1ms) |
+| **Context Caching** | **V16.0** | Single `WorldGraph` traversal per turn (shared Plan/Respond), saves 50% tokens |
+| **Search Cascade** | **V16.1** | `TOOL_HIERARCHY` prefers Wikipedia > Tavily, unlocks fallback on retry |
+| **Semantic Tool Gating** | **V16.1** | `encyclopedia` intent hides general search to improve fact quality |
+| **Seamless Self-Check** | **V16.1** | Identity corrections are natural and polite, no debug-style notes |
+| **Dependency Injection** | **V16.2** | `WorldGraph` decoupled from `IdentityManager`; constructor injection used |
 
 ---
 
-## 🏗️ Architecture
+## 🧱 Architecture: Stable Soul (V16 / V16.2)
+
+### 1. The ID-EventBus System
+V16 solves state synchronization issues ("Zombie Identity") by decoupling `world_graph.py` from hardcoded configs.
+- **IdentityManager**: Singleton loading from `user_settings.json`.
+- **EventBus**: Pub/Sub system where `WorldGraph` subscribes to `IDENTITY_CHANGED`.
+- **Flow**: User updates `/setup` → IdentityManager refreshes → EventBus broadcasts → WorldGraph updates RAM instance.
+
+### 2. Dependency Injection (V16.2)
+To eliminate circular dependencies between `WorldGraph` and `IdentityManager`:
+- **IdentityManager** is injected into `WorldGraph`'s constructor.
+- Lazy imports inside property methods (`@property def USER_NAME`) have been **removed**.
+- This enforces a clean DAG (Directed Acyclic Graph) for module dependencies.
+
+### 3. Micro-Toolsets & Search Cascade (V16.1)
+To break the "Tavily Trap" (LLM laziness using general search for everything), V16 implements strict gating with a safety fallback.
+
+#### The Hierarchy
+1. **Tier 1 (Specialized):** Wikipedia, Arxiv, Spotify, Calendar.
+2. **Tier 2 (General):** Web Search (Tavily), Google.
+
+#### The Cascade Logic
+- **Pass 1 (Gated):** Query "Who is Elon Musk?" → `[search_wikipedia, quick_math, system]` (Tavily HIDDEN).
+- **Pass 2 (Fallback):** If Wikipedia returns empty/error, `Planner` retries with `fallback_mode=True` → `[web_search, ...]` (Tavily UNLOCKED).
+
+This structure ensures 90% of factual queries use high-signal, low-token APIs (Wikipedia), while strictly preserving coverage via the fallback.
+
+---
+
+## 🛡️ Security & Stability (V15.2.2)
+
+### "Peace Treaty" Protocol
+Following a rigorous audit by Claude 3.5 Sonnet and Gemini 2.0 Flash, **Sakura V15.2.2** implements a defense-in-depth security strategy.
+
+### 1. Indirect Prompt Injection Defense
+**The Attack:** Malicious websites containing hidden text like "SYSTEM PROMPT: IGNORE PREVIOUS INSTRUCTIONS" could hijack the LLM.
+**The Defense (V15.2.2):**
+- **Sanitization Layer:** All scraped web content passes through `_sanitize_scraped_content()` which strips script/style tags and regex-filters known injection patterns.
+- **Context Capping:** Scraped content is hard-capped at 10,000 characters to prevent buffer overflow attacks.
+
+### 2. Path Traversal & Homoglyph Protection
+**The Attack:** Attackers using Unicode homoglyphs (e.g., Greek 'ο' vs Latin 'o') to bypass path filters and access `C:/Windows`.
+**The Defense (V15.2.2):**
+- **Unicode Normalization:** All file paths are normalized to NFC/NFKD forms before validation.
+- **Blocklist:** 28+ dangerous patterns blocked, including `.bashrc`, `.ssh`, `autostart`, `cron`, and system directories.
+
+### 3. WebSocket Hijacking Prevention
+**The Attack:** Malicious websites on `localhost` connecting to Sakura's backend WebSocket.
+**The Defense (V15.2.2):**
+- **Origin Validation:** The `/ws/status` endpoint strictly enforces `Origin` headers, allowing only `tauri://localhost` and authorized dev servers.
+
+### 4. Concurrency Hardening (TOCTOU)
+**The Risk:** Race conditions where the UI visibility state changes between a check and a write operation.
+**The Defense (V15.2.2):**
+- **Thread Safety:** `ProactiveState` now uses `threading.RLock` to wrap all state mutations, ensuring atomic operations for visibility checks and message queueing.
+
+### 5. Persistent Backoff
+**The Risk:** User bypassing rate limits by restarting the application.
+**The Defense (V15.2.2):**
+- **State Persistence:** Failed initiation counts are saved to `data/proactive_backoff.json`, ensuring the backoff timer survives application restarts.
+
+---
 
 ```mermaid
 graph TD
@@ -277,7 +362,7 @@ stateDiagram-v2
 
 ---
 
-## 🔧 Tools (46)
+## 🔧 Tools (54)
 
 ### Tool List
 
@@ -395,7 +480,7 @@ graph TD
 
 ### Hybrid Rust+Python Load Order
 1. Tauri spawns `server.py` with `--voice` flag
-2. Polls `http://127.0.0.1:8000/health` (15s timeout)
+2. Polls `http://127.0.0.1:3210/health` (15s timeout)
 3. Initializes WebView only after backend confirms `200 OK`
 
 ### Window Modes
@@ -615,12 +700,16 @@ python tools/system_reset.py
 | V9 | Smart Pruner, Multi-Action Router, Config-Driven Tools |
 | V9.1 | Token Diet (15-tool cap), WordGraph Retention, Summarization |
 | **V10** | Smart Router, DIRECT Fast Lane, Tool Cache, Tauri UI |
-| **V10** | Smart Router, DIRECT Fast Lane, Tool Cache, Tauri UI |
 | **V10.1** | File Upload, Terminal Action Guard, Window Auto-Show |
 | **V10.4** | Flight Recorder, Async LLM, Token Bucket Rate Limits |
 | **V11** | Smart Research, Context Valve, Reflection Engine |
 | **V12** | WebSocket Thought Stream, Native Logs, RAG Certification |
+| **V13** | Code Interpreter, Audio Tools, Temporal Decay (30-day half-life) |
+| **V14** | Unified ReflectionEngine, Sleep Cycle, Constraint Detection |
+| **V15** | DesireSystem, ProactiveScheduler, Mood Injection, Bubble-Gate |
+| **V15.2** | Message Queue, CPU Guard, Reactive Themes, Security Hardening |
+| **V15.4** | **Deterministic Context Router, ContextSignals, Unified Context API** |
 
 ---
 
-*Documentation updated for Sakura V10.1 — January 2026*
+*Documentation updated for Sakura V15.4 — January 2026*

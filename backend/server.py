@@ -384,6 +384,8 @@ async def get_settings():
         "GOOGLE_API_KEY": mask_key("GOOGLE_API_KEY"),
         "OPENROUTER_API_KEY": mask_key("OPENROUTER_API_KEY"),
         "SPOTIFY_CLIENT_ID": mask_key("SPOTIFY_CLIENT_ID"),
+        # Spotify device (not masked - it's just a name, not secret)
+        "SPOTIFY_DEVICE_NAME": os.getenv("SPOTIFY_DEVICE_NAME", ""),
         # User personalization (not masked)
         "USER_NAME": user_settings.get("user_name", ""),
         "USER_LOCATION": user_settings.get("user_location", ""),
@@ -419,9 +421,10 @@ async def update_settings(request: Request):
                         env_dict[key] = val
                     env_lines.append(line)
         
-        # 2. Update only provided API keys
+        # 2. Update only provided API keys and device settings
         api_key_fields = {"GROQ_API_KEY", "TAVILY_API_KEY", "OPENROUTER_API_KEY", 
-                          "GOOGLE_API_KEY", "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"}
+                          "GOOGLE_API_KEY", "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET",
+                          "SPOTIFY_DEVICE_NAME"}
         
         updated_keys = []
         for key in api_key_fields:

@@ -4,7 +4,8 @@ import asyncio
 from langchain_core.messages import HumanMessage
 
 # Add project root to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 # Mock LLM for speed, or use real one? Real one is needed to test prompts.
 from sakura_assistant.core.container import get_container, reset_container

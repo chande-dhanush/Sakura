@@ -337,9 +337,11 @@ class ToolExecutor:
                 
                 if state: state.record_tool_result(success=not is_soft_failure)
                 
+                # V17: Don't break after terminal actions - allow multi-tool chains
+                # Logging only, no break
                 if tool_name in TERMINAL_ACTIONS:
-                    print(f"⏹️ [Async Executor] Terminal action '{tool_name}' completed.")
-                    break
+                    print(f"✅ [Async Executor] Terminal action '{tool_name}' completed.")
+                    
                     
             except Exception as e:
                 err_msg = f"Error: {e}"
@@ -562,10 +564,11 @@ class ToolExecutor:
                 if state:
                     state.record_tool_result(success=not is_soft_failure)
                 
-                # V10: Stop after terminal actions (prevent multiple YouTube tabs)
+                # V17: Don't break after terminal actions - allow multi-tool chains
+                # Logging only, no break
                 if tool_name in TERMINAL_ACTIONS:
-                    print(f"⏹️ [Executor] Terminal action '{tool_name}' completed - stopping plan execution.")
-                    break
+                    print(f"✅ [Executor] Terminal action '{tool_name}' completed.")
+                    
                     
             except Exception as e:
                 err_msg = f"Error: {e}"

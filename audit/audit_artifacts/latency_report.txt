@@ -4,8 +4,8 @@ SAKURA ROUTE LATENCY AUDIT
 
 DIRECT ROUTE:
   Samples: 2
-  P50: 195.50ms
-  P99: 390.72ms
+  P50: 150.12ms
+  P99: 300.01ms
 
 TARGETS:
   Direct Route: < 1000ms (1s)

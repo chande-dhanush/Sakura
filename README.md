@@ -1,11 +1,12 @@
-# 🌸 Sakura V15.2
+# 🌸 Sakura V16.2
 
 > A production-grade personal AI assistant with voice, vision, code execution, cognitive architecture, and 54 tools.
 
-![Version](https://img.shields.io/badge/version-15.2.1-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-16.2-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)
+![Stability](https://img.shields.io/badge/architecture-Stable%20Soul-purple?style=for-the-badge)
 
 <p align="center">
   <img src="docs/sakura_demo.gif" alt="Sakura Demo" width="600"/>
@@ -27,6 +28,10 @@ Sakura is a **desktop AI assistant** that can:
 - 💓 **Feel moods** — tracks social battery & loneliness (V15)
 - 💌 **Reach out when lonely** — proactive check-ins (V15)
 - 🛡️ **Respects your focus** — won't interrupt when hidden (V15.2)
+- 🏰 **Stable Soul** — Reactive Identity + EventBus + Dependency Injection (V16.2)
+- 🚦 **Search Cascade** — Fallback logic for Wikipedia > Tavily (V16.1)
+- 🧠 **Deterministic Context** — segmented Planner/Responder pruning (V15.4)
+- 🔄 **Unified Context API** — single source of truth for LLM data (V15.4)
 
 **Free to run** — Uses Groq (Llama 3.3 70B) and Google Gemini free tiers.
 
@@ -159,7 +164,8 @@ Sakura/
 │   ├── server.py           # Main API server
 │   ├── sakura_assistant/
 │   │   ├── core/           # Router, Executor, Planner
-│   │   │   └── cognitive/  # V15: DesireSystem, ProactiveScheduler
+│   │   │   ├── cognitive/  # V15: DesireSystem, ProactiveScheduler
+│   │   │   └── context_manager.py # V15.4: Deterministic Context Router
 │   │   └── tools_libs/     # 54 tool implementations
 │   ├── tests/              # All test suites
 │   └── data/               # World graph, templates
@@ -181,21 +187,22 @@ cd frontend
 npm run tauri build
 ```
 
-**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_15.2.1_x64-setup.exe`
+**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_15.4_x64-setup.exe`
 
 ---
 
-## 🆕 What's New in V15.2
+## 🆕 What's New in V15.4
 
 | Feature | Description |
 |---------|-------------|
+| **Deterministic Router** | Segmented pruning (Planner context vs Responder context) |
+| **Unified Context API** | Single source of truth for all LLM context injection |
+| **ContextSignals** | Dataclass-driven intent detection for deterministic routing |
 | **Cognitive Architecture** | DesireSystem tracks mood, loneliness, social battery |
 | **Proactive Check-ins** | Sakura reaches out when lonely (0 LLM cost) |
 | **Bubble-Gate UX** | Respects your focus — won't interrupt when hidden |
-| **Message Queue (2h TTL)** | Queues messages when you're away, delivers on return |
-| **CPU Guard** | Skips TTS when CPU > 80% to prevent stutter |
 | **Reactive Themes** | UI colors shift based on mood (5 palettes) |
-| **Pre-Computed Initiations** | 3 AM icebreaker generation for next-day use |
+| **Port 3210** | Optimized port to avoid conflicts |
 
 ### Previous Versions
 

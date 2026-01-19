@@ -779,7 +779,9 @@ def schedule_cognitive_tasks():
     """
     V15: Schedule all cognitive background tasks.
     Call this from server.py startup.
+    V17: Added missing proactive check scheduling.
     """
+    import asyncio
     scheduler = get_scheduler()
     
     # Hourly tick for desire decay
@@ -789,7 +791,27 @@ def schedule_cognitive_tasks():
         name="desire_tick"
     )
     
+    # V17: Hourly proactive initiation check (was missing!)
+    def _run_proactive_wrapper():
+        """Wrapper to run async proactive check from sync callback."""
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(run_hourly_proactive_check())
+            else:
+                loop.run_until_complete(run_hourly_proactive_check())
+        except RuntimeError:
+            # No event loop - create one
+            asyncio.run(run_hourly_proactive_check())
+    
+    scheduler.schedule_interval(
+        interval_seconds=3600,  # 1 hour
+        callback=_run_proactive_wrapper,
+        name="proactive_check"
+    )
+    
     print("🧠 [Cognitive] Scheduled hourly desire tick")
+    print("💌 [Cognitive] Scheduled hourly proactive check")
 
 
 async def run_full_sleep_cycle():

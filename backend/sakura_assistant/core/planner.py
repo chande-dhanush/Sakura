@@ -298,11 +298,12 @@ class Planner:
                         "tool_call_id": call["id"]
                     })
                     
-                    if tool_name in TERMINAL_TOOLS:
-                        break
+                    # V17: Don't break after terminal actions - allow multi-tool chains
+                    # The LLM decided to call multiple tools, trust its judgment
                 
-                if len(plan) > 3:
-                    plan = plan[:3]
+                # V17: Increased cap from 3 to 5 for multi-tool requests
+                if len(plan) > 5:
+                    plan = plan[:5]
                 
                 _log_planner_usage(est_tokens, len(plan), is_retry=bool(hindsight))
                 print(f"📋 Planner Output: {len(plan)} steps (Async).")
@@ -459,15 +460,13 @@ class Planner:
                         "tool_call_id": call["id"]
                     })
                     
-                    # V10: Stop after first terminal action (one action = one tab)
-                    if tool_name in TERMINAL_TOOLS:
-                        print(f"🛑 Planner: Stopping plan after terminal action: {tool_name}")
-                        break
+                    # V17: Don't break after terminal actions - allow multi-tool chains
+                    # The LLM decided to call multiple tools, trust its judgment
                 
-                # Safety cap
-                if len(plan) > 3:
-                    print(f"⚠️ Planner: Capping plan from {len(plan)} to 3 steps")
-                    plan = plan[:3]
+                # V17: Increased cap from 3 to 5 for multi-tool requests
+                if len(plan) > 5:
+                    print(f"⚠️ Planner: Capping plan from {len(plan)} to 5 steps")
+                    plan = plan[:5]
                 
                 # Log usage
                 _log_planner_usage(est_tokens, len(plan), is_retry=bool(hindsight))
