@@ -111,21 +111,24 @@ def get_health_report() -> Dict[str, int]:
 
 def _write_health_report_on_exit():
     """Write health report to log on exit."""
-    report = get_health_report()
-    stability_logger.info("=" * 50)
-    stability_logger.info("HEALTH REPORT ON EXIT")
-    stability_logger.info(f"  Errors: {report['errors']}")
-    stability_logger.info(f"  Warnings: {report['warnings']}")
-    stability_logger.info(f"  Success Calls: {report['success_calls']}")
-    stability_logger.info(f"  Flow Events: {report['flow_events']}")
-    stability_logger.info(f"  Memory Events: {report['mem_events']}")
-    stability_logger.info(f"  Context Events: {report['ctx_events']}")
-    stability_logger.info("=" * 50)
-    
-    # Also write JSON report
-    report_file = LOG_DIR / f"health_report_{TODAY}.json"
-    with open(report_file, 'w') as f:
-        json.dump(report, f, indent=2)
+    try:
+        report = get_health_report()
+        stability_logger.info("=" * 50)
+        stability_logger.info("HEALTH REPORT ON EXIT")
+        stability_logger.info(f"  Errors: {report['errors']}")
+        stability_logger.info(f"  Warnings: {report['warnings']}")
+        stability_logger.info(f"  Success Calls: {report['success_calls']}")
+        stability_logger.info(f"  Flow Events: {report['flow_events']}")
+        stability_logger.info(f"  Memory Events: {report['mem_events']}")
+        stability_logger.info(f"  Context Events: {report['ctx_events']}")
+        stability_logger.info("=" * 50)
+        
+        # Also write JSON report
+        report_file = LOG_DIR / f"health_report_{TODAY}.json"
+        with open(report_file, 'w') as f:
+            json.dump(report, f, indent=2)
+    except:
+        pass
 
 
 # Register exit handler

@@ -29,7 +29,7 @@ def audit_o1_scaling():
     """
     print("🚀 Starting O(1) Scaling Audit...")
     
-    from sakura_assistant.core.world_graph import WorldGraph, EntityType, EntitySource
+    from sakura_assistant.core.graph.world_graph import WorldGraph, EntityType, EntitySource
     
     sizes = [10, 100, 1000, 10000]
     results = []
@@ -160,7 +160,7 @@ def audit_route_latency():
     
     # Try to use the forced router (no LLM call, instant)
     try:
-        from sakura_assistant.core.forced_router import process_query
+        from sakura_assistant.core.routing.forced_router import process_query
         
         print("  Using forced router for pattern matching...")
         
@@ -178,10 +178,10 @@ def audit_route_latency():
     
     # Also measure the router classification (if available)
     try:
-        from sakura_assistant.core.router import IntentRouter
+        from sakura_assistant.core.routing.router import IntentRouter
         
         # Check if we have an LLM configured
-        from sakura_assistant.core.container import get_container
+        from sakura_assistant.core.infrastructure.container import get_container
         container = get_container()
         
         if container.has_groq or container.has_openrouter:

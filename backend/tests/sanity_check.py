@@ -28,17 +28,17 @@ def check_tool_count():
         EXPECTED = 47
         
         if count >= EXPECTED:
-            print(f"✅ Tool count: {count} (expected >= {EXPECTED})")
+            print(f" Tool count: {count} (expected >= {EXPECTED})")
             return True
         else:
-            print(f"❌ Tool count: {count} (expected >= {EXPECTED})")
+            print(f" Tool count: {count} (expected >= {EXPECTED})")
             return False
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f" Import failed: {e}")
         print("   (Circular import? Check tools.py imports)")
         return False
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f" Unexpected error: {e}")
         return False
 
 
@@ -48,23 +48,23 @@ def check_config_imports():
         from sakura_assistant import config
         assert hasattr(config, 'TOOL_GROUPS')
         assert hasattr(config, 'TOOL_GROUPS_UNIVERSAL')
-        print("✅ Config loaded successfully")
+        print(" Config loaded successfully")
         return True
     except Exception as e:
-        print(f"❌ Config failed: {e}")
+        print(f" Config failed: {e}")
         return False
 
 
 def check_world_graph():
     """Verify World Graph initializes."""
     try:
-        from sakura_assistant.core.world_graph import WorldGraph
+        from sakura_assistant.core.graph.world_graph import WorldGraph
         wg = WorldGraph()
         assert wg is not None
-        print("✅ World Graph initializes")
+        print(" World Graph initializes")
         return True
     except Exception as e:
-        print(f"❌ World Graph failed: {e}")
+        print(f" World Graph failed: {e}")
         return False
 
 
@@ -84,16 +84,16 @@ def main():
         try:
             results.append(check())
         except Exception as e:
-            print(f"❌ {name} crashed: {e}")
+            print(f" {name} crashed: {e}")
             results.append(False)
     
     print("=" * 50)
     
     if all(results):
-        print("✅ ALL CHECKS PASSED - Safe to commit")
+        print(" ALL CHECKS PASSED - Safe to commit")
         return 0
     else:
-        print("❌ SOME CHECKS FAILED - Do not commit!")
+        print(" SOME CHECKS FAILED - Do not commit!")
         return 1
 
 

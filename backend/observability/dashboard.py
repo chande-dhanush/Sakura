@@ -4,7 +4,7 @@ Sakura Sight - Observability Dashboard V2
 Mission Control for Sakura V10 Brain.
 
 Hierarchy:
-  📅 Date → 💬 User Query → ⚡ Phase → 🛠️ Details
+   Date →  User Query → ⚡ Phase → ️ Details
 
 Run with: streamlit run dashboard.py
 """
@@ -21,7 +21,7 @@ from collections import defaultdict
 
 st.set_page_config(
     page_title="Sakura Sight",
-    page_icon="🌸",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -235,25 +235,25 @@ def render_kpis(traces: list):
     
     # First row: Classic metrics
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("📊 Total Queries", total)
-    col2.metric("✅ Success Rate", f"{(success/total)*100:.0f}%")
+    col1.metric(" Total Queries", total)
+    col2.metric(" Success Rate", f"{(success/total)*100:.0f}%")
     col3.metric("⚡ Avg Latency", f"{avg_latency/1000:.2f}s")
-    col4.metric("📅 Days Tracked", len(set(t['date'] for t in traces)))
+    col4.metric(" Days Tracked", len(set(t['date'] for t in traces)))
     
     # Second row: Token/Cost metrics (V13)
     st.markdown("---")
     col5, col6, col7, col8 = st.columns(4)
-    col5.metric("🔤 Total Tokens", f"{total_tokens:,}")
-    col6.metric("💰 Est. Cost", f"${total_cost:.4f}")
-    col7.metric("🤖 LLM Calls", total_llm_calls)
-    col8.metric("📈 Avg Tokens/Query", f"{total_tokens//total:,}" if total else "0")
+    col5.metric(" Total Tokens", f"{total_tokens:,}")
+    col6.metric(" Est. Cost", f"${total_cost:.4f}")
+    col7.metric(" LLM Calls", total_llm_calls)
+    col8.metric(" Avg Tokens/Query", f"{total_tokens//total:,}" if total else "0")
 
 def render_phase_details(phase_name: str, events: list):
     """Render detailed events for a phase."""
-    icon = "🔹"
-    if phase_name == "Router": icon = "🚥"
+    icon = ""
+    if phase_name == "Router": icon = ""
     elif phase_name == "Executor": icon = "⚙️"
-    elif phase_name == "Responder": icon = "🗣️"
+    elif phase_name == "Responder": icon = "️"
     
     total_duration = sum(e.get('duration_ms', 0) for e in events)
     duration_str = f"({round(total_duration/1000, 2)}s)" if total_duration else ""
@@ -281,7 +281,7 @@ def render_phase_details(phase_name: str, events: list):
 
 def render_query_card(trace: dict):
     """Render a single query card with expandable phases."""
-    success_icon = "🟢" if trace['success'] else "🔴"
+    success_icon = "" if trace['success'] else ""
     latency = round(trace['total_ms'] / 1000, 2)
     
     # Main query expander
@@ -290,14 +290,14 @@ def render_query_card(trace: dict):
         expanded=False
     ):
         # ─── Input/Output Section ─────────────────────────────────────
-        st.markdown("#### 💬 Conversation")
+        st.markdown("####  Conversation")
         
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**🧑 User Input:**")
+            st.markdown("** User Input:**")
             st.info(trace['query'])
         with col2:
-            st.markdown("**🌸 Sakura Response:**")
+            st.markdown("** Sakura Response:**")
             response = trace.get('response', 'No response captured')
             if response:
                 st.success(response)
@@ -314,14 +314,14 @@ def render_query_card(trace: dict):
         # Calculate durations for each phase
         param_cols = st.columns(3)
         phase_order = ['Router', 'Executor', 'Responder']
-        phase_icons = {'Router': '🚥', 'Executor': '⚙️', 'Responder': '🗣️'}
+        phase_icons = {'Router': '', 'Executor': '⚙️', 'Responder': '️'}
         
         for i, phase in enumerate(phase_order):
             if phase in phases:
                 duration = sum(e.get('duration_ms', 0) for e in phases[phase])
                 with param_cols[i]:
                     st.metric(
-                        label=f"{phase_icons.get(phase, '🔹')} {phase}",
+                        label=f"{phase_icons.get(phase, '')} {phase}",
                         value=f"{round(duration/1000, 2)}s"
                     )
         
@@ -330,19 +330,19 @@ def render_query_card(trace: dict):
         tokens = trace.get('tokens', {})
         token_cols = st.columns(4)
         with token_cols[0]:
-            st.metric("🔤 Tokens", f"{tokens.get('total', 0):,}")
+            st.metric(" Tokens", f"{tokens.get('total', 0):,}")
         with token_cols[1]:
-            st.metric("💰 Cost", f"${trace.get('cost_usd', 0):.6f}")
+            st.metric(" Cost", f"${trace.get('cost_usd', 0):.6f}")
         with token_cols[2]:
-            st.metric("🤖 LLM Calls", trace.get('llm_calls', 0))
+            st.metric(" LLM Calls", trace.get('llm_calls', 0))
         with token_cols[3]:
             models = trace.get('models_used', [])
-            st.metric("🧠 Models", ", ".join(models[:2]) if models else "N/A")
+            st.metric(" Models", ", ".join(models[:2]) if models else "N/A")
         
         st.divider()
         
         # ─── Phase Details ────────────────────────────────────────────
-        st.markdown("#### 📜 Execution Details")
+        st.markdown("####  Execution Details")
         
         for phase in phase_order:
             if phase in phases:
@@ -359,20 +359,20 @@ def render_query_card(trace: dict):
 
 def main():
     # ─── Header ───────────────────────────────────────────────────────────────
-    st.title("🌸 Sakura Sight")
+    st.title(" Sakura Sight")
     st.caption("Real-time observability for your AI assistant")
     
     # ─── Sidebar: Data Source ─────────────────────────────────────────────────
-    st.sidebar.markdown("## 📡 Data Source")
+    st.sidebar.markdown("##  Data Source")
     
     sources = {}
     if LOCAL_LOG.exists():
-        sources["🔧 Development"] = str(LOCAL_LOG)
+        sources[" Development"] = str(LOCAL_LOG)
     if APPDATA_LOG and APPDATA_LOG.exists():
-        sources["🚀 Production"] = str(APPDATA_LOG)
+        sources[" Production"] = str(APPDATA_LOG)
     
     if not sources:
-        sources["🔧 Development"] = str(LOCAL_LOG)
+        sources[" Development"] = str(LOCAL_LOG)
     
     selected_source = st.sidebar.radio(
         "Log Location",
@@ -382,9 +382,9 @@ def main():
     )
     current_log = Path(sources[selected_source])
     
-    st.sidebar.caption(f"📂 `{current_log.name}`")
+    st.sidebar.caption(f" `{current_log.name}`")
     
-    if st.sidebar.button("🔄 Refresh Data"):
+    if st.sidebar.button(" Refresh Data"):
         st.cache_data.clear()
         st.rerun()
     
@@ -404,7 +404,7 @@ def main():
     grouped = group_by_date(traces)
     dates = list(grouped.keys())
     
-    st.sidebar.markdown("## 📅 Filter by Date")
+    st.sidebar.markdown("##  Filter by Date")
     selected_date = st.sidebar.selectbox(
         "Select Date",
         options=["All Dates"] + dates,
@@ -427,7 +427,7 @@ def main():
             date_traces = grouped[date]
             
             # Date header
-            st.markdown(f"### 📅 {date}")
+            st.markdown(f"###  {date}")
             st.caption(f"{len(date_traces)} queries")
             
             # Query cards
@@ -437,7 +437,7 @@ def main():
             st.markdown("---")
     else:
         # Single date view
-        st.markdown(f"### 📅 {selected_date}")
+        st.markdown(f"###  {selected_date}")
         st.caption(f"{len(filtered_traces)} queries")
         
         for trace in filtered_traces:
@@ -445,7 +445,7 @@ def main():
     
     # ─── Footer ───────────────────────────────────────────────────────────────
     st.sidebar.markdown("---")
-    st.sidebar.caption("🌸 Sakura Sight v2.0")
+    st.sidebar.caption(" Sakura Sight v2.0")
 
 if __name__ == "__main__":
     main()

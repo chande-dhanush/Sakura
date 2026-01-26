@@ -88,7 +88,7 @@ def audit_router_accuracy():
     
     # Try forced router first (no LLM needed)
     try:
-        from sakura_assistant.core.router import IntentRouter
+        from sakura_assistant.core.routing.router import IntentRouter
         
         print("   Using heuristic classification...\n")
         

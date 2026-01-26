@@ -81,10 +81,10 @@ def play_youtube(topic: str) -> str:
         # Method 2: Fallback
         search_url = f"https://www.youtube.com/results?search_query={quote(topic)}"
         webbrowser.open(search_url)
-        return f"📺 Opening YouTube search for '{topic}'."
+        return f" Opening YouTube search for '{topic}'."
         
     except Exception as e:
-        return f"❌ YouTube error: {e}"
+        return f" YouTube error: {e}"
 
 @tool
 def get_weather(city: str = "") -> str:
@@ -103,17 +103,17 @@ def get_weather(city: str = "") -> str:
             return cached_result + " (cached)"
     
     try:
-        url = f"https://wttr.in/{city}?format=%l:+%c+%t+(%f)+💧%h+💨%w"
+        url = f"https://wttr.in/{city}?format=%l:+%c+%t+(%f)+%h+%w"
         response = requests.get(url, timeout=5, headers={'User-Agent': 'curl/7.68.0'})
         
         if response.status_code == 200 and "Unknown location" not in response.text:
-            result = f"🌤️ {response.text.strip()}"
+            result = f"️ {response.text.strip()}"
             _weather_cache[city_key] = (result, time.time())
             return result
         else:
-            return f"❌ Could not find weather for '{city}'."
+            return f" Could not find weather for '{city}'."
     except Exception as e:
-        return f"❌ Weather unavailable: {e}"
+        return f" Weather unavailable: {e}"
 
 @tool
 def open_site(site_name: str) -> str:
@@ -126,19 +126,19 @@ def open_site(site_name: str) -> str:
     bookmarks, _ = _load_bookmarks()
     
     if not bookmarks:
-        return "❌ No bookmarks configured. Add sites to data/bookmarks.json."
+        return " No bookmarks configured. Add sites to data/bookmarks.json."
     
     matched_name, url = _fuzzy_match(site_name, bookmarks)
     
     if url:
         webbrowser.open(url)
-        return f"🌐 Opening {matched_name}: {url}"
+        return f" Opening {matched_name}: {url}"
     else:
         # Suggest similar
         suggestions = [name for name in bookmarks.keys() if site_name[0].lower() == name[0].lower()][:5]
         if suggestions:
-            return f"❌ Site '{site_name}' not found. Did you mean: {', '.join(suggestions)}?"
-        return f"❌ Site '{site_name}' not found. Use 'list my bookmarks' to see available sites."
+            return f" Site '{site_name}' not found. Did you mean: {', '.join(suggestions)}?"
+        return f" Site '{site_name}' not found. Use 'list my bookmarks' to see available sites."
 
 @tool
 def list_bookmarks() -> str:
@@ -147,13 +147,13 @@ def list_bookmarks() -> str:
     bookmarks_path = os.path.join(get_project_root(), "data", "bookmarks.json")
     
     if not os.path.exists(bookmarks_path):
-        return "❌ No bookmarks file found."
+        return " No bookmarks file found."
     
     try:
         with open(bookmarks_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        lines = ["📚 **Available Site Shortcuts:**\n"]
+        lines = [" **Available Site Shortcuts:**\n"]
         for category, sites in data.items():
             lines.append(f"\n**{category.title()}:**")
             site_list = ", ".join(sites.keys())
@@ -161,7 +161,7 @@ def list_bookmarks() -> str:
         
         return "\n".join(lines)
     except Exception as e:
-        return f"❌ Error loading bookmarks: {e}"
+        return f" Error loading bookmarks: {e}"
 
 @tool
 def save_bookmark(name: str, url: str, category: str = "custom") -> str:
@@ -192,16 +192,16 @@ def save_bookmark(name: str, url: str, category: str = "custom") -> str:
         with open(bookmarks_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         
-        return f"✅ Saved bookmark: '{name}' → {url}"
+        return f" Saved bookmark: '{name}' → {url}"
     except Exception as e:
-        return f"❌ Failed to save bookmark: {e}"
+        return f" Failed to save bookmark: {e}"
 
 @tool
 def web_search(query: str, max_results: int = 5) -> str:
     """Search the web for information."""
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
-        return "❌ TAVILY_API_KEY missing."
+        return " TAVILY_API_KEY missing."
     try:
         from tavily import TavilyClient
         print(f"Called Search: {query}")
@@ -212,18 +212,18 @@ def web_search(query: str, max_results: int = 5) -> str:
         
         results = response.get("results", [])
         if not results:
-            return "❌ No search results found."
+            return " No search results found."
         
         out = []
         for r in results:
             title = r.get("title", "No title")
             snippet = r.get("content", "")[:200]
             url = r.get("url", "")
-            out.append(f"🔍 **{title}**\n   {snippet}...\n   🔗 {url}")
+            out.append(f" **{title}**\n   {snippet}...\n    {url}")
         
         return "\n\n".join(out)
     except Exception as e:
-        return f"❌ Search failed: {e}"
+        return f" Search failed: {e}"
 
 @tool
 def search_wikipedia(query: str) -> str:
@@ -234,15 +234,15 @@ def search_wikipedia(query: str) -> str:
         wikipedia.set_lang("en")
         search_results = wikipedia.search(query, results=1)
         if not search_results:
-            return "❌ No Wikipedia page found."
+            return " No Wikipedia page found."
         
         page_title = search_results[0]
         summary = wikipedia.summary(page_title, sentences=3)
-        return f"📚 Wikipedia ({page_title}):\n{summary}\n(Source: {wikipedia.page(page_title).url})"
+        return f" Wikipedia ({page_title}):\n{summary}\n(Source: {wikipedia.page(page_title).url})"
     except ImportError:
-        return "❌ 'wikipedia' library not installed."
+        return " 'wikipedia' library not installed."
     except Exception as e:
-        return f"❌ Wikipedia error: {e}"
+        return f" Wikipedia error: {e}"
 
 @tool
 def search_arxiv(query: str) -> str:
@@ -259,16 +259,16 @@ def search_arxiv(query: str) -> str:
         
         results = []
         for r in client.results(search):
-            results.append(f"📄 {r.title}\n   - Authors: {', '.join(a.name for a in r.authors)}\n   - Summary: {r.summary[:200]}...\n   - PDF: {r.pdf_url}")
+            results.append(f" {r.title}\n   - Authors: {', '.join(a.name for a in r.authors)}\n   - Summary: {r.summary[:200]}...\n   - PDF: {r.pdf_url}")
             
         if not results:
-            return "❌ No papers found."
+            return " No papers found."
             
         return "\n\n".join(results)
     except ImportError:
-        return "❌ 'arxiv' library not installed."
+        return " 'arxiv' library not installed."
     except Exception as e:
-        return f"❌ Arxiv error: {e}"
+        return f" Arxiv error: {e}"
 
 @tool
 def get_news(topic: str = "technology") -> str:
@@ -279,23 +279,23 @@ def get_news(topic: str = "technology") -> str:
         response = requests.get(url, timeout=5)
         
         if response.status_code != 200:
-            return f"❌ News fetch failed"
+            return f" News fetch failed"
         
         import re
         titles = re.findall(r"<title>(.*?)</title>", response.text)
         headlines = titles[1:6]  # Top 5 headlines
         
         if not headlines:
-            return f"❌ No news found for '{topic}'"
+            return f" No news found for '{topic}'"
         
-        result = [f"📰 **Top {topic} news:**"]
+        result = [f" **Top {topic} news:**"]
         for i, title in enumerate(headlines, 1):
             title = title.replace("&amp;", "&").replace("&quot;", '"')
             result.append(f"{i}. {title}")
         
         return "\n".join(result)
     except Exception as e:
-        return f"❌ News fetch failed: {e}"
+        return f" News fetch failed: {e}"
 
 @tool
 def web_scrape(url: str, extract_main: bool = True) -> str:
@@ -340,14 +340,14 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         clean_text = '\n'.join(lines)
         
         if len(clean_text) > 2000:
-            return f"📄 Content (Truncated, {len(clean_text)} chars):\n{clean_text[:2000]}...\n(Full auto-ingest moved to Memory tools)"
+            return f" Content (Truncated, {len(clean_text)} chars):\n{clean_text[:2000]}...\n(Full auto-ingest moved to Memory tools)"
             
         if len(clean_text) < 100:
             return f"⚠️ Could not extract meaningful content from {url}."
         
         return clean_text
     except Exception as e:
-        return f"❌ Scraping failed: {e}"
+        return f" Scraping failed: {e}"
 
 
 def _sanitize_scraped_content(text: str) -> str:

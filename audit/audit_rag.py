@@ -21,7 +21,7 @@ from typing import List, Dict
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-from sakura_assistant.core.container import get_container
+from sakura_assistant.core.infrastructure.container import get_container
 from sakura_assistant.memory.faiss_store.store import get_memory_store
 try:
     from sakura_assistant.core.tools_libs.web import web_search
@@ -185,8 +185,11 @@ class RagAuditor:
                 
             print(f"      Score: {score}/1.0")
             
-            # Clean up
-            store.delete_store()
+            # Clean up (Wrap in try-except for Windows file lock stability)
+            try:
+                store.delete_store()
+            except Exception as cleanup_err:
+                print(f"   ⚠️ Cleanup warning (non-fatal): {cleanup_err}")
             
             return [{"query": query, "score": score, "type": "Document"}]
             

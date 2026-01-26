@@ -71,35 +71,35 @@ DIRS_TO_RECREATE = [
 
 def perform_reset():
     print("=" * 50)
-    print("🌸 SAKURA V9.1 - COMPLETE SYSTEM RESET")
+    print(" SAKURA V9.1 - COMPLETE SYSTEM RESET")
     print("=" * 50)
     
     deleted_count = 0
     
     # 1. Delete specific files
-    print("\n📄 Deleting files...")
+    print("\n Deleting files...")
     for path in FILES_TO_DELETE:
         if os.path.exists(path):
             try:
                 os.remove(path)
-                print(f"  ✅ {os.path.basename(path)}")
+                print(f"   {os.path.basename(path)}")
                 deleted_count += 1
             except Exception as e:
-                print(f"  ❌ {os.path.basename(path)}: {e}")
+                print(f"   {os.path.basename(path)}: {e}")
     
     # 2. Delete directories
-    print("\n📁 Deleting directories...")
+    print("\n Deleting directories...")
     for path in DIRS_TO_DELETE:
         if os.path.exists(path):
             try:
                 shutil.rmtree(path)
-                print(f"  ✅ {os.path.relpath(path, PROJECT_ROOT)}")
+                print(f"   {os.path.relpath(path, PROJECT_ROOT)}")
                 deleted_count += 1
             except Exception as e:
-                print(f"  ❌ {os.path.relpath(path, PROJECT_ROOT)}: {e}")
+                print(f"   {os.path.relpath(path, PROJECT_ROOT)}: {e}")
     
     # 3. Cleanup patterns (backups, caches)
-    print("\n🧹 Cleaning backups and caches...")
+    print("\n Cleaning backups and caches...")
     patterns = [
         os.path.join(DATA_DIR, "*.bak"),
         os.path.join(DATA_DIR, "*_backup*"),
@@ -110,23 +110,23 @@ def perform_reset():
         for f in glob.glob(pattern):
             try:
                 os.remove(f)
-                print(f"  ✅ {os.path.basename(f)}")
+                print(f"   {os.path.basename(f)}")
                 deleted_count += 1
             except Exception as e:
-                print(f"  ❌ {os.path.basename(f)}: {e}")
+                print(f"   {os.path.basename(f)}: {e}")
     
     # 4. Recreate empty directories
-    print("\n📂 Recreating directories...")
+    print("\n Recreating directories...")
     for directory in DIRS_TO_RECREATE:
         try:
             os.makedirs(directory, exist_ok=True)
-            print(f"  ✅ {os.path.relpath(directory, PROJECT_ROOT)}")
+            print(f"   {os.path.relpath(directory, PROJECT_ROOT)}")
         except Exception as e:
-            print(f"  ❌ {os.path.relpath(directory, PROJECT_ROOT)}: {e}")
+            print(f"   {os.path.relpath(directory, PROJECT_ROOT)}: {e}")
     
     print("\n" + "=" * 50)
-    print(f"🌸 RESET COMPLETE - Deleted {deleted_count} items")
-    print("🌸 Yuki is reborn. Run 'python server.py' to start fresh!")
+    print(f" RESET COMPLETE - Deleted {deleted_count} items")
+    print(" Yuki is reborn. Run 'python server.py' to start fresh!")
     print("=" * 50)
 
 if __name__ == "__main__":
@@ -139,5 +139,5 @@ if __name__ == "__main__":
     if confirm.strip().upper() == "RESET":
         perform_reset()
     else:
-        print("❌ Reset cancelled.")
+        print(" Reset cancelled.")
 

@@ -68,7 +68,7 @@ def _check_sandbox_image() -> bool:
         if not dockerfile_path.exists():
             return False
         
-        print(f"🔧 Building sandbox image from {dockerfile_path}...")
+        print(f" Building sandbox image from {dockerfile_path}...")
         build_result = subprocess.run(
             [
                 "docker", "build",
@@ -83,7 +83,7 @@ def _check_sandbox_image() -> bool:
         return build_result.returncode == 0
         
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        print(f"❌ Docker image check failed: {e}")
+        print(f" Docker image check failed: {e}")
         return False
 
 
@@ -227,7 +227,7 @@ def execute_python(
                 output_name = f"plot_{uuid.uuid4().hex[:8]}.png"
                 dest_path = get_uploads_dir() / output_name
                 shutil.copy(plot_path, dest_path)
-                output += f"\n\n📊 Plot saved: {output_name}"
+                output += f"\n\n Plot saved: {output_name}"
             
             # Truncate if too long
             if len(output) > MAX_OUTPUT_CHARS:
@@ -263,7 +263,7 @@ def check_code_interpreter_status() -> str:
         status["sandbox_image_ready"] = _check_sandbox_image()
     
     if status["docker_available"] and status["sandbox_image_ready"]:
-        return f"""✅ Code Interpreter is ready!
+        return f""" Code Interpreter is ready!
 
 Docker: Running
 Sandbox Image: {DOCKER_IMAGE}
@@ -273,7 +273,7 @@ Available Packages: {', '.join(status['available_packages'])}
 Use execute_python() to run code."""
     
     elif not status["docker_available"]:
-        return "❌ Docker is not available. Please start Docker Desktop."
+        return " Docker is not available. Please start Docker Desktop."
     
     else:
         return "⚠️ Sandbox image not ready. It will be built on first use."

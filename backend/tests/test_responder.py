@@ -17,7 +17,7 @@ class TestResponseGenerator(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Import the responder."""
-        from sakura_assistant.core.responder import ResponseGenerator, ResponseContext
+        from sakura_assistant.core.models.responder import ResponseGenerator, ResponseContext
         cls.ResponseGenerator = ResponseGenerator
         cls.ResponseContext = ResponseContext
     
@@ -93,7 +93,7 @@ class TestResponseContext(unittest.TestCase):
     
     def test_default_values(self):
         """Test ResponseContext defaults."""
-        from sakura_assistant.core.responder import ResponseContext
+        from sakura_assistant.core.models.responder import ResponseContext
         
         context = ResponseContext(user_input="Hello")
         
@@ -105,7 +105,7 @@ class TestResponseContext(unittest.TestCase):
     
     def test_with_history(self):
         """Test ResponseContext with history."""
-        from sakura_assistant.core.responder import ResponseContext
+        from sakura_assistant.core.models.responder import ResponseContext
         
         history = [
             {"role": "user", "content": "Hi"},
@@ -125,7 +125,7 @@ class TestContextBuilding(unittest.TestCase):
     
     def test_build_compact_context_empty(self):
         """Test compact context with empty history."""
-        from sakura_assistant.core.responder import ResponseGenerator
+        from sakura_assistant.core.models.responder import ResponseGenerator
         
         generator = ResponseGenerator(llm=None, personality="")
         result = generator._build_compact_context([], "test input")
@@ -134,7 +134,7 @@ class TestContextBuilding(unittest.TestCase):
     
     def test_build_compact_context_with_history(self):
         """Test compact context with history."""
-        from sakura_assistant.core.responder import ResponseGenerator
+        from sakura_assistant.core.models.responder import ResponseGenerator
         
         generator = ResponseGenerator(llm=None, personality="")
         history = [

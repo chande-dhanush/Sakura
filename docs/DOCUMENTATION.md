@@ -1,5 +1,5 @@
-# Sakura V16.2 — Technical Documentation
-*System Certified: January 17, 2026*
+# Sakura V17 — Technical Documentation
+*System Certified: January 19, 2026*
 
 ---
 
@@ -68,6 +68,9 @@
 | **Semantic Tool Gating** | **V16.1** | `encyclopedia` intent hides general search to improve fact quality |
 | **Seamless Self-Check** | **V16.1** | Identity corrections are natural and polite, no debug-style notes |
 | **Dependency Injection** | **V16.2** | `WorldGraph` decoupled from `IdentityManager`; constructor injection used |
+| **Execution V17** | **V17.0** | Unified Sync/Async paths, Contractual Latency Budgets, `ExecutionDispatcher` |
+| **Core Refactor** | **V17.0** | Bloated `core/` split into 6 logical subdirectories (Encryption, Graph, Routing...) |
+| **Guaranteed Emission** | **V17.0** | `ResponseEmitter` ensures 0% silent failures (UI safety net) |
 
 ---
 
@@ -97,6 +100,12 @@ To break the "Tavily Trap" (LLM laziness using general search for everything), V
 - **Pass 2 (Fallback):** If Wikipedia returns empty/error, `Planner` retries with `fallback_mode=True` → `[web_search, ...]` (Tavily UNLOCKED).
 
 This structure ensures 90% of factual queries use high-signal, low-token APIs (Wikipedia), while strictly preserving coverage via the fallback.
+
+### 4. V17 Execution Architecture
+V17 introduces a hardened execution pipeline that eliminates "split-brain" bugs between sync and async modes.
+- **ExecutionDispatcher:** Central routing logic that chooses between `OneShotRunner` (fast lane) and `ReActLoop` (complex lane) based on `ExecutionContext`.
+- **Contractual Budgets:** `ReActLoop` now enforces strict time budgets (e.g., 20s for research) using `asyncio.wait_for()`, returning `PARTIAL` status on timeout.
+- **Unified Path:** Both `run()` (sync) and `arun()` (async) now flow through the same Dispatcher, ensuring identical behavior.
 
 ---
 
@@ -243,10 +252,10 @@ V10 introduces a 4-layer routing funnel for optimal latency.
 
 ```python
 CACHE_TTL = {
-    "get_weather": 1800,      # 30 mins
-    "web_search": 86400,      # 24 hours
+    "get_weather": 600,       # 10 mins (ACTUAL)
+    "web_search": 0,          # NOT CACHED
     "get_news": 3600,         # 1 hour
-    "define_word": 604800,    # 7 days
+    "define_word": 0,         # NOT CACHED
 }
 ```
 
@@ -333,10 +342,10 @@ The **single source of truth** for identity, memory, and context.
 ```mermaid
 stateDiagram-v2
     [*] --> EPHEMERAL
-    EPHEMERAL --> CANDIDATE : ref_count ≥ 2
+    EPHEMERAL --> CANDIDATE : ref_count ≥ 3
     EPHEMERAL --> [*] : garbage collected
-    CANDIDATE --> PROMOTED : ref_count ≥ 3 or user_stated
-    CANDIDATE --> EPHEMERAL : stale (7 days)
+    CANDIDATE --> PROMOTED : ref_count ≥ 5 + 0.7 confidence
+    CANDIDATE --> EPHEMERAL : stale (30 days)
     PROMOTED --> PROMOTED : protected forever
     
     note right of EPHEMERAL : Temporary mentions
@@ -590,15 +599,38 @@ sakura-v10/
 │   ├── sakura_assistant/           # Core Python logic
 │   │   ├── config.py               # Configuration & personality
 │   │   ├── core/
-│   │   │   ├── llm.py              # SmartAssistant facade
-│   │   │   ├── router.py           # Intent classification
-│   │   │   ├── executor.py         # Tool execution + ReAct
-│   │   │   ├── responder.py        # Response generation
-│   │   │   ├── planner.py          # Token-optimized planner
-│   │   │   ├── world_graph.py      # World Graph (1700+ lines)
-│   │   │   ├── container.py        # Dependency injection
-│   │   │   ├── voice_engine.py     # Background voice loop
-│   │   │   └── scheduler.py        # Background tasks
+│   │   │   ├── context/            # State Management
+│   │   │   │   ├── manager.py      # Context orchestration
+│   │   │   │   └── governor.py     # Safety limits
+│   │   │   ├── execution/          # Execution Pipeline
+│   │   │   │   ├── dispatcher.py   # Mode routing (V17)
+│   │   │   │   ├── executor.py     # ReAct Loop
+│   │   │   │   ├── planner.py      # Planning logic
+│   │   │   │   └── oneshot.py      # Fast-lane runner
+│   │   │   ├── graph/              # Graph Database
+│   │   │   │   ├── world_graph.py  # Entity/Action nodes
+│   │   │   │   ├── identity.py     # Identity manager
+│   │   │   │   └── ephemeral.py    # Short-term RAG
+│   │   │   ├── infrastructure/     # System Services
+│   │   │   │   ├── scheduler.py    # Background tasks
+│   │   │   │   └── voice.py        # Voice engine
+│   │   │   ├── models/             # LLM Layer
+│   │   │   │   ├── wrapper.py      # Model abstraction
+│   │   │   │   └── responder.py    # Response generation
+│   │   │   ├── routing/            # Intent Layer
+│   │   │   │   ├── router.py       # Intent classification
+│   │   │   │   └── toolsets.py     # Micro-toolsets
+│   │   │   ├── llm.py              # System Facade
+│   │   │   └── tools.py            # Tool Registry
+│   │   ├── memory/
+│   │   │   ├── chroma_store/       # Long-term + ephemeral RAG
+│   │   │   └── faiss_store/        # Conversation history
+│   │   ├── utils/
+│   │   │   ├── tts.py              # Kokoro TTS
+│   │   │   ├── wake_word.py        # DTW detection
+│   │   │   ├── logging.py          # Structured logging
+│   │   │   └── metrics.py          # Prometheus endpoint
+│   │   └── tests/                  # Test suite (17 files)
 │   │   ├── memory/
 │   │   │   ├── chroma_store/       # Long-term + ephemeral RAG
 │   │   │   └── faiss_store/        # Conversation history
@@ -709,7 +741,9 @@ python tools/system_reset.py
 | **V15** | DesireSystem, ProactiveScheduler, Mood Injection, Bubble-Gate |
 | **V15.2** | Message Queue, CPU Guard, Reactive Themes, Security Hardening |
 | **V15.4** | **Deterministic Context Router, ContextSignals, Unified Context API** |
+| **V16.2** | Dependency Injection, Stable Soul Architecture |
+| **V17.0** | **Execution V17 (Dispatcher, Budgets), Core Refactor (6 subdirs), Guaranteed Emission** |
 
 ---
 
-*Documentation updated for Sakura V15.4 — January 2026*
+*Documentation updated for Sakura V17.0 — January 19, 2026*

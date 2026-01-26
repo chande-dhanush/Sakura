@@ -1,11 +1,11 @@
 {
-  "social_battery": 0.5099999999999996,
+  "social_battery": 0.0,
   "loneliness": 0.0,
-  "curiosity": 0.4000000000000002,
+  "curiosity": 0.95,
   "duty": 0.0,
-  "last_interaction": 1768554794.0649037,
-  "last_user_message": 1768554794.0649037,
+  "last_interaction": 1769056771.76374,
+  "last_user_message": 1769056771.76374,
   "last_sakura_initiation": 0.0,
-  "messages_today": 7,
+  "messages_today": 1,
   "initiations_today": 0
 }

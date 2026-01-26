@@ -10,9 +10,9 @@ def update_user_memory(category: str, key: str, value: str) -> str:
     try:
         from ...utils.preferences import update_preference
         update_preference(category, key, value)
-        return f"🧠 Memory updated: {category} -> {key}={value}"
+        return f" Memory updated: {category} -> {key}={value}"
     except Exception as e:
-        return f"❌ Failed: {e}"
+        return f" Failed: {e}"
 
 @tool
 def ingest_document(path: str) -> str:
@@ -21,10 +21,10 @@ def ingest_document(path: str) -> str:
         from ...memory.ingestion.pipeline import get_ingestion_pipeline
         pipeline = get_ingestion_pipeline()
         result = pipeline.ingest_file_sync(path)
-        if result.get("error"): return f"❌ Error: {result.get('message')}"
-        return f"✅ Ingested '{result['filename']}' (ID: {result['file_id']})"
+        if result.get("error"): return f" Error: {result.get('message')}"
+        return f" Ingested '{result['filename']}' (ID: {result['file_id']})"
     except Exception as e:
-        return f"❌ Ingest failed: {e}"
+        return f" Ingest failed: {e}"
 
 @tool
 def fetch_document_context(query: str) -> str:
@@ -34,7 +34,7 @@ def fetch_document_context(query: str) -> str:
         router = get_document_router()
         return router.query(query)
     except Exception as e:
-        return f"❌ Retrieval error: {e}"
+        return f" Retrieval error: {e}"
 
 @tool
 def list_uploaded_documents() -> str:
@@ -45,7 +45,7 @@ def list_uploaded_documents() -> str:
         if not files: return "No documents."
         return "\n".join([f"- [{f['id']}] {f['filename']}" for f in files])
     except Exception as e:
-        return f"❌ Error: {e}"
+        return f" Error: {e}"
 
 @tool
 def delete_document(doc_id: str) -> str:
@@ -58,9 +58,9 @@ def delete_document(doc_id: str) -> str:
         get_metadata_manager().delete_metadata(doc_id)
         get_doc_store(doc_id).delete_store()
         get_file_registry().delete_file(doc_id)
-        return "✅ Deleted."
+        return " Deleted."
     except Exception as e:
-        return f"❌ Delete failed: {e}"
+        return f" Delete failed: {e}"
 
 @tool
 def get_rag_telemetry() -> str:
@@ -70,7 +70,7 @@ def get_rag_telemetry() -> str:
         stats = get_telemetry().get_metrics()
         return str(stats)
     except Exception as e:
-        return f"❌ Error: {e}"
+        return f" Error: {e}"
 
 @tool
 def trigger_reindex() -> str:
@@ -79,7 +79,7 @@ def trigger_reindex() -> str:
         from ...memory.maintenance import get_reindex_job
         return get_reindex_job().run_full_reindex()
     except Exception as e:
-        return f"❌ Error: {e}"
+        return f" Error: {e}"
 
 @tool
 def query_ephemeral(ephemeral_id: str, query: str) -> str:
@@ -91,7 +91,7 @@ def query_ephemeral(ephemeral_id: str, query: str) -> str:
         from ..ephemeral_manager import get_ephemeral_manager
         return get_ephemeral_manager().query(ephemeral_id, query)
     except Exception as e:
-        return f"❌ Query failed: {e}"
+        return f" Query failed: {e}"
 
 # --- Meta Tools ---
 

@@ -8,14 +8,20 @@ import threading
 import gc
 import numpy as np
 import soundfile as sf
+from pathlib import Path
 
-# --- Imports ---
 try:
     from kokoro import KPipeline
     KOKORO_AVAILABLE = True
-except ImportError as e:
-    print(f"❌ Kokoro Import Failed: {e}")
+    print("SUCCESS: Kokoro TTS loaded!", file=sys.stderr)
+except Exception as e:
     KOKORO_AVAILABLE = False
+    print("=" * 60, file=sys.stderr)
+    print("KOKORO IMPORT FAILED - FULL TRACEBACK:", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
 
 # Fallback Imports
 try:
@@ -25,6 +31,22 @@ except ImportError:
     PYTTSX3_AVAILABLE = False
 
 from .memory import cleanup_memory
+
+
+# --- Audio Output Directory (works in dev and frozen mode) ---
+def get_audio_output_dir() -> Path:
+    """Get writable directory for audio files (works in dev and frozen mode)"""
+    if getattr(sys, 'frozen', False):
+        # Production: Use AppData (same as .env location)
+        app_data = Path(os.getenv('APPDATA')) / 'SakuraV10' / 'audio'
+    else:
+        # Dev: Use backend/temp_audio
+        app_data = Path(__file__).parent.parent.parent / 'temp_audio'
+    
+    # Create directory if it doesn't exist
+    app_data.mkdir(parents=True, exist_ok=True)
+    return app_data
+
 
 # --- Global State ---
 _pipeline = None
@@ -90,7 +112,7 @@ def get_pipeline():
             try:
                 _pipeline = KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M') 
             except Exception as e:
-                print(f"❌ Kokoro TTS failed: {e}")
+                print(f" Kokoro TTS failed: {e}")
                 _pipeline = None
         
         _last_used_time = time.time()
@@ -121,7 +143,7 @@ def play_audio_file(file_path):
             try:
                 pygame.mixer.init()
             except Exception as e:
-                print(f"❌ Audio Init Failed: {e}")
+                print(f" Audio Init Failed: {e}")
                 return False
 
         # Reset stop flag before playback
@@ -139,7 +161,7 @@ def play_audio_file(file_path):
             # V4: Check stop flag during playback
             if _stop_flag:
                 pygame.mixer.music.stop()
-                print("🔇 TTS interrupted by user")
+                print(" TTS interrupted by user")
                 break
             pygame.time.Clock().tick(10)
         
@@ -151,7 +173,7 @@ def play_audio_file(file_path):
         
         return True
     except Exception as e:
-        print(f"⚠️ Playback Error: {e}")
+        print(f"Playback Error: {e}")
         _is_speaking = False
         _resume_wake_word("playback_error")
         return False
@@ -177,9 +199,26 @@ def kokoro_tts(text, voice='af_heart'):
     # Reset stop flag at start
     _stop_flag = False
     _is_speaking = True
-        
-    temp_file = f"kokoro_{uuid.uuid4().hex}.wav"
-    print(f"🗣️ Kokoro Request: '{text[:50]}...'")
+    
+    # V17: Use proper writable directory for audio files
+    audio_dir = get_audio_output_dir()
+    temp_file = audio_dir / f"kokoro_{uuid.uuid4().hex}.wav"
+    
+    # Debug logging for audio path
+    print("=" * 60, file=sys.stderr)
+    print("[TTS DEBUG] KOKORO AUDIO GENERATION", file=sys.stderr)
+    print(f"[TTS] Current working directory: {os.getcwd()}", file=sys.stderr)
+    if getattr(sys, 'frozen', False):
+        print(f"[TTS] Running in FROZEN mode", file=sys.stderr)
+        print(f"[TTS] PyInstaller temp dir: {sys._MEIPASS}", file=sys.stderr)
+    else:
+        print(f"[TTS] Running in DEV mode", file=sys.stderr)
+    print(f"[TTS] Audio output directory: {audio_dir}", file=sys.stderr)
+    print(f"[TTS] Audio output file: {temp_file}", file=sys.stderr)
+    print(f"[TTS] Directory exists: {audio_dir.exists()}", file=sys.stderr)
+    print(f"[TTS] Directory writable: {os.access(audio_dir, os.W_OK)}", file=sys.stderr)
+    print(f"[TTS] Kokoro Request: '{text[:50]}...'", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
 
     try:
         # Generate with interrupt checks
@@ -190,7 +229,7 @@ def kokoro_tts(text, voice='af_heart'):
         for (_, _, chunk) in gen:
             # V4: Check stop flag during generation
             if _stop_flag:
-                print("🔇 TTS generation interrupted")
+                print("[TTS] TTS generation interrupted", file=sys.stderr)
                 _is_speaking = False
                 return False
                 
@@ -200,7 +239,7 @@ def kokoro_tts(text, voice='af_heart'):
                 audio = np.concatenate([audio, chunk])
         
         if audio is None:
-             print("❌ Kokoro produced no audio.")
+             print("[TTS] ✗ Kokoro produced no audio.", file=sys.stderr)
              _is_speaking = False
              return False
 
@@ -209,8 +248,17 @@ def kokoro_tts(text, voice='af_heart'):
             _is_speaking = False
             return False
 
-        # Save
-        sf.write(temp_file, audio, 24000)
+        # Save to file
+        sf.write(str(temp_file), audio, 24000)
+        
+        # Verify file creation
+        if temp_file.exists():
+            size = temp_file.stat().st_size
+            print(f"[TTS] ✓ Audio file created: {size} bytes", file=sys.stderr)
+        else:
+            print(f"[TTS] ✗ ERROR: File NOT created at {temp_file}", file=sys.stderr)
+            _is_speaking = False
+            return False
         
         # Update usage time
         _last_used_time = time.time()
@@ -220,27 +268,107 @@ def kokoro_tts(text, voice='af_heart'):
         cleanup_memory()
         
         # Play (has its own interrupt handling)
-        return play_audio_file(temp_file)
+        print(f"[TTS] Attempting to play: {temp_file}", file=sys.stderr)
+        return play_audio_file(str(temp_file))
         
     except Exception as e:
-        print(f"❌ Kokoro Generation Failed: {e}")
+        print(f"[TTS] ✗ Kokoro Generation Failed: {e}", file=sys.stderr)
         import traceback
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stderr)
         _is_speaking = False
-        if os.path.exists(temp_file):
+        if temp_file.exists():
             try: os.remove(temp_file)
             except: pass
         return False
+
+
+def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
+    """
+    Generate audio file and return path (NO playback).
+    Used by frontend for HTML5 Audio API playback.
+    
+    Returns:
+        str: Absolute path to the generated WAV file, or None on failure.
+    """
+    global _pipeline, _last_used_time
+    
+    if not KOKORO_AVAILABLE:
+        print("[TTS] ✗ Kokoro not available for generation", file=sys.stderr)
+        return None
+
+    pipe = get_pipeline()
+    if not pipe:
+        print("[TTS] ✗ Failed to get Kokoro pipeline", file=sys.stderr)
+        return None
+    
+    # V18: Use proper writable directory for audio files
+    audio_dir = get_audio_output_dir()
+    temp_file = audio_dir / f"kokoro_{uuid.uuid4().hex}.wav"
+    
+    print(f"[TTS] Generating audio for frontend: '{text[:50]}...'", file=sys.stderr)
+    print(f"[TTS] Output: {temp_file}", file=sys.stderr)
+
+    try:
+        # Generate audio chunks
+        gen = pipe(text, voice=voice, speed=1)
+        
+        audio = None
+        for (_, _, chunk) in gen:
+            if audio is None:
+                audio = chunk
+            else:
+                audio = np.concatenate([audio, chunk])
+        
+        if audio is None:
+            print("[TTS] ✗ Kokoro produced no audio.", file=sys.stderr)
+            return None
+
+        # Save to file
+        sf.write(str(temp_file), audio, 24000)
+        
+        # Verify file creation
+        if not temp_file.exists():
+            print(f"[TTS] ✗ ERROR: File NOT created at {temp_file}", file=sys.stderr)
+            return None
+        
+        size = temp_file.stat().st_size
+        print(f"[TTS] ✓ Audio file created: {size} bytes", file=sys.stderr)
+        
+        # === AGGRESSIVE MEMORY CLEANUP ===
+        # Offload Kokoro immediately to save RAM
+        del audio, gen
+        if pipe:
+            del pipe
+            _pipeline = None
+        cleanup_memory()
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print("[TTS] ✓ Kokoro offloaded, memory freed", file=sys.stderr)
+        
+        _last_used_time = time.time()
+        
+        return str(temp_file)
+        
+    except Exception as e:
+        print(f"[TTS] ✗ Generation Failed: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        if temp_file.exists():
+            try: os.remove(temp_file)
+            except: pass
+        return None
+
 
 def pyttsx3_tts(text):
     """Final Fallback: Pyttsx3 (lightweight, no model download)"""
     global _is_speaking
     
     if not PYTTSX3_AVAILABLE:
-        print("❌ Final Fallback Failed: pyttsx3 not installed.")
+        print(" Final Fallback Failed: pyttsx3 not installed.")
         return False
         
-    print("⚠️ Switching to pyttsx3 (lightweight fallback)...")
+    print("Switching to pyttsx3 (lightweight fallback)...")
     try:
         _is_speaking = True
         engine = pyttsx3.init()
@@ -249,7 +377,7 @@ def pyttsx3_tts(text):
         _is_speaking = False
         return True
     except Exception as e:
-        print(f"❌ Pyttsx3 Error: {e}")
+        print(f" Pyttsx3 Error: {e}")
         _is_speaking = False
         return False
 

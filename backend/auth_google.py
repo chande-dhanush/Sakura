@@ -71,12 +71,12 @@ def authenticate():
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            print("🔄 Refreshing expired token...")
+            print(" Refreshing expired token...")
             creds.refresh(Request())
         else:
-            print("🚀 Starting new authentication flow...")
+            print(" Starting new authentication flow...")
             if not os.path.exists(CREDENTIALS_PATH):
-                print(f"❌ Error: 'credentials.json' not found!")
+                print(f" Error: 'credentials.json' not found!")
                 print(f"   Expected location: {CREDENTIALS_PATH}")
                 print("1. Go to Google Cloud Console.")
                 print("2. Create OAuth 2.0 Client ID (Desktop App).")
@@ -91,7 +91,7 @@ def authenticate():
         # Save the credentials for the next run
         with open(TOKEN_PATH, 'w') as token:
             token.write(creds.to_json())
-            print(f"✅ Authentication successful! Token saved to: {TOKEN_PATH}")
+            print(f" Authentication successful! Token saved to: {TOKEN_PATH}")
     
     return creds
 

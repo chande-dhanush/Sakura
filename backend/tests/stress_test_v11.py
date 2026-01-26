@@ -42,7 +42,7 @@ def mock_compute_embeddings(texts: List[str]) -> List[List[float]]:
     return [[random.random() for _ in range(384)] for _ in texts]
 
 async def stress_test():
-    print("🔥 STARTED: V11.3 Automated Stress Test")
+    print(" STARTED: V11.3 Automated Stress Test")
     
     # Setup
     eph_man = get_ephemeral_manager()
@@ -65,28 +65,28 @@ async def stress_test():
         
         # ASSERTION 1: Interception Triggered
         if "[System: Context Overflow Protection]" not in output:
-            print("❌ FAILURE: Output was not intercepted!")
+            print(" FAILURE: Output was not intercepted!")
             print(f"Output preview: {output[:200]}")
             return
-        print("✅ PASS: Output intercepted.")
+        print(" PASS: Output intercepted.")
         
         # ASSERTION 2: Ephemeral ID Generation
         import re
         match = re.search(r'Ephemeral Store ID: (eph_[a-f0-9]+)', output)
         if not match:
-            print("❌ FAILURE: Could not extract Ephemeral ID.")
+            print(" FAILURE: Could not extract Ephemeral ID.")
             return
         
         eph_id = match.group(1)
-        print(f"✅ PASS: Generated ID '{eph_id}'")
+        print(f" PASS: Generated ID '{eph_id}'")
         
         # Verify folder exists on disk
         from sakura_assistant.config import get_project_root
         store_path = os.path.join(get_project_root(), "data", "chroma_store", eph_id)
         if not os.path.exists(store_path):
-             print(f"❌ FAILURE: Chroma folder {store_path} NOT created.")
+             print(f" FAILURE: Chroma folder {store_path} NOT created.")
              return
-        print(f"✅ PASS: Chroma folder verified at {store_path}")
+        print(f" PASS: Chroma folder verified at {store_path}")
 
         # --- Step 2: Retrieval ---
         # We need to ensure the query is embedded similarly for retrieval to work.
@@ -106,12 +106,12 @@ async def stress_test():
             # We just want to see if it crashes or returns a valid tool output
             res = query_ephemeral.invoke({"ephemeral_id": eph_id, "query": "golden key"})
             print(f"   Query Response: {res[:100]}...")
-            if "❌" in res:
-                 print(f"❌ FAILURE: Query tool error: {res}")
+            if "" in res:
+                 print(f" FAILURE: Query tool error: {res}")
                  return
-            print("✅ PASS: Query tool executed successfully.")
+            print(" PASS: Query tool executed successfully.")
         except Exception as e:
-            print(f"❌ FAILURE: Query tool exception: {e}")
+            print(f" FAILURE: Query tool exception: {e}")
             return
 
         # --- Step 3: Cleanup ---
@@ -133,14 +133,14 @@ async def stress_test():
             time.sleep(1.0)
             
         if not folder_gone:
-            print(f"❌ FAILURE: Cleanup did not delete folder {store_path}")
+            print(f" FAILURE: Cleanup did not delete folder {store_path}")
             # Try manual delete to be nice
             try: shutil.rmtree(store_path)
             except: pass
             return
-        print("✅ PASS: Ephemeral store deleted.")
+        print(" PASS: Ephemeral store deleted.")
 
-    print("\n🎉 SUCCESS: All Systems Operational.")
+    print("\n SUCCESS: All Systems Operational.")
 
 if __name__ == "__main__":
     asyncio.run(stress_test())

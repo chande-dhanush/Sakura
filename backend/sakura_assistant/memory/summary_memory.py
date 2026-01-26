@@ -105,7 +105,7 @@ New messages:
                 if len(self.summary) > 1000:
                     self.summary = self.summary[-1000:]
                 
-                print(f"🧠 [SummaryMemory] Compressed {len(self.recent_messages)} messages")
+                print(f" [SummaryMemory] Compressed {len(self.recent_messages)} messages")
                 
             except Exception as e:
                 print(f"⚠️ [SummaryMemory] LLM compression failed: {e}")
@@ -140,7 +140,7 @@ New messages:
         self.recent_messages = []
         self.message_count_since_compress = 0
         self._save()
-        print("🗑️ [SummaryMemory] Cleared")
+        print("️ [SummaryMemory] Cleared")
     
     def _load(self) -> None:
         """Load persisted summary from disk."""
@@ -149,7 +149,7 @@ New messages:
                 with open(self.persist_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self.summary = data.get("summary", "")
-                    print(f"📂 [SummaryMemory] Loaded ({len(self.summary)} chars)")
+                    print(f" [SummaryMemory] Loaded ({len(self.summary)} chars)")
         except Exception as e:
             print(f"⚠️ [SummaryMemory] Load failed: {e}")
     

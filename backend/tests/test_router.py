@@ -17,7 +17,7 @@ class TestIntentRouter(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Import the router."""
-        from sakura_assistant.core.router import IntentRouter, RouteResult
+        from sakura_assistant.core.routing.router import IntentRouter, RouteResult
         cls.IntentRouter = IntentRouter
         cls.RouteResult = RouteResult
     
@@ -120,7 +120,7 @@ class TestRouterIntegration(unittest.TestCase):
     
     def test_route_action_command_no_llm(self):
         """Action commands should not need LLM call."""
-        from sakura_assistant.core.router import IntentRouter
+        from sakura_assistant.core.routing.router import IntentRouter
         
         router = IntentRouter(llm=None)  # No LLM
         result = router.route("play some music")

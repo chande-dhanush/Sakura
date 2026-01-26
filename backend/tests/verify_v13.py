@@ -17,10 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 def test_temporal_decay():
     """Verify temporal decay works."""
     print("\n" + "="*50)
-    print("🧪 TEST: Temporal Decay")
+    print(" TEST: Temporal Decay")
     print("="*50)
     
-    from sakura_assistant.core.world_graph import (
+    from sakura_assistant.core.graph.world_graph import (
         EntityNode, EntityType, EntityLifecycle, EntitySource
     )
     
@@ -34,7 +34,7 @@ def test_temporal_decay():
     )
     conf = entity.get_current_confidence()
     assert conf == 0.8, f"Fresh confidence wrong: {conf}"
-    print(f"  ✅ Fresh entity confidence: {conf}")
+    print(f"   Fresh entity confidence: {conf}")
     
     # Test 2: Decay after 30 days
     entity_old = EntityNode(
@@ -46,7 +46,7 @@ def test_temporal_decay():
     )
     conf_old = entity_old.get_current_confidence()
     assert 0.45 <= conf_old <= 0.55, f"30-day decay wrong: {conf_old}"
-    print(f"  ✅ 30-day decay (half-life): {conf_old:.3f}")
+    print(f"   30-day decay (half-life): {conf_old:.3f}")
     
     # Test 3: touch() boost
     entity_boost = EntityNode(
@@ -59,7 +59,7 @@ def test_temporal_decay():
     entity_boost.touch()
     # Use approximate comparison for floating point
     assert abs(entity_boost.confidence - 0.85) < 0.0001, f"touch() boost wrong: {entity_boost.confidence}"
-    print(f"  ✅ touch() boost: 0.8 → {entity_boost.confidence}")
+    print(f"   touch() boost: 0.8 → {entity_boost.confidence}")
     
     # Test 4: Demotion
     demote_entity = EntityNode(
@@ -74,16 +74,16 @@ def test_temporal_decay():
     demoted = demote_entity.check_lifecycle_demotion()
     assert demoted == True
     assert demote_entity.lifecycle == EntityLifecycle.CANDIDATE
-    print(f"  ✅ Lifecycle demotion: PROMOTED → CANDIDATE")
+    print(f"   Lifecycle demotion: PROMOTED → CANDIDATE")
     
-    print("  ✅ TEMPORAL DECAY: ALL PASSED")
+    print("   TEMPORAL DECAY: ALL PASSED")
     return True
 
 
 def test_adaptive_routing():
     """Verify urgency detection."""
     print("\n" + "="*50)
-    print("🧪 TEST: Adaptive Routing")
+    print(" TEST: Adaptive Routing")
     print("="*50)
     
     # Force reimport to get latest code
@@ -103,21 +103,21 @@ def test_adaptive_routing():
     for query, expected in urgent_tests:
         result = get_urgency(query)
         assert result == expected, f"'{query}' expected {expected}, got {result}"
-        print(f"  ✅ '{query[:25]}...' → {result}")
+        print(f"   '{query[:25]}...' → {result}")
     
     # Test RouteResult with urgency
     result = RouteResult("DIRECT", "gmail_read_email", "URGENT")
     assert result.is_urgent == True
-    print(f"  ✅ RouteResult.is_urgent works")
+    print(f"   RouteResult.is_urgent works")
     
-    print("  ✅ ADAPTIVE ROUTING: ALL PASSED")
+    print("   ADAPTIVE ROUTING: ALL PASSED")
     return True
 
 
 def test_code_interpreter():
     """Verify code interpreter setup."""
     print("\n" + "="*50)
-    print("🧪 TEST: Code Interpreter")
+    print(" TEST: Code Interpreter")
     print("="*50)
     
     from sakura_assistant.core.tools_libs.code_interpreter import (
@@ -126,27 +126,27 @@ def test_code_interpreter():
     
     # Check tools exist
     assert execute_python is not None
-    print("  ✅ execute_python tool exists")
+    print("   execute_python tool exists")
     
     # Check docker availability
     docker_ok = _check_docker_available()
     if docker_ok:
-        print("  ✅ Docker is running")
+        print("   Docker is running")
         
         # Try a simple execution
         result = check_code_interpreter_status.invoke({})
-        print(f"  ✅ Status check: {result[:50]}...")
+        print(f"   Status check: {result[:50]}...")
     else:
         print("  ⚠️ Docker not running (start Docker Desktop to use)")
     
-    print("  ✅ CODE INTERPRETER: SETUP VERIFIED")
+    print("   CODE INTERPRETER: SETUP VERIFIED")
     return True
 
 
 def test_audio_tools():
     """Verify audio tools setup."""
     print("\n" + "="*50)
-    print("🧪 TEST: Audio Summarization")
+    print(" TEST: Audio Summarization")
     print("="*50)
     
     from sakura_assistant.core.tools_libs.audio_tools import (
@@ -156,34 +156,34 @@ def test_audio_tools():
     # Check tools exist and are LangChain tools
     assert hasattr(transcribe_audio, 'name')
     assert transcribe_audio.name == "transcribe_audio"
-    print("  ✅ transcribe_audio tool exists")
+    print("   transcribe_audio tool exists")
     
     assert hasattr(summarize_audio, 'name')
     assert summarize_audio.name == "summarize_audio"
-    print("  ✅ summarize_audio tool exists")
+    print("   summarize_audio tool exists")
     
     # Check pydub availability
     try:
         from pydub import AudioSegment
-        print("  ✅ pydub installed")
+        print("   pydub installed")
     except ImportError:
         print("  ⚠️ pydub not installed: pip install pydub")
     
     # Check speech_recognition
     try:
         import speech_recognition as sr
-        print("  ✅ speech_recognition installed")
+        print("   speech_recognition installed")
     except ImportError:
         print("  ⚠️ speech_recognition not installed")
     
-    print("  ✅ AUDIO TOOLS: SETUP VERIFIED")
+    print("   AUDIO TOOLS: SETUP VERIFIED")
     return True
 
 
 def test_tools_registry():
     """Verify all V13 tools are in registry."""
     print("\n" + "="*50)
-    print("🧪 TEST: Tools Registry")
+    print(" TEST: Tools Registry")
     print("="*50)
     
     from sakura_assistant.core.tools import get_all_tools
@@ -200,19 +200,19 @@ def test_tools_registry():
     
     for tool in v13_tools:
         if tool in tool_names:
-            print(f"  ✅ {tool} registered")
+            print(f"   {tool} registered")
         else:
-            print(f"  ❌ {tool} NOT FOUND")
+            print(f"   {tool} NOT FOUND")
             return False
     
-    print(f"  ✅ TOOLS REGISTRY: {len(all_tools)} tools total")
+    print(f"   TOOLS REGISTRY: {len(all_tools)} tools total")
     return True
 
 
 def main():
     """Run all verification tests."""
     print("\n" + "="*60)
-    print("🚀 SAKURA V13 FEATURE VERIFICATION")
+    print(" SAKURA V13 FEATURE VERIFICATION")
     print("="*60)
     
     results = []
@@ -220,49 +220,49 @@ def main():
     try:
         results.append(("Temporal Decay", test_temporal_decay()))
     except Exception as e:
-        print(f"  ❌ FAILED: {e}")
+        print(f"   FAILED: {e}")
         results.append(("Temporal Decay", False))
     
     try:
         results.append(("Adaptive Routing", test_adaptive_routing()))
     except Exception as e:
-        print(f"  ❌ FAILED: {e}")
+        print(f"   FAILED: {e}")
         results.append(("Adaptive Routing", False))
     
     try:
         results.append(("Code Interpreter", test_code_interpreter()))
     except Exception as e:
-        print(f"  ❌ FAILED: {e}")
+        print(f"   FAILED: {e}")
         results.append(("Code Interpreter", False))
     
     try:
         results.append(("Audio Tools", test_audio_tools()))
     except Exception as e:
-        print(f"  ❌ FAILED: {e}")
+        print(f"   FAILED: {e}")
         results.append(("Audio Tools", False))
     
     try:
         results.append(("Tools Registry", test_tools_registry()))
     except Exception as e:
-        print(f"  ❌ FAILED: {e}")
+        print(f"   FAILED: {e}")
         results.append(("Tools Registry", False))
     
     # Summary
     print("\n" + "="*60)
-    print("📊 SUMMARY")
+    print(" SUMMARY")
     print("="*60)
     
     passed = sum(1 for _, ok in results if ok)
     total = len(results)
     
     for name, ok in results:
-        status = "✅ PASS" if ok else "❌ FAIL"
+        status = " PASS" if ok else " FAIL"
         print(f"  {status}: {name}")
     
     print(f"\n  TOTAL: {passed}/{total} passed")
     
     if passed == total:
-        print("\n🎉 ALL V13 FEATURES VERIFIED!")
+        print("\n ALL V13 FEATURES VERIFIED!")
     else:
         print("\n⚠️ Some features need attention")
     

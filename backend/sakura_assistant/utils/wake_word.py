@@ -215,7 +215,7 @@ class WakeWordDetector:
                     mfcc = self._extract_mfcc(samples)
                     if mfcc is not None:
                         self._templates.append(mfcc)
-                        print(f"[WAKE] ✅ Converted {fname} to MFCC, shape={mfcc.shape}")
+                        print(f"[WAKE]  Converted {fname} to MFCC, shape={mfcc.shape}")
                     else:
                         print(f"[WAKE] ⚠️ MFCC extraction returned None for {fname}")
                 except Exception as e:
@@ -599,7 +599,7 @@ def record_wake_template(duration: float = 1.5) -> Optional[np.ndarray]:
             frames_per_buffer=1024
         )
         
-        print(f"🎤 Recording for {duration}s...")
+        print(f" Recording for {duration}s...")
         frames = []
         
         for _ in range(0, int(SAMPLE_RATE / 1024 * duration)):
@@ -617,7 +617,7 @@ def record_wake_template(duration: float = 1.5) -> Optional[np.ndarray]:
         detector = WakeWordDetector()
         mfcc = detector._extract_mfcc(samples)
         
-        print("✅ Recording complete")
+        print(" Recording complete")
         return mfcc
         
     except Exception as e:

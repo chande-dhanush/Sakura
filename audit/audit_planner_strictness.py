@@ -8,8 +8,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 # Mock LLM for speed, or use real one? Real one is needed to test prompts.
-from sakura_assistant.core.container import get_container, reset_container
-from sakura_assistant.core.planner import Planner
+from sakura_assistant.core.infrastructure.container import get_container, reset_container
+from sakura_assistant.core.execution.planner import Planner
 
 def test_planner_strictness():
     """Verify Planner follows the 'Force Tool' and 'Think Fast' rules."""

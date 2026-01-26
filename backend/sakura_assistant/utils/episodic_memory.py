@@ -32,7 +32,7 @@ class EpisodicMemoryStore:
             with open(EPISODES_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.episodes, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            print(f"❌ Error saving episodes: {e}")
+            print(f" Error saving episodes: {e}")
 
     def add_episode(self, summary: str, tags: List[str] = None):
         """Adds a new episodic memory."""
@@ -44,7 +44,7 @@ class EpisodicMemoryStore:
         }
         self.episodes.append(episode)
         self.save()
-        print(f"🧠 Episode stored: '{summary[:30]}...'")
+        print(f" Episode stored: '{summary[:30]}...'")
 
     def search_episodes(self, query: str, limit: int = 3) -> List[Dict]:
         """

@@ -45,9 +45,9 @@ class ToolStateManager:
                     scope="user-read-playback-state user-modify-playback-state user-read-currently-playing",
                     open_browser=True
                 ))
-                print("✅ Spotify client initialized (Lazy Load).")
+                print(" Spotify client initialized (Lazy Load).")
         except Exception as e:
-            print(f"❌ Spotify init failed: {e}")
+            print(f" Spotify init failed: {e}")
 
 state_manager = ToolStateManager()
 
@@ -65,7 +65,7 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
     if not client:
         # Try to open app first
         if app_open:
-            print("🔄 Launching Spotify (Client Init)...")
+            print(" Launching Spotify (Client Init)...")
             try:
                 app_open("spotify", match_closest=True, output=False)
                 time.sleep(5) # Wait for app to start
@@ -75,7 +75,7 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
                 pass
             
     if not client:
-        return "❌ Spotify not configured or unreachable. Please use 'play_youtube' instead."
+        return " Spotify not configured or unreachable. Please use 'play_youtube' instead."
     
     try:
         action = action.lower()
@@ -89,7 +89,7 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
                 devices = client.devices()
                 device_list = devices.get('devices', [])
             except:
-                return "❌ Spotify API Error: Could not fetch devices."
+                return " Spotify API Error: Could not fetch devices."
 
             # 2. Find matching device
             for d in device_list:
@@ -110,7 +110,7 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
             # 3. If still no device, try launching App
             if not target_device:
                 if app_open:
-                    print("🔄 No Spotify device found. Launching local app...")
+                    print(" No Spotify device found. Launching local app...")
                     try:
                         app_open("spotify", match_closest=True, output=False)
                         
@@ -133,7 +133,7 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
                                         target_device = d
                                         break
                                 if target_device:
-                                    print(f"✅ Found device: {target_device['name']}")
+                                    print(f" Found device: {target_device['name']}")
                                     break
                             except:
                                 pass
@@ -142,16 +142,16 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
 
             if not target_device:
                 available = ", ".join([d['name'] for d in device_list]) if device_list else "None"
-                return f"❌ No Spotify device found. Available: {available}. Try opening Spotify manually."
+                return f" No Spotify device found. Available: {available}. Try opening Spotify manually."
 
             # 4. Activate Device
             if not target_device['is_active']:
                 try:
-                    print(f"🔄 Activating '{target_device['name']}' ({target_device['id']})...")
+                    print(f" Activating '{target_device['name']}' ({target_device['id']})...")
                     client.transfer_playback(target_device['id'], force_play=False)
                     time.sleep(1)
                 except Exception as e:
-                    return f"❌ Failed to activate '{target_device['name']}': {e}"
+                    return f" Failed to activate '{target_device['name']}': {e}"
 
             # Now proceed with Play
             if song_name:
@@ -159,8 +159,8 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
                 tracks = results.get("tracks", {}).get("items", [])
                 if tracks:
                     client.start_playback(uris=[tracks[0]["uri"]])
-                    return f"🎵 Playing '{tracks[0]['name']}'."
-                return f"❌ Song '{song_name}' not found."
+                    return f" Playing '{tracks[0]['name']}'."
+                return f" Song '{song_name}' not found."
             else:
                 client.start_playback()
                 return "▶️ Resumed playback."
@@ -177,8 +177,8 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
             current = client.current_playback()
             if current and current.get("is_playing"):
                 item = current.get("item", {})
-                return f"🎵 Now Playing: {item.get('name')} by {', '.join(a['name'] for a in item.get('artists', []))}"
+                return f" Now Playing: {item.get('name')} by {', '.join(a['name'] for a in item.get('artists', []))}"
             return "⏸️ Nothing playing."
-        return "❌ Unknown action."
+        return " Unknown action."
     except Exception as e:
-        return f"❌ Spotify error: {e}"
+        return f" Spotify error: {e}"

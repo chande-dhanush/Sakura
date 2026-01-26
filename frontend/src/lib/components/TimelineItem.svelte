@@ -3,6 +3,7 @@
     import { moodColors, deleteMessage } from '$lib/stores/chat.js';
     import ThoughtChain from './ThoughtChain.svelte';
     import MarkdownRenderer from './MarkdownRenderer.svelte';
+    import { speak } from '$lib/audioService';
     
     export let message;
     
@@ -21,13 +22,10 @@
     async function handleSpeak() {
         if (!message.content) return;
         try {
-            await fetch('http://localhost:3210/voice/speak', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: message.content })
-            });
+            await speak(message.content);
         } catch (e) {
             console.error("Speak failed", e);
+            // TODO: Show toast notification to user
         }
     }
 </script>

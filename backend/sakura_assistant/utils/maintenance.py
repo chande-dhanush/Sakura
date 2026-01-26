@@ -73,7 +73,7 @@ class MemoryMaintenance:
             return 0
             
         to_remove = current_count - MAX_MEMORIES
-        print(f"🧹 Pruning {to_remove} old memories...")
+        print(f" Pruning {to_remove} old memories...")
         
         # Keep the newest MAX_MEMORIES
         # Assuming memory_texts is append-only (oldest first)

@@ -18,7 +18,7 @@ async def mock_request(data):
     return MockRequest()
 
 async def verify_streaming():
-    print("🧪 Starting Async Server Verification...")
+    print(" Starting Async Server Verification...")
     
     # 1. Initialize Server (lifespan)
     app = FastAPI()
@@ -26,11 +26,11 @@ async def verify_streaming():
         # 2. Prepare Request
         req = await mock_request({"query": "What time is it?", "tts_enabled": False})
         
-        print("📨 Sending 'What time is it?' to chat endpoint...")
+        print(" Sending 'What time is it?' to chat endpoint...")
         response = await chat(req)
         
         # 3. Stream Response
-        print("🌊 Streaming response...")
+        print(" Streaming response...")
         async for chunk in response.body_iterator:
             chunk_str = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
             lines = chunk_str.strip().split("\n")
@@ -59,7 +59,7 @@ async def verify_streaming():
                     except Exception as e:
                         print(f"   [Parse Error] {e} line: {line}")
 
-    print("\n✅ Verification Complete: Async Streaming + FlightRecorder SSE working!")
+    print("\n Verification Complete: Async Streaming + FlightRecorder SSE working!")
 
 if __name__ == "__main__":
     asyncio.run(verify_streaming())

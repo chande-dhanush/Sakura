@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 # Add parent path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from sakura_assistant.core.world_graph import (
+from sakura_assistant.core.graph.world_graph import (
     EntityNode, EntityType, EntityLifecycle, EntitySource, RecencyBucket
 )
 

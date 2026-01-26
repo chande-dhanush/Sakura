@@ -62,7 +62,7 @@ def execute_actions(actions: List[Dict[str, Any]]) -> str:
         args = action.get('args', {})
         
         if tool_name not in tool_map:
-            results.append(f"❌ Tool '{tool_name}' not found.")
+            results.append(f" Tool '{tool_name}' not found.")
             continue
             
         try:
@@ -70,7 +70,7 @@ def execute_actions(actions: List[Dict[str, Any]]) -> str:
             res = tool_map[tool_name].invoke(args)
             results.append(f"▶️ {tool_name}: {res}")
         except Exception as e:
-            results.append(f"❌ {tool_name} failed: {e}")
+            results.append(f" {tool_name} failed: {e}")
             
     return "\n\n".join(results)
 
@@ -150,26 +150,26 @@ def currency_convert(amount: float, from_currency: str, to_currency: str) -> str
         response = requests.get(url, timeout=5)
         
         if response.status_code != 200:
-            return f"❌ Could not fetch rates for {from_curr}."
+            return f" Could not fetch rates for {from_curr}."
         
         data = response.json()
         rates = data.get("rates", {})
         
         if to_curr not in rates:
-            return f"❌ Currency '{to_curr}' not found."
+            return f" Currency '{to_curr}' not found."
         
         rate = rates[to_curr]
         converted = amount * rate
         
-        return f"💱 {amount:.2f} {from_curr} = {converted:.2f} {to_curr} (Rate: 1 {from_curr} = {rate:.4f} {to_curr})"
+        return f" {amount:.2f} {from_curr} = {converted:.2f} {to_curr} (Rate: 1 {from_curr} = {rate:.4f} {to_curr})"
     except Exception as e:
-        return f"❌ Conversion failed: {e}"
+        return f" Conversion failed: {e}"
 
 @tool
 def clear_all_ephemeral_memory() -> str:
     """Clear session memory."""
     # Wrapper
-    return "✅ Session memory cleared."
+    return " Session memory cleared."
 
 # --- Factory ---
 

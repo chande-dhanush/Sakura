@@ -58,12 +58,12 @@ class DocumentRouter:
 
         # 0. Encode Query (Needed for Cache & Search)
         if not self.encoder:
-            return "❌ Embedding model not loaded."
+            return " Embedding model not loaded."
             
         try:
             query_emb = self.encoder.encode(query_text)
         except Exception as e:
-            return f"❌ Embedding failed: {e}"
+            return f" Embedding failed: {e}"
 
         # 1. Check Ephemeral Cache (EAG)
         cached_results = self.cache.check(query_emb, query_text)
@@ -78,7 +78,7 @@ class DocumentRouter:
         # 3. LLM Routing
         selected_doc_ids = self._route_query(query_text, all_meta, top_k=top_k_docs)
         if not selected_doc_ids:
-            return "📭 No relevant documents found."
+            return " No relevant documents found."
 
         # 4. Vector Search per Doc
         aggregated_results = []
@@ -107,7 +107,7 @@ class DocumentRouter:
         # 6. Update Cache
         self.cache.update(query_emb, final_results, query_text)
 
-        return self._format_results(final_results, source="Document Store 📚")
+        return self._format_results(final_results, source="Document Store ")
 
     def _route_query(self, query: str, metadatas: List[Dict], top_k: int) -> List[str]:
         """Ask LLM which docs are relevant."""
@@ -146,7 +146,7 @@ If none relevant, return [].
 
     def _format_results(self, results: List[Dict], source: str) -> str:
         """Format results for context injection."""
-        if not results: return "📭 No context found."
+        if not results: return " No context found."
         
         out = [f"### Relevant Context ({source})"]
         for r in results:

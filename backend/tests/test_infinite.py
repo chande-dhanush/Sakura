@@ -21,17 +21,17 @@ from sakura_assistant.core.llm import SmartAssistant
 from sakura_assistant.core.broadcaster import get_broadcaster
 
 async def run_infinite_test():
-    print("🚀 Starting 'Infinite' Test (V12)...")
+    print(" Starting 'Infinite' Test (V12)...")
     
     # 0. Subscribe to Thought Stream
     def print_thought(event, data):
         # Filter for key events to keep log clean
         if event in ["thinking", "tool_start", "rate_limit", "pacing", "cache_hit"]:
-            emoji = "📡"
+            emoji = ""
             if event == "pacing": emoji = "⏳"
             if event == "cache_hit": emoji = "⚡"
-            if event == "tool_start": emoji = "🛠️"
-            if event == "rate_limit": emoji = "🛑"
+            if event == "tool_start": emoji = "️"
+            if event == "rate_limit": emoji = ""
             
             print(f"{emoji} [{event.upper()}] {data}")
 
@@ -41,13 +41,13 @@ async def run_infinite_test():
     # 1. Initialize Assistant
     try:
         assistant = SmartAssistant()
-        print("✅ Assistant Initialized")
+        print(" Assistant Initialized")
     except Exception as e:
-        print(f"❌ Init Failed: {e}")
+        print(f" Init Failed: {e}")
         return
 
     query = "Compare the features of the top 5 AI models in 2026."
-    print(f"\n❓ Query: {query}\n")
+    print(f"\n Query: {query}\n")
     
     try:
         # History mock
@@ -59,7 +59,7 @@ async def run_infinite_test():
         duration = time.time() - start_time
         
         print("\n" + "="*50)
-        print(f"✅ FINAL RESPONSE ({duration:.2f}s):")
+        print(f" FINAL RESPONSE ({duration:.2f}s):")
         print("="*50)
         print(result.get("content", "No content"))
         print("\n")
@@ -67,7 +67,7 @@ async def run_infinite_test():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f"❌ RUN FAILED: {e}")
+        print(f" RUN FAILED: {e}")
 
 if __name__ == "__main__":
     # Ensure env vars are loaded (via config verify or manually if needed)

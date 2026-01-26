@@ -145,7 +145,7 @@ def transcribe_audio(file_path: str, language: str = "en-US") -> str:
             os.unlink(wav_path)
         
         word_count = len(transcript.split())
-        return f"📝 Transcript ({word_count} words):\n\n{transcript}"
+        return f" Transcript ({word_count} words):\n\n{transcript}"
         
     except ImportError as e:
         return f"Error: {e}"
@@ -198,16 +198,16 @@ def summarize_audio(
         
         # Too short to summarize
         if word_count < 30:
-            return f"📝 Audio content ({word_count} words):\n\n{transcript}"
+            return f" Audio content ({word_count} words):\n\n{transcript}"
         
         # Generate summary using existing LLM
-        from sakura_assistant.core.container import get_container
+        from sakura_assistant.core.infrastructure.container import get_container
         
         container = get_container()
         responder = container.models.get("responder")
         
         if not responder:
-            return f"📝 Transcript (no LLM available for summary):\n\n{transcript}"
+            return f" Transcript (no LLM available for summary):\n\n{transcript}"
         
         # Style-specific prompts
         style_prompts = {
@@ -226,7 +226,7 @@ Summary:"""
         response = responder.invoke([HumanMessage(content=prompt)])
         summary = response.content.strip()
         
-        return f"""🎧 Audio Summary ({style})
+        return f""" Audio Summary ({style})
 
 {summary}
 

@@ -24,18 +24,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sakura_assistant.core.llm import SmartAssistant
 from sakura_assistant.core.broadcaster import get_broadcaster
-from sakura_assistant.core.container import get_container
+from sakura_assistant.core.infrastructure.container import get_container
 from sakura_assistant.core.tools_libs.research import SmartResearcher
 
 async def audit_v12():
-    print("🛡️ STARTING V12 FINAL AUDIT 🛡️")
+    print("️ STARTING V12 FINAL AUDIT ️")
     print("===============================")
     
     # Setup Event Listener (Mocking WebSocket)
     events = []
     def listener(event, data):
         events.append({"event": event, "data": data, "time": time.time()})
-        # print(f"   📡 [Event] {event}") # Debug
+        # print(f"    [Event] {event}") # Debug
     
     broadcaster = get_broadcaster()
     broadcaster.add_listener(listener)
@@ -47,7 +47,7 @@ async def audit_v12():
     # ---------------------------------------------------------
     # TEST 4: Split-Brain Model Audit (Static Check)
     # ---------------------------------------------------------
-    print("\n🔍 [Test 4] auditing Model Configuration...")
+    print("\n [Test 4] auditing Model Configuration...")
     container = get_container()
     planner_model = container.config.planner_model
     responder_model = container.config.responder_model
@@ -56,15 +56,15 @@ async def audit_v12():
     print(f"   Responder: {responder_model}")
     
     if "8b" in planner_model and "70b" in responder_model:
-        print("   ✅ PASS: Split-Brain Config Verified (8B Planning / 70B Response)")
+        print("    PASS: Split-Brain Config Verified (8B Planning / 70B Response)")
     else:
-        print("   ❌ FAIL: Incorrect Model Assignment!")
+        print("    FAIL: Incorrect Model Assignment!")
         # Don't exit, keep running other tests
     
     # ---------------------------------------------------------
     # TEST 1 & 3: Thought Stream & Pacing
     # ---------------------------------------------------------
-    print("\n🔍 [Test 1 & 3] Auditing Thought Stream & Pacing...")
+    print("\n [Test 1 & 3] Auditing Thought Stream & Pacing...")
     # Force multi-step: "What is the capital of France? Also what is 50 times 3?" 
     # This should trigger `web_search` then `quick_math` or similar. 
     # Actually, simpler: "Get the time in Tokyo and then the time in New York."
@@ -83,23 +83,23 @@ async def audit_v12():
     has_tool = "tool_start" in event_types
     
     if has_thinking and has_tool:
-        print("   ✅ PASS: Thought Stream Active (Thinking + Tool events received)")
+        print("    PASS: Thought Stream Active (Thinking + Tool events received)")
     else:
-        print(f"   ❌ FAIL: Missing events. Got: {list(set(event_types))}")
+        print(f"    FAIL: Missing events. Got: {list(set(event_types))}")
 
     # Check Pacing (if multiple tools used)
     # If only 1 tool, pacing might not trigger (requires step > 1).
     # We'll check if 'pacing' event exists OR if we only had 1 step.
     pacing_events = [e for e in events if e["event"] == "pacing"]
     if pacing_events:
-        print(f"   ✅ PASS: 'Wait & See' Pacing Triggered ({len(pacing_events)} pauses)")
+        print(f"    PASS: 'Wait & See' Pacing Triggered ({len(pacing_events)} pauses)")
     else:
         print("   ℹ️ Note: No Pacing events (Single step execution?) - Accepted if single step.")
 
     # ---------------------------------------------------------
     # TEST 2: Smart Cache Precision
     # ---------------------------------------------------------
-    print("\n🔍 [Test 2] Auditing Smart Cache Precision...")
+    print("\n [Test 2] Auditing Smart Cache Precision...")
     researcher = SmartResearcher()
     
     # Unique ID to avoid previous run collisions
@@ -125,7 +125,7 @@ async def audit_v12():
     
     cache_hit_events = [e for e in events if e["event"] == "cache_hit"]
     if not cache_hit_events:
-        print(f"   ✅ PASS: Cache Miss (Duration: {t1-t0:.2f}s)")
+        print(f"    PASS: Cache Miss (Duration: {t1-t0:.2f}s)")
     else:
         print("   ⚠️ WARN: Unexpected Cache Hit on Step A")
 
@@ -139,23 +139,23 @@ async def audit_v12():
     
     cache_hit_events = [e for e in events if e["event"] == "cache_hit"]
     if cache_hit_events:
-        print(f"   ✅ PASS: Cache Hit Triggered")
+        print(f"    PASS: Cache Hit Triggered")
         if duration < 0.5:
-             print(f"   ✅ PASS: Low Latency ({duration:.4f}s < 0.5s)")
+             print(f"    PASS: Low Latency ({duration:.4f}s < 0.5s)")
         else:
-             print(f"   ❌ FAIL: Latency too high ({duration:.4f}s)")
+             print(f"    FAIL: Latency too high ({duration:.4f}s)")
     else:
-        print("   ❌ FAIL: Cache Miss on Variant Query!")
+        print("    FAIL: Cache Miss on Variant Query!")
         
     # ---------------------------------------------------------
     # Cleanup
     # ---------------------------------------------------------
-    print("\n🧹 Cleaning up...")
+    print("\n Cleaning up...")
     from sakura_assistant.core.ephemeral_manager import get_ephemeral_manager
     get_ephemeral_manager().cleanup_old(0)
-    print("   ✅ Ephemeral stores cleaned.")
+    print("    Ephemeral stores cleaned.")
     
-    print("\n🎉 V12 AUDIT COMPLETE.")
+    print("\n V12 AUDIT COMPLETE.")
 
 if __name__ == "__main__":
     asyncio.run(audit_v12())

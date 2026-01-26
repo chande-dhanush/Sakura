@@ -56,7 +56,7 @@ class ProactiveScheduler:
         """
         self.initiations_path = initiations_path
         self.websocket_callback = websocket_callback
-        print(f"🔔 [ProactiveScheduler] Initialized")
+        print(f" [ProactiveScheduler] Initialized")
     
     def get_planned_initiations(self) -> List[str]:
         """Load pre-computed messages from JSON."""
@@ -113,23 +113,23 @@ class ProactiveScheduler:
                 message = self.pop_initiation()
                 if message:
                     state.queue_message(message)
-                    print(f"🤫 [ProactiveScheduler] UI hidden, message queued for later")
+                    print(f" [ProactiveScheduler] UI hidden, message queued for later")
                     return False
-            print(f"🤫 [ProactiveScheduler] UI hidden, staying silent")
+            print(f" [ProactiveScheduler] UI hidden, staying silent")
             return False
         
         # Gate 1: Check desire system
         should_act, reason = self.desire_system.should_initiate()
         
         if not should_act:
-            print(f"🤫 [ProactiveScheduler] Staying silent: {reason}")
+            print(f" [ProactiveScheduler] Staying silent: {reason}")
             return False
         
         # Gate 2: Get pre-computed message
         message = self.pop_initiation()
         
         if not message:
-            print("📭 [ProactiveScheduler] No pre-computed messages available")
+            print(" [ProactiveScheduler] No pre-computed messages available")
             return False
         
         # Gate 3: Send via WebSocket
@@ -137,14 +137,14 @@ class ProactiveScheduler:
             try:
                 await self.websocket_callback(message)
                 self.desire_system.record_initiation()
-                print(f"💌 [ProactiveScheduler] Sent: {message[:50]}...")
+                print(f" [ProactiveScheduler] Sent: {message[:50]}...")
                 return True
             except Exception as e:
-                print(f"❌ [ProactiveScheduler] WebSocket send failed: {e}")
+                print(f" [ProactiveScheduler] WebSocket send failed: {e}")
                 return False
         else:
             # No WebSocket callback - just log
-            print(f"💌 [ProactiveScheduler] Would send (no WS): {message[:50]}...")
+            print(f" [ProactiveScheduler] Would send (no WS): {message[:50]}...")
             self.desire_system.record_initiation()
             return True
     
@@ -164,9 +164,9 @@ class ProactiveScheduler:
                     "generated": datetime.now().isoformat(),
                     "count": len(messages)
                 }, f, indent=2)
-            print(f"✨ [ProactiveScheduler] Saved {len(messages)} planned initiations")
+            print(f" [ProactiveScheduler] Saved {len(messages)} planned initiations")
         except Exception as e:
-            print(f"❌ [ProactiveScheduler] Failed to save: {e}")
+            print(f" [ProactiveScheduler] Failed to save: {e}")
     
     def get_status(self) -> Dict[str, Any]:
         """Get current status for debugging."""

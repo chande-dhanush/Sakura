@@ -1,37 +1,33 @@
 {
   "version": "v7",
-  "current_turn": 6,
-  "current_session": "7a51d110-236e-4cba-9c6b-c57f779532dd",
+  "current_turn": 7,
+  "current_session": "ee32ee74-3625-479d-bd7f-48c4e5c5714b",
   "entities": {
     "user:self": {
       "id": "user:self",
       "type": "user",
-      "name": "Dhanush",
+      "name": "Hacker",
       "attributes": {
-        "age": 22,
-        "birthday": "29 October",
-        "location": "Bangalore, India",
-        "interests": [
-          "AI",
-          "Anime",
-          "Travelling"
-        ]
+        "age": null,
+        "birthday": "",
+        "location": "Test Lab",
+        "interests": []
       },
       "lifecycle": "promoted",
       "source": "system",
       "mutable_by": [
-        "user_confirmed",
-        "user_stated"
+        "user_stated",
+        "user_confirmed"
       ],
-      "created_at": "2026-01-16T19:29:27.308607",
-      "last_referenced": "2026-01-16T19:29:27.308607",
+      "created_at": "2026-01-23T12:39:44.577679",
+      "last_referenced": "2026-01-23T12:39:44.577679",
       "reference_count": 0,
       "confidence": 1.0,
       "not_claims": [
         "NOT the actor Dhanush",
         "NOT a public figure"
       ],
-      "summary": "Dhanush, 22, from Bangalore, India. Interests: AI, Anime, Travelling."
+      "summary": "Hacker, None, from Test Lab. Interests: ."
     },
     "pref:communication": {
       "id": "pref:communication",
@@ -45,71 +41,134 @@
       "lifecycle": "promoted",
       "source": "system",
       "mutable_by": [
-        "user_confirmed",
-        "user_stated"
+        "user_stated",
+        "user_confirmed"
       ],
-      "created_at": "2026-01-16T19:29:27.308607",
-      "last_referenced": "2026-01-16T19:29:27.308607",
+      "created_at": "2026-01-23T12:39:44.577679",
+      "last_referenced": "2026-01-23T12:39:44.577679",
       "reference_count": 0,
       "confidence": 1.0,
       "not_claims": [],
       "summary": "Prefers practical, direct replies. Enjoys being teased."
     },
-    "entity:topic:the_user_greeted_the_assistant_with_a_good_morning_message,_addressing_it_as_'yuki'_and_then_'sakura": {
-      "id": "entity:topic:the_user_greeted_the_assistant_with_a_good_morning_message,_addressing_it_as_'yuki'_and_then_'sakura",
+    "entity:topic:shutdowntestref": {
+      "id": "entity:topic:shutdowntestref",
       "type": "topic",
-      "name": "The user greeted the assistant with a good morning message, addressing it as 'yuki' and then 'Sakura",
+      "name": "ShutdownTestRef",
       "attributes": {
-        "category": "relationship",
+        "status": "verified"
+      },
+      "lifecycle": "promoted",
+      "source": "user_stated",
+      "mutable_by": [
+        "user_stated",
+        "user_confirmed"
+      ],
+      "created_at": "2026-01-19T22:39:15.029876",
+      "last_referenced": "2026-01-19T22:39:15.029876",
+      "reference_count": 0,
+      "confidence": 0.9,
+      "not_claims": [],
+      "summary": "ShutdownTestRef (topic)"
+    },
+    "entity:topic:the_h100_5.5_is_an_nvidia_gpu_model_with_specific_memory_and_performance_capabilities.": {
+      "id": "entity:topic:the_h100_5.5_is_an_nvidia_gpu_model_with_specific_memory_and_performance_capabilities.",
+      "type": "topic",
+      "name": "The H100 5.5 is an Nvidia GPU model with specific memory and performance capabilities.",
+      "attributes": {
+        "category": "technology",
         "crystallized": true,
         "confidence": 0.7
       },
       "lifecycle": "promoted",
       "source": "memory_recalled",
       "mutable_by": [
-        "user_confirmed",
-        "user_stated"
+        "user_stated",
+        "user_confirmed"
       ],
-      "created_at": "2026-01-16T14:40:22.025199",
-      "last_referenced": "2026-01-16T14:40:22.025199",
+      "created_at": "2026-01-22T10:03:22.603825",
+      "last_referenced": "2026-01-22T10:03:22.603825",
       "reference_count": 0,
       "confidence": 0.3,
       "not_claims": [],
-      "summary": "The user greeted the assistant with a good morning message, addressing it as 'yuki' and then 'Sakura (topic)"
+      "summary": "The H100 5.5 is an Nvidia GPU model with specific memory and performance capabilities. (topic)"
     },
-    "constraint:crystallized_the_user_mentioned_hoping_thei": {
-      "id": "constraint:crystallized_the_user_mentioned_hoping_thei",
+    "entity:topic:the_assistant_was_unable_to_stream_the_song_'brothers_in_arms'_on_youtube.": {
+      "id": "entity:topic:the_assistant_was_unable_to_stream_the_song_'brothers_in_arms'_on_youtube.",
       "type": "topic",
-      "name": "The user mentioned hoping their edits to the assistant's V15 work.",
+      "name": "The assistant was unable to stream the song 'Brothers in Arms' on YouTube.",
       "attributes": {
-        "constraint_type": "temporal",
-        "implications": [],
-        "criticality": 0.8,
-        "crystallized": true
+        "category": "technology",
+        "crystallized": true,
+        "confidence": 0.7
       },
       "lifecycle": "promoted",
-      "source": "user_stated",
+      "source": "memory_recalled",
       "mutable_by": [
-        "user_confirmed",
-        "user_stated"
+        "user_stated",
+        "user_confirmed"
       ],
-      "created_at": "2026-01-16T14:40:22.025199",
-      "last_referenced": "2026-01-16T14:40:22.025199",
+      "created_at": "2026-01-22T10:03:22.603825",
+      "last_referenced": "2026-01-22T10:03:22.603825",
       "reference_count": 0,
-      "confidence": 0.9,
+      "confidence": 0.3,
       "not_claims": [],
-      "summary": "The user mentioned hoping their edits to the assistant's V15 work. (topic)"
+      "summary": "The assistant was unable to stream the song 'Brothers in Arms' on YouTube. (topic)"
+    },
+    "entity:topic:the_assistant_was_unable_to_fulfill_some_of_the_user's_requests,_including_playing_specific_songs_on": {
+      "id": "entity:topic:the_assistant_was_unable_to_fulfill_some_of_the_user's_requests,_including_playing_specific_songs_on",
+      "type": "topic",
+      "name": "The assistant was unable to fulfill some of the user's requests, including playing specific songs on",
+      "attributes": {
+        "category": "technology",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_stated",
+        "user_confirmed"
+      ],
+      "created_at": "2026-01-22T10:03:22.603825",
+      "last_referenced": "2026-01-22T10:03:22.603825",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The assistant was unable to fulfill some of the user's requests, including playing specific songs on (topic)"
+    },
+    "entity:topic:the_assistant_suggested_shutting_down_a_front-end_process_from_the_server_side_or_manually_when_the_": {
+      "id": "entity:topic:the_assistant_suggested_shutting_down_a_front-end_process_from_the_server_side_or_manually_when_the_",
+      "type": "topic",
+      "name": "The assistant suggested shutting down a front-end process from the server side or manually when the ",
+      "attributes": {
+        "category": "technology",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_stated",
+        "user_confirmed"
+      ],
+      "created_at": "2026-01-22T10:03:22.603825",
+      "last_referenced": "2026-01-22T10:03:22.603825",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The assistant suggested shutting down a front-end process from the server side or manually when the  (topic)"
     }
   },
   "actions": [
     {
-      "id": "action:t-3",
-      "turn": 3,
-      "timestamp": "2026-01-16T14:41:16.303414",
+      "id": "action:t-2",
+      "turn": 2,
+      "timestamp": "2026-01-19T21:53:44.830931",
       "action_type": "tool",
-      "tool": "set_reminder",
+      "tool": "spotify_control",
       "args": {},
-      "result": "\u2705 Reminder set for 5.0 mins.",
+      "result": "\ud83c\udfb5 Playing 'You're My Favourite Part Of This Life'.",
       "success": true,
       "focus_entity": null,
       "entities_involved": [],
@@ -118,17 +177,17 @@
       "user_satisfaction": null,
       "significance": 0.5,
       "key_facts": [],
-      "summary": "set_reminder() \u2713",
-      "session_id": "12ccc231-36b6-4772-8a3c-4b2dfbc6c013"
+      "summary": "spotify_control() \u2713",
+      "session_id": "4afc82d1-7799-4337-a702-6a327831f07e"
     },
     {
-      "id": "action:t-4",
-      "turn": 4,
-      "timestamp": "2026-01-16T14:42:31.921519",
+      "id": "action:t-3",
+      "turn": 3,
+      "timestamp": "2026-01-19T21:54:17.174592",
       "action_type": "tool",
-      "tool": "calendar_create_event",
+      "tool": "play_youtube",
       "args": {},
-      "result": "\u26a0\ufe0f Date appears to be in the past (2024-03-16T12:00:00). Did you mean 2026 instead of 2024? Please try again with the correct year.",
+      "result": "\u25b6\ufe0f Now playing on YouTube: 'Brothers in arms'",
       "success": true,
       "focus_entity": null,
       "entities_involved": [],
@@ -137,17 +196,17 @@
       "user_satisfaction": null,
       "significance": 0.5,
       "key_facts": [],
-      "summary": "calendar_create_event() \u2713",
-      "session_id": "12ccc231-36b6-4772-8a3c-4b2dfbc6c013"
+      "summary": "play_youtube() \u2713",
+      "session_id": "4afc82d1-7799-4337-a702-6a327831f07e"
     },
     {
       "id": "action:t-5",
       "turn": 5,
-      "timestamp": "2026-01-16T14:43:13.403011",
+      "timestamp": "2026-01-19T22:01:53.351975",
       "action_type": "tool",
-      "tool": "calendar_create_event",
+      "tool": "play_youtube",
       "args": {},
-      "result": "\u2705 Event created: https://www.google.com/calendar/event?eid=ZWNjZzdtcGo0MG9kbGo2ZzFuNDUxMzBkcm8gZGhhbnVzaHBjaGFuZGVAbQ",
+      "result": "\u25b6\ufe0f Now playing on YouTube: 'Brothers in arms'",
       "success": true,
       "focus_entity": null,
       "entities_involved": [],
@@ -156,8 +215,27 @@
       "user_satisfaction": null,
       "significance": 0.5,
       "key_facts": [],
-      "summary": "calendar_create_event() \u2713",
-      "session_id": "12ccc231-36b6-4772-8a3c-4b2dfbc6c013"
+      "summary": "play_youtube() \u2713",
+      "session_id": "e75e054c-2bce-499a-9bd4-8f6e3949344e"
+    },
+    {
+      "id": "action:t-5",
+      "turn": 5,
+      "timestamp": "2026-01-19T22:01:53.353570",
+      "action_type": "tool",
+      "tool": "open_app",
+      "args": {},
+      "result": "\ud83d\ude80 Opened 'Visual Studio Code'.",
+      "success": true,
+      "focus_entity": null,
+      "entities_involved": [],
+      "depends_on": null,
+      "user_intent": "casual",
+      "user_satisfaction": null,
+      "significance": 0.5,
+      "key_facts": [],
+      "summary": "open_app() \u2713",
+      "session_id": "e75e054c-2bce-499a-9bd4-8f6e3949344e"
     }
   ]
 }

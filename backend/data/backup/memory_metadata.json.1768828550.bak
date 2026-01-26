@@ -1,0 +1,398 @@
+{
+  "texts": [
+    "The project code name is Sakura V10.",
+    "The panic button code is 1999.",
+    "h100 5.5",
+    "H100 5.5 is the Nvidia Hopper‑based GPU, the “H100” model with 80 GB of HBM2e memory and a peak FP32 performance of around 3.2 TFLOPs.  \nThe “5.5” usually refers to the driver/firmware version that ships with that card, not a hardware change.  \nIf you need deeper specs or benchmark data, let me know.",
+    "dating",
+    "Oh, so you’re looking for love advice? I’m all ears—just don’t expect me to swipe right on your profile. Let’s make sure you’re not just a “hacker” in the lab, but also a smooth operator in the dating scene.",
+    "shut down the front end but the back end was till running so it is responding to me",
+    "I’m not a system admin, so I can’t actually kill your front‑end process.  \nIf you’re seeing responses, the back‑end is still alive—just shut it down from the server side or kill the process manually.  \nNeed a quick command line tip? I’ve got you."
+  ],
+  "metadata": [
+    {
+      "timestamp": "2026-01-16T13:35:39.137447",
+      "role": "system",
+      "hash": "c7794b1ec36ed57fcf6f82aa1d46aa437c04f0d9f925125f7d82021f488b9f43"
+    },
+    {
+      "timestamp": "2026-01-16T13:35:44.115261",
+      "role": "system",
+      "hash": "c5a929573d1b5cde1b93348d0fa9e3eeb6d2832093c04f858e70b25a4bcd2903"
+    },
+    {
+      "timestamp": "2026-01-19T18:42:18.519186",
+      "role": "user",
+      "hash": "a5dcebcc382be148052780657ef5cad6d47e0e1c498a3a0561e3e6c30c3fa201"
+    },
+    {
+      "timestamp": "2026-01-19T18:42:26.546892",
+      "role": "assistant",
+      "hash": "cb1e4e21b44db42441135addbaac0a449914d7a4ca9f129ae641ea0a85e33615"
+    },
+    {
+      "timestamp": "2026-01-19T18:44:58.146669",
+      "role": "user",
+      "hash": "0bcc639f6c41a8b9ea537cd08d9e8f8d6908c4dd79eeb431126b2781ba57771e"
+    },
+    {
+      "timestamp": "2026-01-19T18:44:58.736415",
+      "role": "assistant",
+      "hash": "4102e0cfa73615a45fcd8d323267b44f3cf8907658bbb863a2d9336800aec37a"
+    },
+    {
+      "timestamp": "2026-01-19T18:45:49.293422",
+      "role": "user",
+      "hash": "28319c2736eb25d427c1af2dd2704df73e8d1a29a409db350afcb93631fb2f13"
+    },
+    {
+      "timestamp": "2026-01-19T18:45:50.429314",
+      "role": "assistant",
+      "hash": "548a74b844dbf2e66ff0f6b426b4d1eeeb06626029a0bd56632c6b45c6613ae4"
+    }
+  ],
+  "inverted_index": {
+    "sakura": [
+      0
+    ],
+    "project": [
+      0
+    ],
+    "v10": [
+      0
+    ],
+    "code": [
+      0,
+      1
+    ],
+    "name": [
+      0
+    ],
+    "panic": [
+      1
+    ],
+    "1999": [
+      1
+    ],
+    "button": [
+      1
+    ],
+    "h100": [
+      2,
+      3
+    ],
+    "5": [
+      2,
+      3
+    ],
+    "2": [
+      3
+    ],
+    "hopper": [
+      3
+    ],
+    "around": [
+      3
+    ],
+    "card": [
+      3
+    ],
+    "3": [
+      3
+    ],
+    "change": [
+      3
+    ],
+    "version": [
+      3
+    ],
+    "gb": [
+      3
+    ],
+    "driver": [
+      3
+    ],
+    "firmware": [
+      3
+    ],
+    "if": [
+      3,
+      7
+    ],
+    "refers": [
+      3
+    ],
+    "tflops": [
+      3
+    ],
+    "fp32": [
+      3
+    ],
+    "based": [
+      3
+    ],
+    "specs": [
+      3
+    ],
+    "usually": [
+      3
+    ],
+    "model": [
+      3
+    ],
+    "performance": [
+      3
+    ],
+    "that": [
+      3
+    ],
+    "nvidia": [
+      3
+    ],
+    "need": [
+      3,
+      7
+    ],
+    "data": [
+      3
+    ],
+    "benchmark": [
+      3
+    ],
+    "me": [
+      3,
+      5,
+      6
+    ],
+    "you": [
+      3,
+      5,
+      7
+    ],
+    "not": [
+      3,
+      5,
+      7
+    ],
+    "gpu": [
+      3
+    ],
+    "hardware": [
+      3
+    ],
+    "peak": [
+      3
+    ],
+    "deeper": [
+      3
+    ],
+    "hbm2e": [
+      3
+    ],
+    "let": [
+      3,
+      5
+    ],
+    "memory": [
+      3
+    ],
+    "80": [
+      3
+    ],
+    "ships": [
+      3
+    ],
+    "know": [
+      3
+    ],
+    "dating": [
+      4,
+      5
+    ],
+    "re": [
+      5,
+      7
+    ],
+    "right": [
+      5
+    ],
+    "make": [
+      5
+    ],
+    "looking": [
+      5
+    ],
+    "operator": [
+      5
+    ],
+    "don": [
+      5
+    ],
+    "ears": [
+      5
+    ],
+    "m": [
+      5,
+      7
+    ],
+    "s": [
+      5
+    ],
+    "t": [
+      5,
+      7
+    ],
+    "your": [
+      5,
+      7
+    ],
+    "hacker": [
+      5
+    ],
+    "profile": [
+      5
+    ],
+    "scene": [
+      5
+    ],
+    "also": [
+      5
+    ],
+    "advice": [
+      5
+    ],
+    "oh": [
+      5
+    ],
+    "lab": [
+      5
+    ],
+    "love": [
+      5
+    ],
+    "smooth": [
+      5
+    ],
+    "so": [
+      5,
+      6,
+      7
+    ],
+    "i": [
+      5,
+      7
+    ],
+    "expect": [
+      5
+    ],
+    "all": [
+      5
+    ],
+    "just": [
+      5,
+      7
+    ],
+    "swipe": [
+      5
+    ],
+    "sure": [
+      5
+    ],
+    "back": [
+      6,
+      7
+    ],
+    "front": [
+      6,
+      7
+    ],
+    "it": [
+      6,
+      7
+    ],
+    "was": [
+      6
+    ],
+    "responding": [
+      6
+    ],
+    "shut": [
+      6,
+      7
+    ],
+    "down": [
+      6,
+      7
+    ],
+    "end": [
+      6,
+      7
+    ],
+    "running": [
+      6
+    ],
+    "till": [
+      6
+    ],
+    "tip": [
+      7
+    ],
+    "side": [
+      7
+    ],
+    "ve": [
+      7
+    ],
+    "kill": [
+      7
+    ],
+    "still": [
+      7
+    ],
+    "responses": [
+      7
+    ],
+    "seeing": [
+      7
+    ],
+    "admin": [
+      7
+    ],
+    "server": [
+      7
+    ],
+    "actually": [
+      7
+    ],
+    "quick": [
+      7
+    ],
+    "got": [
+      7
+    ],
+    "alive": [
+      7
+    ],
+    "from": [
+      7
+    ],
+    "command": [
+      7
+    ],
+    "manually": [
+      7
+    ],
+    "system": [
+      7
+    ],
+    "line": [
+      7
+    ],
+    "can": [
+      7
+    ],
+    "process": [
+      7
+    ]
+  }
+}

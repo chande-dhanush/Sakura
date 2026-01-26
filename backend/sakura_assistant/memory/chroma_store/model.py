@@ -22,15 +22,15 @@ def get_embedding_model():
     
     with _embed_lock:
         if _embedding_model is None:
-            logger.info(f"🧠 Loading Chroma embedding model: {EMBEDDING_MODEL_NAME}...")
-            print(f"🧠 Loading Chroma embedding model: {EMBEDDING_MODEL_NAME}...")
+            logger.info(f" Loading Chroma embedding model: {EMBEDDING_MODEL_NAME}...")
+            print(f" Loading Chroma embedding model: {EMBEDDING_MODEL_NAME}...")
             try:
                 _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-                logger.info("✅ Chroma embeddings loaded.")
-                print("✅ Chroma embeddings loaded.")
+                logger.info(" Chroma embeddings loaded.")
+                print(" Chroma embeddings loaded.")
             except Exception as e:
                 logger.error(f"Failed to load Chroma embedding model: {e}")
-                print(f"❌ Failed to load embedding model: {e}")
+                print(f" Failed to load embedding model: {e}")
                 return None
         
         _embed_last_used = time.time()
@@ -69,13 +69,13 @@ def unload_embedding_model():
     
     with _embed_lock:
         if _embedding_model is not None:
-            logger.info("💤 Unloading Chroma embeddings (idle timeout)...")
-            print("💤 Unloading Chroma embeddings (idle timeout)...")
+            logger.info(" Unloading Chroma embeddings (idle timeout)...")
+            print(" Unloading Chroma embeddings (idle timeout)...")
             del _embedding_model
             _embedding_model = None
             gc.collect()
-            logger.info("✅ Chroma embeddings unloaded.")
-            print("✅ Chroma embeddings unloaded.")
+            logger.info(" Chroma embeddings unloaded.")
+            print(" Chroma embeddings unloaded.")
 
 def is_loaded() -> bool:
     """Check if embedding model is currently loaded."""

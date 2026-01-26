@@ -143,7 +143,7 @@ def create_default_files():
 
 def main():
     print("=" * 60)
-    print("🌸 SAKURA V15: FRESH START")
+    print(" SAKURA V15: FRESH START")
     print("=" * 60)
     print()
     
@@ -151,25 +151,25 @@ def main():
         DATA_DIR.mkdir(parents=True)
         print(f"Created data directory: {DATA_DIR}")
     
-    print("📦 Creating backup...")
+    print(" Creating backup...")
     backup_dir = backup_before_clear()
     print(f"  Backup saved to: {backup_dir}")
     print()
     
-    print("🗑️  Clearing files...")
+    print("️  Clearing files...")
     clear_files()
     print()
     
-    print("📁 Clearing directories...")
+    print(" Clearing directories...")
     clear_directories()
     print()
     
-    print("✨ Creating default files...")
+    print(" Creating default files...")
     create_default_files()
     print()
     
     print("=" * 60)
-    print("✅ Fresh start complete!")
+    print(" Fresh start complete!")
     print()
     print("Next steps:")
     print("  1. Start the server: python server.py")

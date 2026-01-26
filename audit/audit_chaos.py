@@ -129,8 +129,8 @@ def audit_llm_failover():
     }
     
     try:
-        from sakura_assistant.core.model_wrapper import ReliableLLM
-        from sakura_assistant.core.container import get_container
+        from sakura_assistant.core.models.wrapper import ReliableLLM
+        from sakura_assistant.core.infrastructure.container import get_container
         import inspect
         
         # Check if failover logic exists in code
@@ -166,12 +166,12 @@ def audit_executor_recovery():
     }
     
     try:
-        from sakura_assistant.core.executor import ToolExecutor
+        from sakura_assistant.core.execution.executor import ToolExecutor, ExecutionPolicy
         
-        if hasattr(ToolExecutor, 'FALLBACK_MAP'):
+        if hasattr(ExecutionPolicy, 'FALLBACK_MAP'):
             results["fallback_map_exists"] = True
             results["fallback_chains"] = [
-                f"{k} -> {v}" for k, v in ToolExecutor.FALLBACK_MAP.items()
+                f"{k} -> {v}" for k, v in ExecutionPolicy.FALLBACK_MAP.items()
             ]
             print(f"  Fallback chains found:")
             for chain in results["fallback_chains"]:

@@ -10,7 +10,7 @@ These tests verify the core invariants of the World Graph:
 """
 import pytest
 from datetime import datetime, timedelta
-from sakura_assistant.core.world_graph import (
+from sakura_assistant.core.graph.world_graph import (
     WorldGraph,
     EntityNode,
     ActionNode,

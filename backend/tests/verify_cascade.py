@@ -6,7 +6,7 @@ class MockLLM:
     async def ainvoke(self, messages): return None
 
 def test_cascade():
-    print("🧪 Starting Search Cascade Test...")
+    print(" Starting Search Cascade Test...")
     p = Planner(MockLLM())
     
     # Mock tools
@@ -21,11 +21,11 @@ def test_cascade():
         names = [t.name for t in tools]
         print(f"Tools: {names}") 
         if "web_search" not in names and "search_wikipedia" in names:
-            print("✅ Tavily HIDDEN")
+            print(" Tavily HIDDEN")
         else:
-            print("❌ Gating Failed")
+            print(" Gating Failed")
     except Exception as e:
-        print(f"❌ Test 1 Error: {e}")
+        print(f" Test 1 Error: {e}")
 
     # 2. Cascade (With history)
     print("\nTest 2: Cascade Trigger (History present)")
@@ -35,11 +35,11 @@ def test_cascade():
         names = [t.name for t in tools]
         print(f"Tools: {names}")
         if "web_search" in names:
-            print("✅ Tavily UNLOCKED (Cascade worked)")
+            print(" Tavily UNLOCKED (Cascade worked)")
         else:
-            print("❌ Cascade Failed - Tavily still hidden")
+            print(" Cascade Failed - Tavily still hidden")
     except Exception as e:
-        print(f"❌ Test 2 Error: {e}")
+        print(f" Test 2 Error: {e}")
 
 if __name__ == "__main__":
     test_cascade()

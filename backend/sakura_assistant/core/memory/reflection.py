@@ -12,7 +12,7 @@ import asyncio
 import json
 import re
 from typing import List, Dict, Any, Optional
-from ..world_graph import get_world_graph, WorldGraph, EntityType, EntitySource, EntityLifecycle
+from ..graph.world_graph import get_world_graph, WorldGraph, EntityType, EntitySource, EntityLifecycle
 
 
 class ReflectionEngine:
@@ -37,7 +37,7 @@ class ReflectionEngine:
 
     def _get_llm(self):
         if not self._llm:
-            from ..container import get_container
+            from ..infrastructure.container import get_container
             self._llm = get_container().get_router_llm()  # Use fast 8B model
         return self._llm
 
@@ -81,7 +81,7 @@ class ReflectionEngine:
             # Skip if user message is too short (saves Groq RPM)
             if len(latest_user) < 15:
                 self.last_reflected_index = current_len
-                print(f"💨 [Reflection] Skipping short message ({len(latest_user)} chars)")
+                print(f" [Reflection] Skipping short message ({len(latest_user)} chars)")
                 return
         
         # Filter for meaningful content
@@ -97,7 +97,7 @@ class ReflectionEngine:
         # 3. Update pointer immediately (prevent double processing)
         self.last_reflected_index = current_len
         
-        print(f"🤔 [Reflection] Analyzing {len(delta)} new messages...")
+        print(f" [Reflection] Analyzing {len(delta)} new messages...")
 
         # 4. Prepare Prompt
         from ...config import REFLECTION_SYSTEM_PROMPT
@@ -139,7 +139,7 @@ class ReflectionEngine:
 
         except Exception as e:
             # Red Team requirement: Never crash on reflection failure
-            print(f"❌ [Reflection] Error (non-fatal): {e}")
+            print(f" [Reflection] Error (non-fatal): {e}")
 
     def _safe_parse_json(self, content: str) -> Optional[Dict]:
         """
@@ -210,7 +210,7 @@ class ReflectionEngine:
                 if ent.get("summary"):
                     node.summary = ent["summary"]
             
-            print(f"✨ [Reflection] Entity: {eid} -> {ent.get('summary')}")
+            print(f" [Reflection] Entity: {eid} -> {ent.get('summary')}")
 
     def _process_constraints(self, constraints: List[Dict]):
         """
@@ -264,7 +264,7 @@ class ReflectionEngine:
             if criticality > 0.8:
                 # Critical constraints bypass normal rules entirely
                 node.confidence = 1.0
-                print(f"🚨 [Reflection] CRITICAL Constraint: {constraint_id} (criticality={criticality})")
+                print(f" [Reflection] CRITICAL Constraint: {constraint_id} (criticality={criticality})")
             else:
                 node.confidence = max(node.confidence, 0.8)
                 print(f"⚠️ [Reflection] Constraint: {constraint_id} -> {summary}")
@@ -286,14 +286,14 @@ class ReflectionEngine:
                 entity = self.wg.entities[retire_id]
                 entity.lifecycle_state = EntityLifecycle.EPHEMERAL
                 entity.confidence = 0.1
-                print(f"✅ [Reflection] Retired: {retire_id}")
+                print(f" [Reflection] Retired: {retire_id}")
             else:
                 # Try fuzzy match on constraint: entities
                 for eid, entity in self.wg.entities.items():
                     if eid.startswith("constraint:") and retire_id.lower() in eid.lower():
                         entity.lifecycle_state = EntityLifecycle.EPHEMERAL
                         entity.confidence = 0.1
-                        print(f"✅ [Reflection] Retired (fuzzy): {eid}")
+                        print(f" [Reflection] Retired (fuzzy): {eid}")
                         break
 
 

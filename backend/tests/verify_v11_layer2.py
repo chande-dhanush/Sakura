@@ -19,7 +19,7 @@ from sakura_assistant.core.ephemeral_manager import EphemeralManager
 from sakura_assistant.core.tools_libs.memory_tools import query_ephemeral
 
 async def test_context_valve():
-    print("\n🛡️ Testing V11.3 Context Valve...")
+    print("\n️ Testing V11.3 Context Valve...")
     
     # 1. Setup Mock Ephemeral Manager
     mock_eph_man = MagicMock()
@@ -50,17 +50,17 @@ async def test_context_valve():
         print(f"   Executor Output Preview: {output[:200]}")
         
         if "Context Overflow Protection" in output:
-            print("✅ Interception Triggered Successfully")
+            print(" Interception Triggered Successfully")
         else:
-            print("❌ Interception FAILED")
+            print(" Interception FAILED")
             return
             
         # Verify Ingest Call
         mock_eph_man.ingest_text.assert_called_once()
-        print("✅ EphemeralManager.ingest_text() called")
+        print(" EphemeralManager.ingest_text() called")
 
 async def test_ephemeral_query():
-    print("\n📦 Testing Ephemeral Query Tool...")
+    print("\n Testing Ephemeral Query Tool...")
     
     # Mock Manager Query
     mock_eph_man = MagicMock()
@@ -71,14 +71,14 @@ async def test_ephemeral_query():
         print(f"   Query Result: {res}")
         
         if "Found relevant context" in res:
-             print("✅ query_ephemeral tool works")
+             print(" query_ephemeral tool works")
         else:
-             print("❌ query_ephemeral failed")
+             print(" query_ephemeral failed")
 
 async def main():
     await test_context_valve()
     await test_ephemeral_query()
-    print("\n🎉 V11.3 Context Valve Verification COMPLETE.")
+    print("\n V11.3 Context Valve Verification COMPLETE.")
 
 if __name__ == "__main__":
     asyncio.run(main())

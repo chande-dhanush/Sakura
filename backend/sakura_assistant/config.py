@@ -2,7 +2,7 @@ import os
 import json
 from dotenv import load_dotenv
 from dotenv import load_dotenv
-from sakura_assistant.utils.pathing import normalize_path, get_project_root
+from .utils.pathing import normalize_path, get_project_root
 
 # Load environment variables
 # Load environment variables
@@ -247,14 +247,30 @@ TOOL HIERARCHY (OBEY THIS ORDER):
 5. EMAIL → gmail_read_email or gmail_send_email
 6. CALENDAR → calendar_get_events or calendar_create_event
 7. NOTES → note_create or note_list
-8. GENERAL SEARCH → web_search (ONLY if above don't apply)
+8. APPS → open_app
+9. GENERAL SEARCH → web_search (ONLY if above don't apply)
+
+INSTRUCTIONS:
+You have access to tools. CALL THE TOOLS directly to fulfill the user's request.
+- For multi-step requests (e.g. "Do A, then B, and also C"), CALL MULTIPLE TOOLS in one turn if possible.
+- Do NOT output a JSON plan in text. Just use the tools.
+- If you need to search, play music, and open an app, generate THREE separate tool calls.
+
+EXAMPLES:
+User: "Play No Friends on Spotify"
+Action: Call tool 'spotify_control' with args {{'action': 'play', 'song_name': 'no friends'}}
+
+User: "Open VS Code, play music, and search news"
+Action: Call 3 tools:
+1. open_app(app_name="Visual Studio Code")
+2. spotify_control(action="play")
+3. web_search(query="latest news")
 
 RULES:
-- "search/find/look up" → MUST use tool, not memory
-- Real-time data (prices, weather) → MUST use tool
-- Resolve pronouns (it/that/this) from history before calling
-- Keep reasoning under 30 words
-- Extract args exactly as user stated"""
+- "and" / "then" / "also" → MULTIPLE tool calls
+- Extract args exactly as user stated
+- Keep reasoning short
+- CRITICAL: Do NOT repeat tools that have already been executed successfully (check context)."""
 
 # Planner: Retry prompt (V9.2 - ultra-compressed for 8B)
 PLANNER_RETRY_PROMPT = """RETRY: {hindsight}
@@ -273,20 +289,20 @@ VERIFIER_SYSTEM_PROMPT = """You verify if a tool execution satisfied the user's 
 OUTPUT FORMAT: {"verdict": "PASS" or "FAIL", "reason": "≤12 words"}
 
 ═══ PASS CONDITIONS ═══
-✓ Tool succeeded AND result answers the request
-✓ Write operations confirmed: "Note created", "Email sent", "Event created"
-✓ Control operations confirmed: "Now playing", "Paused", "Volume set"
-✓ VALID EMPTY RESULTS (these are NOT failures):
+ Tool succeeded AND result answers the request
+ Write operations confirmed: "Note created", "Email sent", "Event created"
+ Control operations confirmed: "Now playing", "Paused", "Volume set"
+ VALID EMPTY RESULTS (these are NOT failures):
   - "No unread emails" when checking inbox
   - "No events today" when checking calendar
   - "No matching results" from search (searched but nothing found)
-✓ "No action needed" scenarios
+ "No action needed" scenarios
 
 ═══ FAIL CONDITIONS ═══
-✗ Explicit errors: "Error:", "Failed:", "Exception"
-✗ Wrong entity/date/subject returned vs what user asked
-✗ Tool didn't execute or crashed
-✗ Content expected but result genuinely empty (blank string)
+ Explicit errors: "Error:", "Failed:", "Exception"
+ Wrong entity/date/subject returned vs what user asked
+ Tool didn't execute or crashed
+ Content expected but result genuinely empty (blank string)
 
 RULE: Empty list ≠ Failure. "No emails" = PASS. Blank/error = FAIL.
 RULE: If confidence < 80%, output FAIL.
@@ -320,11 +336,19 @@ Example: "yes [6] - technical interest in AI topic"
 """
 
 # Reflection Engine: V14 Unified Memory + Constraint Extractor
-REFLECTION_SYSTEM_PROMPT = """You are the memory processor for an AI assistant. Analyze the conversation and extract:
+# V17 Update: Added strict signal-to-noise rules to prevent over-eager extraction
+REFLECTION_SYSTEM_PROMPT = """You are the memory processor for an AI assistant. Analyze the conversation and extract ONLY high-signal information.
 
-1. ENTITIES: People, topics, preferences mentioned
-2. CONSTRAINTS: Physical limitations, deadlines, injuries, health issues
-3. RETIREMENTS: Previous constraints that are now resolved
+1. ENTITIES: People, personal facts, and EXPLICIT preferences (likes/dislikes).
+2. CONSTRAINTS: Physical limitations, deadlines, health issues.
+3. RETIREMENTS: Previous constraints that are now resolved.
+
+=== EXTRACTION RULES (CRITICAL) ===
+- DO NOT extract preferences for tools/features just because they are mentioned or used (e.g., "User likes email" is NOISE).
+- ONLY extract preferences the user explicitly states (e.g., "I love dark chocolate", "I prefer short answers").
+- DO NOT extract facts about the assistant or the system.
+- Extract personal facts: name, location, job, age, family members.
+- If the turn is purely technical/debug (e.g., "Verifying tools...", "Test script output"), extract NOTHING.
 
 === CONSTRAINT DETECTION ===
 Look for physical/temporal limitations:
@@ -341,28 +365,17 @@ Look for resolution phrases:
 === OUTPUT JSON ===
 {
   "entities": [
-    {"id": "pref:coding", "type": "preference", "summary": "User likes Python", "attributes": {}}
+    {"id": "pref:dark_mode", "type": "preference", "summary": "User prefers dark mode UI", "attributes": {}}
   ],
-  "constraints": [
-    {
-      "id": "constraint:surgery_001",
-      "type": "constraint",
-      "summary": "Cannot walk - leg surgery recovery",
-      "attributes": {
-        "constraint_type": "physical",
-        "implications": ["walking", "exercise", "standing"],
-        "criticality": 0.9
-      }
-    }
-  ],
-  "retirements": ["constraint:old_id_to_archive"]
+  "constraints": [],
+  "retirements": []
 }
 
 RULES:
 - Return VALID JSON only. No markdown, no explanations.
-- If nothing new, return: {"entities": [], "constraints": [], "retirements": []}
+- If nothing high-signal is found, return: {"entities": [], "constraints": [], "retirements": []}
 - constraint_type must be: "physical" | "temporal" | "resource"
-- criticality: 0.0 (minor) to 1.0 (life-threatening)
+- criticality: 0.0 to 1.0
 """
 
 # Responder guardrail: Prevents tool calling in text-only response

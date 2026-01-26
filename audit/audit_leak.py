@@ -42,7 +42,7 @@ def audit_memory_leak_lightweight():
     """
     print("💧 Starting Memory Leak Audit (Lightweight Mode)...")
     
-    from sakura_assistant.core.world_graph import WorldGraph, EntityType, EntitySource
+    from sakura_assistant.core.graph.world_graph import WorldGraph, EntityType, EntitySource
     from sakura_assistant.core.tools import get_all_tools
     
     # Force garbage collection before starting

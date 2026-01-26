@@ -104,12 +104,12 @@ class DesireSystem:
                 with open(persist_path, "r") as f:
                     data = json.load(f)
                     self.state = DesireState.from_dict(data)
-                    print(f"💓 [DesireSystem] Loaded state: battery={self.state.social_battery:.2f}, loneliness={self.state.loneliness:.2f}")
+                    print(f" [DesireSystem] Loaded state: battery={self.state.social_battery:.2f}, loneliness={self.state.loneliness:.2f}")
             except Exception as e:
                 print(f"⚠️ [DesireSystem] Failed to load state: {e}")
                 self.state = DesireState()
         else:
-            print("💓 [DesireSystem] Starting fresh")
+            print(" [DesireSystem] Starting fresh")
             
         # Check for day rollover
         self._check_day_rollover()
@@ -122,7 +122,7 @@ class DesireSystem:
         if now.date() != last_interaction.date():
             self.state.messages_today = 0
             self.state.initiations_today = 0
-            print("🌅 [DesireSystem] New day - counters reset")
+            print(" [DesireSystem] New day - counters reset")
     
     def save(self):
         """Persist state to disk."""
@@ -160,7 +160,7 @@ class DesireSystem:
             self.state.curiosity = min(1.0, self.state.curiosity + 0.1)
         
         self.save()
-        print(f"💬 [DesireSystem] User message: battery={self.state.social_battery:.2f}, loneliness={self.state.loneliness:.2f}")
+        print(f" [DesireSystem] User message: battery={self.state.social_battery:.2f}, loneliness={self.state.loneliness:.2f}")
     
     def on_assistant_message(self, message: str):
         """
@@ -307,7 +307,7 @@ class DesireSystem:
         self.state.initiations_today += 1
         self.state.loneliness = 0.3  # Reset loneliness after reaching out
         self.save()
-        print("💌 [DesireSystem] Recorded proactive initiation")
+        print(" [DesireSystem] Recorded proactive initiation")
     
     def get_state(self) -> DesireState:
         """Get current state for inspection."""

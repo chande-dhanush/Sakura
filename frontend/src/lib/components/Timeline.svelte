@@ -91,6 +91,7 @@
     .timeline {
         flex: 1;
         overflow-y: auto;
+        overflow-x: hidden; /* Prevent horizontal scroll */
         padding: 20px;
         display: flex;
         flex-direction: column;

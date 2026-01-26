@@ -14,7 +14,7 @@ class SmartResearcher:
         if not self._llm:
             # We need a lightweight LLM instance, or reuse the main one.
             # For now, let's create a dedicated one or import global
-            from ..container import get_container
+            from ..infrastructure.container import get_container
             self._llm = get_container().get_responder_llm() # Use Responder (70B) for synthesis
         return self._llm
 
@@ -44,7 +44,7 @@ class SmartResearcher:
         Execute Two-Tier Research with Smart Caching.
         """
         from tavily import TavilyClient
-        from ..broadcaster import broadcast
+        from ..infrastructure.broadcaster import broadcast
         
         # 0. Broadcasting Start
         broadcast("research_start", {"query": query, "step": "Checking Cache..."})
@@ -88,7 +88,7 @@ class SmartResearcher:
                     timestamp = results["metadatas"][0][0].get("timestamp")
                     print(f"⚡ SmartResearcher: Cache Hit (dist={distance:.4f})")
                     broadcast("cache_hit", {"query": query, "distance": distance})
-                    return f"💡 **[Cached Result - {timestamp}]:**\n{cached_summary}"
+                    return f" **[Cached Result - {timestamp}]:**\n{cached_summary}"
         except Exception as e:
             print(f"⚠️ Cache check failed: {e}")
             # Do NOT crash, proceed to live search
@@ -97,12 +97,12 @@ class SmartResearcher:
 
         api_key = os.getenv("TAVILY_API_KEY")
         if not api_key:
-            return "❌ Tavily API Key missing."
+            return " Tavily API Key missing."
 
         client = TavilyClient(api_key=api_key)
         tier = self._determine_tier(query)
         
-        print(f"🕵️ SmartResearcher: Analyzing '{query}' via Tier: {tier.upper()}")
+        print(f"️ SmartResearcher: Analyzing '{query}' via Tier: {tier.upper()}")
         broadcast("tool_start", {"tool": "Tavily", "tier": tier, "query": query})
         
         try:
@@ -116,7 +116,7 @@ class SmartResearcher:
                 
                 # Simple summary for basic facts
                 if not results:
-                    return "❌ No results found."
+                    return " No results found."
                 
                 # Just return a neat list for basic facts, or simple synthesis
                 out = [f"**Research Results (Basic):**"]
@@ -130,7 +130,7 @@ class SmartResearcher:
                 results = response.get("results", [])
                 
                 if not results:
-                    return "❌ No results found."
+                    return " No results found."
                 
                 # Synthesize with LLM
                 context = []
@@ -159,7 +159,7 @@ class SmartResearcher:
                 # Direct LLM call
                 response = await llm.ainvoke([HumanMessage(content=prompt)])
                 
-                final_output = f"🧠 **Research Verdict:**\n\n{response.content}"
+                final_output = f" **Research Verdict:**\n\n{response.content}"
 
             # --- SAVE TO CACHE ---
             if collection and query_emb:
@@ -172,7 +172,7 @@ class SmartResearcher:
                         documents=[final_output],
                         metadatas=[{"query": query, "timestamp": time.ctime(), "tier": tier}]
                     )
-                    print("💾 Saved result to SmartCache")
+                    print(" Saved result to SmartCache")
                 except Exception as e:
                     print(f"⚠️ Cache save failed: {e}")
             else:
@@ -181,7 +181,7 @@ class SmartResearcher:
             return final_output
 
         except Exception as e:
-            return f"❌ Research Error: {e}"
+            return f" Research Error: {e}"
 
 # Tool Wrapper
 @tool

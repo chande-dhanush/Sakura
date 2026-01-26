@@ -39,8 +39,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-PASS = "✅"
-FAIL = "❌"
+PASS = ""
+FAIL = ""
 WARN = "⚠️"
 INFO = "ℹ️"
 
@@ -123,7 +123,7 @@ def audit_imports():
         test("ReflectionEngine import", False, str(e))
     
     try:
-        from sakura_assistant.core.world_graph import get_world_graph
+        from sakura_assistant.core.graph.world_graph import get_world_graph
         test("WorldGraph import", True)
     except Exception as e:
         test("WorldGraph import", False, str(e))
@@ -390,7 +390,7 @@ def audit_world_graph():
     """Audit World Graph configuration."""
     section("7. WORLD GRAPH")
     
-    from sakura_assistant.core.world_graph import WorldGraph, EntityType, EntityLifecycle
+    from sakura_assistant.core.graph.world_graph import WorldGraph, EntityType, EntityLifecycle
     
     # Test atomic save
     wg = WorldGraph()
@@ -545,7 +545,7 @@ def audit_cognitive():
     test("Has analyze_turn_async method", hasattr(re, 'analyze_turn_async'))
     
     # 10.4 World Graph context injection
-    from sakura_assistant.core.world_graph import get_world_graph
+    from sakura_assistant.core.graph.world_graph import get_world_graph
     
     wg = get_world_graph()
     context = wg.get_context_for_responder()
@@ -646,7 +646,7 @@ def audit_solid():
     print("\n  --- L: Liskov Substitution ---")
     
     # Enum types should be safely substitutable
-    from sakura_assistant.core.world_graph import EntityType, EntityLifecycle, EntitySource
+    from sakura_assistant.core.graph.world_graph import EntityType, EntityLifecycle, EntitySource
     
     # Check all enum values are strings (consistent substitution)
     test("EntityType values are strings", all(isinstance(e.value, str) for e in EntityType))
@@ -687,7 +687,7 @@ def audit_solid():
          'main_llm' in params or 'llm' in params or len(params) > 1)
     
     # World Graph uses singleton pattern with get_* accessor
-    from sakura_assistant.core.world_graph import get_world_graph, set_world_graph
+    from sakura_assistant.core.graph.world_graph import get_world_graph, set_world_graph
     test("WorldGraph supports injection (set_world_graph)", callable(set_world_graph))
     
     # Check broadcaster uses callback pattern (loose coupling)
@@ -702,7 +702,7 @@ def audit_solid():
 
 def main():
     print()
-    print("🔍 SAKURA V15.2.2 PRODUCTION AUDIT")
+    print(" SAKURA V15.2.2 PRODUCTION AUDIT")
     print(f"   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("   Includes: Security, Thread Safety, Performance, SOLID Principles")
     
@@ -721,11 +721,11 @@ def main():
     success = print_summary()
     
     if success:
-        print("✅ All checks passed! V15.2.2 is production-ready.")
-        print("🛡️ Security hardening verified (OWASP compliant)")
-        print("📐 SOLID principles verified (desktop app)")
+        print(" All checks passed! V15.2.2 is production-ready.")
+        print("️ Security hardening verified (OWASP compliant)")
+        print(" SOLID principles verified (desktop app)")
     else:
-        print("❌ Some checks failed. Please fix before deploying.")
+        print(" Some checks failed. Please fix before deploying.")
     
     return 0 if success else 1
 

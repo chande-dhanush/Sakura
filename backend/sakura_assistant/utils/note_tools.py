@@ -14,6 +14,40 @@ NOTE_ROOT = get_note_root()
 
 # --- Helpers ---
 
+def _sanitize_folder_name(folder: str) -> str:
+    """
+    V17.2 SECURITY FIX: Sanitize folder name to prevent directory traversal.
+    
+    Removes:
+    - Parent directory references (..)
+    - Path separators (/, \\)
+    - Non-alphanumeric characters (except space, dash, underscore)
+    
+    Args:
+        folder: Raw folder name from user/LLM
+        
+    Returns:
+        Sanitized folder name safe for os.path.join
+    """
+    if not folder:
+        return ""
+    
+    # Remove dangerous patterns
+    folder = folder.replace("..", "")
+    folder = folder.replace("/", "_")
+    folder = folder.replace("\\", "_")
+    
+    # Whitelist safe characters only
+    safe_folder = "".join(
+        c for c in folder 
+        if c.isalnum() or c in (' ', '_', '-')
+    )
+    
+    # Trim and collapse multiple spaces
+    safe_folder = " ".join(safe_folder.split())
+    
+    return safe_folder[:100]  # Max 100 chars
+
 def slugify(title: str) -> str:
     """
     Replace spaces with underscores, lowercase, trim, safe characters only.
@@ -32,8 +66,19 @@ def ensure_folder(folder: str):
 def get_note_path(title: str, folder: str) -> str:
     """Return full .md path inside NOTE_ROOT."""
     safe_title = slugify(title)
-    ensure_folder(folder)
-    return os.path.join(NOTE_ROOT, folder, f"{safe_title}.md")
+    
+    # V17.2: Sanitize folder to prevent traversal
+    # Note: ensure_folder calls this or needs to be safe. 
+    # The directive says apply sanitization to all functions or usage. 
+    # get_note_path is the central place where os.path.join uses folder.
+    
+    if folder:
+        safe_folder = _sanitize_folder_name(folder)
+        ensure_folder(safe_folder)
+        return os.path.join(NOTE_ROOT, safe_folder, f"{safe_title}.md")
+    
+    ensure_folder("") # root
+    return os.path.join(NOTE_ROOT, f"{safe_title}.md")
 
 def get_daily_note_title(date: Optional[datetime] = None) -> str:
     """Format YYYY-MM-DD"""
@@ -60,7 +105,7 @@ def note_create(title: str, content: str, folder: str = "topics", force: bool = 
     try:
         path = get_note_path(title, folder)
         # if os.path.exists(path) and not force:
-        #     return f"❌ Note '{title}' already exists. Use note_append or force=True."
+        #     return f" Note '{title}' already exists. Use note_append or force=True."
         
         with open(path, 'w', encoding='utf-8') as f:
             f.write(f"# {title}\n\n{content}")
@@ -71,9 +116,9 @@ def note_create(title: str, content: str, folder: str = "topics", force: bool = 
         except Exception:
             pass
             
-        return f"✅ Note created/updated: {path}"
+        return f" Note created/updated: {path}"
     except Exception as e:
-        return f"❌ Error creating note: {e}"
+        return f" Error creating note: {e}"
 
 @tool
 def note_append(title: str, content: str, folder: str = "topics") -> str:
@@ -94,15 +139,15 @@ def note_append(title: str, content: str, folder: str = "topics") -> str:
             except Exception:
                 pass
                 
-            return f"✅ Created new note and appended: {path}"
+            return f" Created new note and appended: {path}"
         
         # Append
         with open(path, 'a', encoding='utf-8') as f:
             f.write(f"\n\n{content}")
             
-        return f"✅ Appended to note: {path}"
+        return f" Appended to note: {path}"
     except Exception as e:
-        return f"❌ Error appending note: {e}"
+        return f" Error appending note: {e}"
 
 @tool
 def note_overwrite(title: str, content: str, folder: str = "topics") -> str:
@@ -119,12 +164,12 @@ def note_read(title: str, folder: str = "topics") -> str:
     try:
         path = get_note_path(title, folder)
         if not os.path.exists(path):
-            return f"❌ Note '{title}' not found in '{folder}'."
+            return f" Note '{title}' not found in '{folder}'."
             
         with open(path, 'r', encoding='utf-8') as f:
             return f.read()
     except Exception as e:
-        return f"❌ Error reading note: {e}"
+        return f" Error reading note: {e}"
 
 @tool
 def note_list(folder: str = "topics") -> str:
@@ -132,16 +177,18 @@ def note_list(folder: str = "topics") -> str:
     List all .md files in a folder.
     """
     try:
-        ensure_folder(folder)
-        folder_path = os.path.join(NOTE_ROOT, folder)
+        # V17.2: Sanitize folder
+        safe_folder = _sanitize_folder_name(folder) if folder else "topics"
+        ensure_folder(safe_folder)
+        folder_path = os.path.join(NOTE_ROOT, safe_folder)
         files = [f for f in os.listdir(folder_path) if f.endswith('.md')]
         
         if not files:
-            return f"📂 Folder '{folder}' is empty."
+            return f" Folder '{safe_folder}' is empty."
             
-        return f"📂 Notes in '{folder}':\n" + "\n".join([f"- {f}" for f in files])
+        return f" Notes in '{safe_folder}':\n" + "\n".join([f"- {f}" for f in files])
     except Exception as e:
-        return f"❌ Error listing notes: {e}"
+        return f" Error listing notes: {e}"
 
 @tool
 def note_delete(title: str, folder: str = "topics") -> str:
@@ -149,18 +196,19 @@ def note_delete(title: str, folder: str = "topics") -> str:
     Delete a note (creating a .bak backup first).
     """
     try:
+        # Note: get_note_path sanitizes internally now
         path = get_note_path(title, folder)
         if not os.path.exists(path):
-            return f"❌ Note '{title}' not found."
+            return f" Note '{title}' not found."
             
         # Backup
         backup_path = path + ".bak"
         shutil.copy2(path, backup_path)
         
         os.remove(path)
-        return f"🗑️ Deleted '{title}' (Backup created: {os.path.basename(backup_path)})"
+        return f"️ Deleted '{title}' (Backup created: {os.path.basename(backup_path)})"
     except Exception as e:
-        return f"❌ Error deleting note: {e}"
+        return f" Error deleting note: {e}"
 
 @tool
 def note_search(keyword: str) -> str:
@@ -170,7 +218,7 @@ def note_search(keyword: str) -> str:
     """
     try:
         if not os.path.exists(NOTE_ROOT):
-            return "❌ Note root directory does not exist."
+            return " Note root directory does not exist."
             
         matches = []
         keyword_lower = keyword.lower()
@@ -204,19 +252,19 @@ def note_search(keyword: str) -> str:
                         continue
                         
         if not matches:
-            return f"🔍 No matches found for '{keyword}'."
+            return f" No matches found for '{keyword}'."
             
         # Sort by count desc
         matches.sort(key=lambda x: x['count'], reverse=True)
         
-        out = [f"🔍 Found {len(matches)} matches for '{keyword}':"]
+        out = [f" Found {len(matches)} matches for '{keyword}':"]
         for m in matches[:10]: # Top 10
             out.append(f"- {m['path']} ({m['count']} matches): {m['preview']}")
             
         return "\n\n".join(out)
         
     except Exception as e:
-        return f"❌ Error searching notes: {e}"
+        return f" Error searching notes: {e}"
 
 @tool
 def note_open(title: str) -> str:
@@ -239,7 +287,7 @@ def note_open(title: str) -> str:
                         matches.append((os.path.join(root, file), 50))
         
         if not matches:
-            return f"❌ Note '{title}' not found."
+            return f" Note '{title}' not found."
             
         # Sort by score desc, then shortest length
         matches.sort(key=lambda x: (-x[1], len(x[0])))
@@ -247,9 +295,9 @@ def note_open(title: str) -> str:
         best_path = matches[0][0]
         try:
             os.startfile(best_path)
-            return f"📄 Opened note: {os.path.basename(best_path)}"
+            return f" Opened note: {os.path.basename(best_path)}"
         except Exception as e:
-            return f"❌ Open failed: {e}"
+            return f" Open failed: {e}"
             
     except Exception as e:
-        return f"❌ Error opening note: {e}"
+        return f" Error opening note: {e}"

@@ -79,7 +79,7 @@ def write_memory_atomic(path: Path, obj: Any):
         with open(str(path) + ".sha256", "w") as f:
             f.write(checksum)
     except Exception as e:
-        print(f"❌ Atomic write failed for {path}: {e}")
+        print(f" Atomic write failed for {path}: {e}")
 
 class VectorMemoryStore:
     """
@@ -129,12 +129,12 @@ class VectorMemoryStore:
             if self._embeddings_model is None:
                 if not FAISS_AVAILABLE:
                     return None
-                logger.info("🧠 Loading embedding model (lazy)...")
-                print("🧠 Loading embedding model (lazy)...")
+                logger.info(" Loading embedding model (lazy)...")
+                print(" Loading embedding model (lazy)...")
                 try:
                     self._embeddings_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-                    logger.info("✅ Embeddings loaded.")
-                    print("✅ Embeddings loaded.")
+                    logger.info(" Embeddings loaded.")
+                    print(" Embeddings loaded.")
                 except Exception as e:
                     logger.error(f"Failed to load embeddings: {e}")
                     return None
@@ -169,13 +169,13 @@ class VectorMemoryStore:
         """Unload embedding model to free memory."""
         with self._embed_lock:
             if self._embeddings_model is not None:
-                logger.info("💤 Unloading embeddings (idle timeout)...")
-                print("💤 Unloading embeddings (idle timeout)...")
+                logger.info(" Unloading embeddings (idle timeout)...")
+                print(" Unloading embeddings (idle timeout)...")
                 del self._embeddings_model
                 self._embeddings_model = None
                 gc.collect()
-                logger.info("✅ Embeddings unloaded.")
-                print("✅ Embeddings unloaded.")
+                logger.info(" Embeddings unloaded.")
+                print(" Embeddings unloaded.")
     
     @property
     def embeddings_model(self):
@@ -190,11 +190,11 @@ class VectorMemoryStore:
     def _initialize_system(self):
         try:
             if not FAISS_AVAILABLE:
-                print("🧠 Using basic memory (FAISS not available)")
+                print(" Using basic memory (FAISS not available)")
                 self.memory_stats["system_health"] = "basic"
                 return
                 
-            print("🧠 Initializing Vector Memory (lazy embeddings)...")
+            print(" Initializing Vector Memory (lazy embeddings)...")
             
             # P0: DO NOT load embeddings here - lazy load on first use
             # self._embeddings_model = SentenceTransformer(EMBEDDING_MODEL_NAME)  # REMOVED
@@ -208,7 +208,7 @@ class VectorMemoryStore:
                             self.faiss_index = faiss.read_index(str(FAISS_INDEX_PATH), faiss.IO_FLAG_MMAP)
                             self._mmap_active = True
                             logger.info("FAISS index loaded with MMAP")
-                            print(f"📂 Loaded FAISS index with MMAP ({self.faiss_index.ntotal} vectors)")
+                            print(f" Loaded FAISS index with MMAP ({self.faiss_index.ntotal} vectors)")
                         except Exception as e:
                             logger.warning(f"FAISS mmap failed, falling back to normal read: {e}")
                             print(f"⚠️ FAISS mmap failed, using normal read: {e}")
@@ -233,7 +233,7 @@ class VectorMemoryStore:
                             self.memory_importance = {}
                     
                     if not self._mmap_active:
-                        print(f"📂 Loaded FAISS index with {self.faiss_index.ntotal} vectors")
+                        print(f" Loaded FAISS index with {self.faiss_index.ntotal} vectors")
                 except Exception as e:
                     print(f"⚠️ Error loading FAISS index: {e}. Creating new one.")
                     self._create_new_index()
@@ -247,10 +247,10 @@ class VectorMemoryStore:
             self.memory_stats["total_memories"] = len(self.memory_texts)
             self.memory_stats["mmap_active"] = self._mmap_active
             
-            print(f"🧠 Memory initialized: {len(self.conversation_history)} msgs in memory, mmap={self._mmap_active}")
+            print(f" Memory initialized: {len(self.conversation_history)} msgs in memory, mmap={self._mmap_active}")
             
         except Exception as e:
-            print(f"❌ Error initializing memory: {e}")
+            print(f" Error initializing memory: {e}")
             self.memory_stats["system_health"] = "error"
 
     def _create_new_index(self):
@@ -293,11 +293,11 @@ class VectorMemoryStore:
                     json.dump(self.memory_importance, f, indent=2)
                     
             except Exception as e:
-                print(f"❌ Error saving index: {e}")
+                print(f" Error saving index: {e}")
 
     def _load_conversation(self):
         """Load conversation history, capped to MAX_INMEM_HISTORY."""
-        print(f"📜 [DEBUG] Checking history file: {CONVERSATION_FILE}")
+        print(f" [DEBUG] Checking history file: {CONVERSATION_FILE}")
         if CONVERSATION_FILE.exists():
             try:
                 with open(CONVERSATION_FILE, 'r', encoding='utf-8') as f:
@@ -306,11 +306,11 @@ class VectorMemoryStore:
                 # P0: Cap in-memory history to MAX_INMEM_HISTORY
                 if len(full_history) > MAX_INMEM_HISTORY:
                     self.conversation_history = full_history[-MAX_INMEM_HISTORY:]
-                    print(f"📜 Loaded last {MAX_INMEM_HISTORY} of {len(full_history)} messages")
+                    print(f" Loaded last {MAX_INMEM_HISTORY} of {len(full_history)} messages")
                 else:
                     self.conversation_history = full_history
                 
-                print(f"💬 In-memory history: {len(self.conversation_history)} messages")
+                print(f" In-memory history: {len(self.conversation_history)} messages")
             except Exception as e:
                 print(f"⚠️ Error loading conversation: {e}")
                 self.conversation_history = []
@@ -399,7 +399,7 @@ class VectorMemoryStore:
                     return  # Skip duplicate
             
             log_mem("STORE.append()", msg)
-            print(f"📝 [APPEND] {msg.get('role')} message to history (len={len(self.conversation_history)+1})")
+            print(f" [APPEND] {msg.get('role')} message to history (len={len(self.conversation_history)+1})")
             self.conversation_history.append(msg)
         self._trigger_debounced_save()
 
@@ -465,7 +465,7 @@ class VectorMemoryStore:
             self.get_context_for_query.cache_clear()
             
         except Exception as e:
-            print(f"❌ Error adding to vector store: {e}")
+            print(f" Error adding to vector store: {e}")
 
     @lru_cache(maxsize=256) # Increased cache size
     def get_context_for_query(self, query: str, k: int = 5, max_chars: int = 2500) -> str:
@@ -546,7 +546,7 @@ class VectorMemoryStore:
             return f"Relevant Memories (Budget: {current_chars}/{max_chars} chars):\n" + "\n".join(final_memories) + f"\n\nRecent Conversation:\n{recent_text}"
             
         except Exception as e:
-            print(f"❌ Error retrieving context: {e}")
+            print(f" Error retrieving context: {e}")
             return ""
 
     def delete_memory_by_keyword(self, keyword: str) -> int:
@@ -585,7 +585,7 @@ class VectorMemoryStore:
         for idx, text in enumerate(new_texts):
             self._update_inverted_index(text, idx)
             
-        print(f"🗑️ Deleted {deleted_count} memories containing '{keyword}'")
+        print(f"️ Deleted {deleted_count} memories containing '{keyword}'")
         return deleted_count
 
     def clear_all_memory(self):

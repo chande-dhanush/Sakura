@@ -13,21 +13,21 @@ TOOL RELIABILITY RESULTS:
 
 spotify_control:
   Attempts: 100
-  Successes: 99
-  Survival Rate: 99.0%
-  Failures Injected: 35
+  Successes: 96
+  Survival Rate: 96.0%
+  Failures Injected: 46
 
 get_weather:
   Attempts: 100
   Successes: 100
   Survival Rate: 100.0%
-  Failures Injected: 16
+  Failures Injected: 22
 
 gmail_read_email:
   Attempts: 100
-  Successes: 99
-  Survival Rate: 99.0%
-  Failures Injected: 20
+  Successes: 100
+  Survival Rate: 100.0%
+  Failures Injected: 17
 
 ----------------------------------------
 FAILOVER CHAIN STATUS:
@@ -44,6 +44,6 @@ EXECUTOR RECOVERY CHAINS:
 
 ============================================================
 OVERALL RELIABILITY GRADE: A
-Average Survival Rate: 99.3% (with 3 retries)
+Average Survival Rate: 98.7% (with 3 retries)
 Target: >95% survival under 30% failure injection
 ============================================================

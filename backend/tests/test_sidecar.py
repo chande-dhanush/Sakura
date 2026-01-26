@@ -21,7 +21,7 @@ print(f"USER_DETAILS: {len(USER_DETAILS)} chars")
 
 # Test LLM
 print("\n=== Testing LLM ===")
-from sakura_assistant.core.container import get_container
+from sakura_assistant.core.infrastructure.container import get_container
 c = get_container()
 print(f"has_groq: {c.has_groq}")
 print(f"has_backup: {c.has_backup}")

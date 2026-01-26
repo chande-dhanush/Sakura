@@ -68,7 +68,7 @@ def gmail_read_email(
     """
     print(f"Called Gmail Read (max={max_results}, unread={unread_only})")
     creds = get_google_creds()
-    if not creds: return "❌ Google Auth failed. Check token.json."
+    if not creds: return " Google Auth failed. Check token.json."
     
     try:
         service = build('gmail', 'v1', credentials=creds)
@@ -86,7 +86,7 @@ def gmail_read_email(
         results = service.users().messages().list(userId='me', q=q, maxResults=max_results).execute()
         messages = results.get('messages', [])
         
-        if not messages: return "📭 No emails found matching your criteria."
+        if not messages: return " No emails found matching your criteria."
         
         # 3. Parallel Fetch (The Speed Hack)
         # We need snippet (from list or full fetch) and headers (from metadata fetch)
@@ -115,7 +115,7 @@ def gmail_read_email(
         return _sanitize_email_list(raw_data, snippets)
         
     except Exception as e:
-        return f"❌ Gmail error: {e}"
+        return f" Gmail error: {e}"
 
 @tool
 @retry_with_auth
@@ -123,7 +123,7 @@ def gmail_send_email(to: str, subject: str, body: str) -> str:
     """Send an email."""
     print("Called Gmail send")
     creds = get_google_creds()
-    if not creds: return "❌ Google Auth failed."
+    if not creds: return " Google Auth failed."
     
     try:
         service = build('gmail', 'v1', credentials=creds)
@@ -133,9 +133,9 @@ def gmail_send_email(to: str, subject: str, body: str) -> str:
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
         
         service.users().messages().send(userId='me', body={'raw': raw}).execute()
-        return f"📨 Email sent to {to}."
+        return f" Email sent to {to}."
     except Exception as e:
-        return f"❌ Send failed: {e}"
+        return f" Send failed: {e}"
 
 # --- Calendar Tools ---
 
@@ -156,7 +156,7 @@ def calendar_get_events(
         max_results: Max events to return (default 10)
     """
     creds = get_google_creds()
-    if not creds: return "❌ Google Auth failed."
+    if not creds: return " Google Auth failed."
     
     try:
         print("Called Calendar get")
@@ -204,7 +204,7 @@ def calendar_get_events(
                 start_str = start_dt.strftime("%I:%M %p, %b %d")
             except:
                 start_str = start
-            out.append(f"🗓️ {start_str} - {summary}")
+            out.append(f"️ {start_str} - {summary}")
         
         # 2. Birthdays Calendar
         if include_birthdays:
@@ -223,15 +223,15 @@ def calendar_get_events(
                     if any(kw in summary.lower() for kw in exclude_set):
                         continue
                     start = b['start'].get('date')
-                    out.append(f"🎂 {start} - {summary}")
+                    out.append(f" {start} - {summary}")
             except Exception:
                 pass
             
-        if not out: return "📅 No upcoming events matching filters."
+        if not out: return " No upcoming events matching filters."
         
         return "\n".join(out)
     except Exception as e:
-        return f"❌ Calendar error: {e}"
+        return f" Calendar error: {e}"
 
 @tool
 @retry_with_auth
@@ -257,7 +257,7 @@ def calendar_create_event(
     CRITICAL: Always use the current year from system context!
     """
     creds = get_google_creds()
-    if not creds: return "❌ Google Auth failed."
+    if not creds: return " Google Auth failed."
     
     try:
         print(f"Called Calendar create (recurrence={recurrence})")
@@ -298,9 +298,9 @@ def calendar_create_event(
         event = service.events().insert(calendarId='primary', body=event).execute()
         
         recurrence_note = " (recurring)" if recurrence else ""
-        return f"✅ Event created{recurrence_note}: {event.get('htmlLink')}"
+        return f" Event created{recurrence_note}: {event.get('htmlLink')}"
     except Exception as e:
-        return f"❌ Create event failed: {e}"
+        return f" Create event failed: {e}"
 
 # --- Tasks Tools ---
 
@@ -309,12 +309,12 @@ def calendar_create_event(
 def tasks_list(show_completed: bool = False, max_results: int = 20) -> str:
     """List Google Tasks with filtering."""
     creds = get_google_creds()
-    if not creds: return "❌ Google Auth failed."
+    if not creds: return " Google Auth failed."
     print("Called Tasks list")
     try:
         service = build('tasks', 'v1', credentials=creds)
         tasklists = service.tasklists().list().execute()
-        if not tasklists.get('items'): return "❌ No task lists found."
+        if not tasklists.get('items'): return " No task lists found."
         
         list_id = tasklists['items'][0]['id']
         params = {
@@ -325,7 +325,7 @@ def tasks_list(show_completed: bool = False, max_results: int = 20) -> str:
         }
         tasks = service.tasks().list(**params).execute()
         items = tasks.get('items', [])
-        if not items: return "✅ No tasks found."
+        if not items: return " No tasks found."
         
         out = []
         for t in items:
@@ -343,7 +343,7 @@ def tasks_list(show_completed: bool = False, max_results: int = 20) -> str:
             out.append(f"{status} {title}{due_str}")
         return "\n".join(out)
     except Exception as e:
-        return f"❌ Tasks error: {e}"
+        return f" Tasks error: {e}"
 
 @tool
 @retry_with_auth
@@ -351,13 +351,13 @@ def tasks_create(title: str, notes: Optional[str] = None) -> str:
     """Create a Google Task."""
     print("Called Tasks create")
     creds = get_google_creds()
-    if not creds: return "❌ Google Auth failed."
+    if not creds: return " Google Auth failed."
     try:
         service = build('tasks', 'v1', credentials=creds)
         tasklists = service.tasklists().list().execute()
         list_id = tasklists['items'][0]['id']
         task = {'title': title, 'notes': notes}
         service.tasks().insert(tasklist=list_id, body=task).execute()
-        return f"✅ Task added: {title}"
+        return f" Task added: {title}"
     except Exception as e:
-        return f"❌ Create task failed: {e}"
+        return f" Create task failed: {e}"

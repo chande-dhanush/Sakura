@@ -10,15 +10,15 @@ def test_context():
     print(ctx)
     print("=======================")
     
-    if "User: Dhanush" in ctx: print("✅ Name Found")
-    else: print("❌ Name Missing")
+    if "User: Dhanush" in ctx: print(" Name Found")
+    else: print(" Name Missing")
     
     # Check for theme (might be inside summary or explicit line)
-    if "UI Theme: dark" in ctx or "Dark Mode" in ctx: print("✅ UI Theme Found")
-    else: print("❌ UI Theme Missing")
+    if "UI Theme: dark" in ctx or "Dark Mode" in ctx: print(" UI Theme Found")
+    else: print(" UI Theme Missing")
     
-    if "Interests: AI" in ctx: print("✅ Interests Found")
-    else: print("❌ Interests Missing")
+    if "Interests: AI" in ctx: print(" Interests Found")
+    else: print(" Interests Missing")
 
 if __name__ == "__main__":
     test_context()

@@ -35,7 +35,7 @@ def test_startup_memory():
     print("="*60)
     
     rss_before = get_rss_mb()
-    print(f"📊 RSS before import: {rss_before:.1f} MB")
+    print(f" RSS before import: {rss_before:.1f} MB")
     
     # Import the memory store - should NOT load embeddings
     from sakura_assistant.memory.faiss_store import get_memory_store
@@ -43,15 +43,15 @@ def test_startup_memory():
     store = get_memory_store()
     
     rss_after = get_rss_mb()
-    print(f"📊 RSS after get_memory_store(): {rss_after:.1f} MB")
-    print(f"📊 Delta: {rss_after - rss_before:.1f} MB")
+    print(f" RSS after get_memory_store(): {rss_after:.1f} MB")
+    print(f" Delta: {rss_after - rss_before:.1f} MB")
     
     # Check that embeddings are NOT loaded
     if store._embeddings_model is None:
-        print("✅ PASS: Embeddings NOT loaded at startup")
+        print(" PASS: Embeddings NOT loaded at startup")
         return True, rss_after
     else:
-        print("❌ FAIL: Embeddings loaded at startup (should be lazy)")
+        print(" FAIL: Embeddings loaded at startup (should be lazy)")
         return False, rss_after
 
 def test_mmap_active():
@@ -64,10 +64,10 @@ def test_mmap_active():
     store = get_memory_store()
     
     mmap_active = getattr(store, '_mmap_active', False)
-    print(f"📊 MMAP Active: {mmap_active}")
+    print(f" MMAP Active: {mmap_active}")
     
     if mmap_active:
-        print("✅ PASS: FAISS loaded with MMAP")
+        print(" PASS: FAISS loaded with MMAP")
         return True
     else:
         print("⚠️ WARN: FAISS not using MMAP (may be unsupported on this platform)")
@@ -85,14 +85,14 @@ def test_history_cap():
     store = get_memory_store()
     
     history_len = len(store.conversation_history)
-    print(f"📊 In-memory history: {history_len} messages")
-    print(f"📊 MAX_INMEM_HISTORY: {MAX_INMEM_HISTORY}")
+    print(f" In-memory history: {history_len} messages")
+    print(f" MAX_INMEM_HISTORY: {MAX_INMEM_HISTORY}")
     
     if history_len <= MAX_INMEM_HISTORY:
-        print("✅ PASS: History capped correctly")
+        print(" PASS: History capped correctly")
         return True
     else:
-        print(f"❌ FAIL: History exceeds cap ({history_len} > {MAX_INMEM_HISTORY})")
+        print(f" FAIL: History exceeds cap ({history_len} > {MAX_INMEM_HISTORY})")
         return False
 
 def test_first_use_embedding():
@@ -107,26 +107,26 @@ def test_first_use_embedding():
     rss_before = get_rss_mb()
     
     # Trigger embedding load by calling get_context_for_query
-    print("🔄 Triggering embedding load via get_context_for_query...")
+    print(" Triggering embedding load via get_context_for_query...")
     
     try:
         context = store.get_context_for_query("test query")
-        print(f"📊 Retrieved context: {len(context)} chars")
+        print(f" Retrieved context: {len(context)} chars")
     except Exception as e:
         print(f"⚠️ Query failed (may be expected if no data): {e}")
     
     rss_after = get_rss_mb()
     delta = rss_after - rss_before
     
-    print(f"📊 RSS before: {rss_before:.1f} MB")
-    print(f"📊 RSS after: {rss_after:.1f} MB")
-    print(f"📊 Delta: {delta:.1f} MB")
+    print(f" RSS before: {rss_before:.1f} MB")
+    print(f" RSS after: {rss_after:.1f} MB")
+    print(f" Delta: {delta:.1f} MB")
     
     # Check embeddings are now loaded
     if store._embeddings_model is not None:
-        print("✅ PASS: Embeddings loaded on first use")
+        print(" PASS: Embeddings loaded on first use")
         if delta >= 200:
-            print(f"✅ Memory delta ~{delta:.0f}MB (expected ~350MB for model)")
+            print(f" Memory delta ~{delta:.0f}MB (expected ~350MB for model)")
         return True, rss_after
     else:
         print("⚠️ WARN: Embeddings may not have loaded (FAISS might not be available)")
@@ -151,7 +151,7 @@ def test_config_flags():
     all_pass = True
     for flag, expected in flags:
         val = getattr(config, flag, None)
-        status = "✅" if val == expected else "⚠️"
+        status = "" if val == expected else "⚠️"
         print(f"{status} {flag} = {val} (expected {expected})")
         if val != expected:
             all_pass = False
@@ -190,14 +190,14 @@ def run_all_tests():
     
     all_pass = all(results.values())
     for test, passed in results.items():
-        status = "✅ PASS" if passed else "❌ FAIL"
+        status = " PASS" if passed else " FAIL"
         print(f"  {test}: {status}")
     
     print()
-    print(f"📊 Final RSS: {get_rss_mb():.1f} MB")
+    print(f" Final RSS: {get_rss_mb():.1f} MB")
     
     if all_pass:
-        print("\n🎉 ALL TESTS PASSED")
+        print("\n ALL TESTS PASSED")
         return 0
     else:
         print("\n⚠️ SOME TESTS FAILED")

@@ -34,11 +34,11 @@ class FileRegistry:
         columns = [info[1] for info in cursor.fetchall()]
         
         if "namespace" not in columns:
-            print("🔄 Migrating DB: Adding 'namespace' column...")
+            print(" Migrating DB: Adding 'namespace' column...")
             cursor.execute("ALTER TABLE files ADD COLUMN namespace TEXT")
             
         if "file_hash" not in columns:
-            print("🔄 Migrating DB: Adding 'file_hash' column...")
+            print(" Migrating DB: Adding 'file_hash' column...")
             cursor.execute("ALTER TABLE files ADD COLUMN file_hash TEXT")
 
         conn.commit()
@@ -77,7 +77,7 @@ class FileRegistry:
         ))
         conn.commit()
         conn.close()
-        print(f"✅ Registered file: {filename} ({file_id})")
+        print(f" Registered file: {filename} ({file_id})")
 
     def get_file(self, file_id: str) -> Optional[Dict[str, Any]]:
         """Get file details by ID."""
@@ -139,7 +139,7 @@ class FileRegistry:
         cursor.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
         conn.commit()
         conn.close()
-        print(f"🗑️ Unregistered file: {file_id}")
+        print(f"️ Unregistered file: {file_id}")
 
     def _calculate_hash(self, file_path: str) -> str:
         """Calculate SHA256 hash of a file."""

@@ -6,6 +6,7 @@
 use std::process::{Command, Child, Stdio};
 use std::sync::Mutex;
 use std::path::PathBuf;
+use std::time::Duration;
 use tauri::{Manager, WebviewWindow, PhysicalPosition, Emitter, Listener};
 
 // Global sidecar process handle
@@ -87,11 +88,11 @@ fn force_quit() {
     // Try graceful shutdown first (saves conversation history)
     let client = reqwest::blocking::Client::new();
     if let Ok(_) = client.post("http://localhost:3210/shutdown")
-        .timeout(std::time::Duration::from_millis(500))
+        .timeout(Duration::from_millis(500))
         .send() 
     {
         println!("✅ Graceful shutdown signal sent");
-        std::thread::sleep(std::time::Duration::from_millis(300));
+        std::thread::sleep(Duration::from_millis(300));
     }
     
     // Kill the Python backend
@@ -103,6 +104,39 @@ fn force_quit() {
     }
     // Hard exit the Tauri app
     std::process::exit(0);
+}
+
+
+#[tauri::command]
+async fn generate_speech(text: String) -> Result<String, String> {
+    println!("🎵 [TTS] Generating speech for frontend: {}...", &text[..text.len().min(50)]);
+    
+    let client = reqwest::Client::new();
+    let response = client
+        .post("http://localhost:3210/voice/generate")
+        .json(&serde_json::json!({"text": text}))
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+    
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Parse failed: {}", e))?;
+    
+    if data["status"] == "success" {
+        let path = data["audio_path"]
+            .as_str()
+            .map(|s: &str| s.to_string())
+            .ok_or("No path in response".to_string())?;
+        println!("🎵 [TTS] ✓ Audio path: {}", path);
+        Ok(path)
+    } else {
+        let msg = data["message"].as_str().unwrap_or("Unknown error").to_string();
+        println!("🎵 [TTS] ✗ Failed: {}", msg);
+        Err(msg)
+    }
 }
 
 fn find_backend_dir() -> Option<PathBuf> {
@@ -309,16 +343,20 @@ fn position_bubble_bottom_right(bubble: &WebviewWindow) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    println!("📱 Creating windows with visibility: bubble=true, main=false, logs=false");
+    
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec![])))
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             get_backend_status,
             toggle_main_window,
             show_main_window,
             hide_main_window,
             open_logs_window,
-            force_quit
+            force_quit,
+            generate_speech
         ])
         .setup(|app| {
             // Start Python backend (sidecar in prod, python in dev)

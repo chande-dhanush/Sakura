@@ -3,21 +3,25 @@ import time
 import re
 from typing import List, Dict, Any, Optional
 
-from ..core.context_manager import ContextManager, get_smart_context
+# V17: Reorganized imports
+from .context import ContextManager, get_smart_context
 from ..config import SYSTEM_PERSONALITY
-from ..core.container import get_container
-from ..core.model_wrapper import ReliableLLM
+from .infrastructure import get_container
+from .models import ReliableLLM
 
 # V10 Modular Components
-from .router import IntentRouter
-from .executor import ToolExecutor
-from .responder import ResponseGenerator, ResponseContext
+from .routing import IntentRouter
+from .execution import ToolExecutor
+from .models import ResponseGenerator, ResponseContext
 from .tools import get_all_tools
 
+# V17: Execution architecture
+from .execution import ExecutionDispatcher, OneShotRunner, ResponseEmitter, EmitterFactory
+
 # V7: World Graph
-from .world_graph import WorldGraph
+from .graph import WorldGraph
 from ..utils.study_mode import detect_study_mode
-from .agent_state import AgentState, RateLimitExceeded
+from .context import AgentState, RateLimitExceeded
 from ..utils.memory import cleanup_memory
 
 # V10.3: Summary Memory for long-context
@@ -33,16 +37,19 @@ from .memory.reflection import get_reflection_engine
 
 class SmartAssistant:
     """
-    Sakura V10 Facade
+    Sakura V17 Facade
     =================
-    Orchestrates the new modular architecture:
-    Router -> Executor -> Responder
+    Orchestrates the V17 execution architecture:
+    Router -> ExecutionDispatcher -> Responder
     
-    This class now delegates all logic to specialized components.
+    V17 Changes:
+    - ExecutionDispatcher replaces direct ToolExecutor calls
+    - ExecutionContext threads mode/budget through pipeline
+    - ResponseEmitter guarantees exactly one message per request
     """
 
     def __init__(self):
-        print("🏗️ Initializing SmartAssistant Facade...")
+        print("️ Initializing SmartAssistant Facade (V17)...")
         self.container = get_container()
         self.tools = get_all_tools()
         self.tool_map = {t.name: t for t in self.tools}
@@ -59,16 +66,25 @@ class SmartAssistant:
             if planner_llm is None: missing.append("Planner")
             if responder_llm is None: missing.append("Responder")
             raise RuntimeError(
-                f"❌ No LLM configured for: {', '.join(missing)}. "
+                f" No LLM configured for: {', '.join(missing)}. "
                 f"Please set GROQ_API_KEY or OPENROUTER_API_KEY in your .env file."
             )
         
         # Initialize Components via Container
         self.router = IntentRouter(router_llm)
+        
+        # V17: Keep ToolExecutor for ReActLoop (internal use only)
         self.executor = ToolExecutor(
             tools=self.tools,
             summarizer_llm=planner_llm
         )
+        
+        # V17: Create OneShotRunner for fast-lane execution
+        self.oneshot_runner = OneShotRunner(
+            tool_runner=self.executor.tool_runner,
+            output_handler=self.executor.output_handler
+        )
+        
         self.responder = ResponseGenerator(
             responder_llm,
             SYSTEM_PERSONALITY
@@ -77,10 +93,18 @@ class SmartAssistant:
         # V7: World Graph (Single Source of Truth)
         # V17: Inject IdentityManager to remove circular imports
         from ..config import get_project_root
-        from .identity_manager import get_identity_manager
+        from .graph import get_identity_manager
         self.world_graph = WorldGraph(
             persist_path=os.path.join(get_project_root(), "data", "world_graph.json"),
             identity_manager=get_identity_manager()
+        )
+        
+        # V17: Create ExecutionDispatcher (unified entry point)
+        self.dispatcher = ExecutionDispatcher(
+            one_shot_runner=self.oneshot_runner,
+            react_loop=self.executor.react_loop,
+            world_graph=self.world_graph,
+            tools=self.tools
         )
         
         # V10.3: Summary Memory (compresses old turns for long-context)
@@ -102,198 +126,59 @@ class SmartAssistant:
             persist_path=os.path.join(get_project_root(), "data", "desire_state.json")
         )
         
+        # V17: ResponseEmitter factory for guaranteed message emission
+        self.emitter_factory = EmitterFactory()
+        
         # Store last response for async reflection (picked up by server.py BackgroundTask)
         self._last_turn_data = {"user_msg": "", "assistant_response": ""}
         
-        print("✅ SmartAssistant Initialized (V15.4 - Context Router)")
+        print(" SmartAssistant Initialized (V17 - ExecutionDispatcher)")
 
     def run(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
         """
-        Main Pipeline:
-        1. Vision Check
-        2. Graph Update (Intent/Refs)
-        3. Router (Direct/Plan/Chat)
-        4. Executor (Tools)
-        5. Responder (Final Answer)
+        Sync Pipeline (V17): Delegates to async path.
+        
+        V17: No more split-brain architecture. Sync just wraps async.
+        All execution semantics unified through dispatcher.
         """
-        print(f"\U0001f680 [LLM] SmartAssistant.run() STARTED")
-        start_time = time.time()
-        state = AgentState()
-        # V16.1: Initialize turn context variable (avoid locals() hack)
-        turn_ctx = None
+        print(f" [LLM] SmartAssistant.run() → delegating to arun()")
         
-        recorder = get_recorder()
-        recorder.start_trace(user_input)
-        
-        # 1. Vision Short-Circuit
-        if image_data:
-            return self._handle_vision(user_input, image_data, start_time)
-            
+        # V17: Force through async path (unified semantics)
+        import asyncio
         try:
-            # 2. Graph & Context
-            study_mode_active = detect_study_mode(user_input)
-            
-            # Update Graph with User Intent
-            self.world_graph.resolve_reference(user_input)
-            self.world_graph.infer_user_intent(user_input, history)
-            
-            # 3. Routing
-            state.record_llm_call("routing")
-            with span("Router"):
-                route_result = self.router.route(user_input, history, study_mode_active)
-            recorder.log("Router", f"Decision: {route_result.classification} (hint: {route_result.tool_hint})")
-            print(f"\U0001f6a6 Router Decision: {route_result.classification}")
-            
-            state.current_intent = route_result.classification
-            
-            # 4. Execution
-            tool_outputs = ""
-            tool_used = "None"
-            
-            # DEBUG: Log route result details
-            print(f"🔍 DEBUG: route_result.needs_tools = {route_result.needs_tools}")
-            print(f"🔍 DEBUG: route_result.tool_hint = {route_result.tool_hint}")
-            print(f"🔍 DEBUG: route_result.classification = {route_result.classification}")
-            
-            if route_result.needs_tools or route_result.tool_hint:
-                print(f"⚙️ Execution Phase: {route_result.classification}")
-                state.record_llm_call("execution")
-                
-                # V16: Single context retrieval per turn (reused for Responder)
-                turn_ctx = self.context_manager.get_context_for_llm(
-                    user_input, 
-                    mode=route_result.classification, 
-                    history=history
-                )
-                planner_ctx = turn_ctx["planner_context"]
-                
-                with span("Executor"):
-                    exec_result = self.executor.execute(
-                        user_input,
-                        route_result,
-                        planner_ctx,
-                        state
-                    )
-                tool_args = exec_result.last_result.get("args") if exec_result.last_result else {}
-                recorder.log("Executor", f"Tool: {exec_result.tool_used}, Success: {exec_result.success}", 
-                            metadata={"args": tool_args})
-                
-                tool_outputs = exec_result.outputs
-                tool_used = exec_result.tool_used
-                
-                # DEBUG: Log execution result
-                print(f"🔍 DEBUG: exec_result.outputs = '{tool_outputs[:100]}...' (len={len(tool_outputs)})")
-                print(f"🔍 DEBUG: exec_result.tool_used = {tool_used}")
-                print(f"🔍 DEBUG: exec_result.success = {exec_result.success}")
-                
-                if exec_result.tool_messages:
-                     # Log actions to World Graph
-                     for action in exec_result.tool_messages:
-                         try:
-                             # action is a ToolMessage or similar dict
-                             tool_name = action.get("tool", "unknown")
-                             tool_args = action.get("args", {})
-                             tool_result = action.get("content", "")
-                             
-                             self.world_graph.record_action(
-                                 tool=tool_name,
-                                 args=tool_args,
-                                 result=str(tool_result),
-                                 success=True # Assumed if we got a result
-                             )
-                         except Exception as wg_err:
-                             print(f"⚠️ World Graph recording failed: {wg_err}")
-            
-            # V10.3: Record turn in Summary Memory
-            self.summary_memory.add_turn("user", user_input)
-            
-            # 5. Response
-            state.record_llm_call("responding")
-            print(f"🏁 Response Phase")
-            
-            # V16: Reuse cached context if available, otherwise fetch
-            if turn_ctx is None:
-                turn_ctx = self.context_manager.get_context_for_llm(
-                    user_input, 
-                    mode=route_result.classification, 
-                    history=history
-                )
-            
-            # V15: Inject mood from DesireSystem
-            mood_prompt = self.desire_system.get_mood_prompt()
-            responder_context = f"{mood_prompt}\n\n{turn_ctx['responder_context']}"
-            
-            # Prepare Responder Context
-            from .responder import ResponseContext
-            resp_context = ResponseContext(
-                user_input=user_input,
-                tool_outputs=tool_outputs,
-                history=history,
-                graph_context=responder_context,
-                intent_adjustment=turn_ctx["intent_adjustment"],
-                current_mood=turn_ctx["current_mood"],
-                study_mode=study_mode_active,
-                session_summary=turn_ctx["summary_context"]
-            )
-            
-            with span("Responder"):
-                response_text = self.responder.generate(resp_context)
-            recorder.log("Responder", f"Generated {len(response_text)} chars")
-            
-            # V15: Update desire state on messages
-            self.desire_system.on_user_message(user_input)
-            self.desire_system.on_assistant_message(response_text)
-            
-            # V10.3: Record assistant response in Summary Memory
-            self.summary_memory.add_turn("assistant", response_text)
-            
-            # Update Graph Logic
-            self.world_graph.advance_turn()
-            self.world_graph.save()
-            
-            recorder.end_trace(success=True, response_preview=response_text[:80])
+            return asyncio.run(self.arun(user_input, history, image_data))
+        except RuntimeError as e:
+            # Already in event loop (e.g., Jupyter notebook)
+            if "asyncio.run() cannot be called from a running event loop" in str(e):
+                print("⚠️ [LLM] Already in event loop, using get_event_loop().run_until_complete()")
+                loop = asyncio.get_event_loop()
+                return loop.run_until_complete(self.arun(user_input, history, image_data))
+            raise
 
-            
-            return {
-                "content": response_text,
-                "mode": route_result.classification,
-                "tool_used": tool_used,
-                "metadata": {
-                    "latency": f"{time.time()-start_time:.2f}s",
-                    "status": "success"
-                }
-            }
-            
-        except RateLimitExceeded:
-            recorder.end_trace(success=False, response_preview="rate_limited")
-            return {
-                "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
-                 "metadata": {"status": "rate_limited"}
-             }
-        except Exception as e:
-            recorder.end_trace(success=False, response_preview=str(e)[:50])
-            print(f"\u274c Pipeline Error: {e}")
-            import traceback
-            traceback.print_exc()
-            return {
-                "content": f"I encountered an error: {e}",
-                 "metadata": {"status": "error"}
-            }
 
     async def arun(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
         """
-        Async Pipeline (V10.4):
+        Async Pipeline (V17):
         1. Vision Check
         2. Graph Update (Sync - fast)
         3. Router (Async)
-        4. Executor (Async)
+        4. ExecutionDispatcher (Async) - NEW in V17
         5. Responder (Async)
+        
+        V17 Changes:
+        - ExecutionDispatcher replaces Executor
+        - ResponseEmitter guarantees exactly one message
+        - ExecutionContext threads mode/budget through pipeline
         """
-        print(f"\U0001f680 [LLM] SmartAssistant.arun() STARTED (Async)")
+        print(f" [LLM] SmartAssistant.arun() STARTED (V17 Async)")
         start_time = time.time()
         state = AgentState()
         recorder = get_recorder()
         recorder.start_trace(user_input)
+        
+        # V17: Create ResponseEmitter for guaranteed message emission
+        request_id = f"req_{int(time.time()*1000)}"
+        emitter = self.emitter_factory.create(request_id)
         
         # 1. Vision Short-Circuit
         if image_data:
@@ -318,35 +203,33 @@ class SmartAssistant:
             with span("Router"):
                 route_result = await self.router.aroute(user_input, history, study_mode_active)
             recorder.log("Router", f"Decision: {route_result.classification} (hint: {route_result.tool_hint})")
-            print(f"\U0001f6a6 Async Router Decision: {route_result.classification}")
+            print(f" Async Router Decision: {route_result.classification}")
             
             state.current_intent = route_result.classification
             
-            # 4. Execution (Async)
+            # 4. Execution (V17: Use ExecutionDispatcher)
             tool_outputs = ""
             tool_used = "None"
+            exec_result = None
             
             if route_result.needs_tools or route_result.tool_hint:
-                print(f"⚙️ Async Execution Phase: {route_result.classification}")
+                print(f"⚙️ V17 Dispatch Phase: {route_result.classification}")
                 state.record_llm_call("execution")
                 
-                # V15.4: Centralized context via ContextManager
-                ctx = self.context_manager.get_context_for_llm(
-                    user_input,
-                    mode=route_result.classification,
-                    history=history
-                )
-                planner_ctx = ctx["planner_context"]
-                
-                with span("Executor"):
-                    exec_result = await self.executor.aexecute(
-                        user_input,
-                        route_result,
-                        planner_ctx,
-                        state
+                with span("ExecutionDispatcher"):
+                    exec_result = await self.dispatcher.dispatch(
+                        user_input=user_input,
+                        classification=route_result.classification,
+                        tool_hint=route_result.tool_hint,
+                        request_id=request_id
                     )
-                tool_args = exec_result.last_result.get("args") if exec_result.last_result else {}
-                recorder.log("Executor", f"Tool: {exec_result.tool_used}, Success: {exec_result.success}", metadata={"args": tool_args})
+                
+                # V17: Use ExecutionStatus instead of bool
+                recorder.log(
+                    "Dispatcher", 
+                    f"Tool: {exec_result.tool_used}, Status: {exec_result.status.value}", 
+                    metadata={"mode": exec_result.last_result.get("mode") if exec_result.last_result else "unknown"}
+                )
                 
                 tool_outputs = exec_result.outputs
                 tool_used = exec_result.tool_used
@@ -373,7 +256,7 @@ class SmartAssistant:
             
             # 5. Response (Async)
             state.record_llm_call("responding")
-            print(f"🏁 Async Response Phase")
+            print(f" Async Response Phase")
             
             # V15.4: Get unified context from ContextManager
             resp_ctx = self.context_manager.get_context_for_llm(
@@ -416,31 +299,63 @@ class SmartAssistant:
             self.world_graph.advance_turn()
             self.world_graph.save()
             
+            # Collect all unique tools used for UI observability
+            all_tools_used = []
+            if exec_result and exec_result.tool_messages:
+                for action in exec_result.tool_messages:
+                    t_name = getattr(action, 'name', None) or action.get('tool', 'unknown')
+                    if t_name and t_name not in all_tools_used:
+                        all_tools_used.append(t_name)
+            
+            # Fallback to tool_used if list is empty (single tool case)
+            if not all_tools_used and tool_used and tool_used != "None":
+                all_tools_used.append(tool_used)
+
             recorder.end_trace(success=True, response_preview=response_text[:80])
+            
+            # V17: Emit response via ResponseEmitter (guaranteed emission)
+            await emitter.emit(response_text, {
+                "status": "success",
+                "latency": f"{time.time()-start_time:.2f}s"
+            })
             
             return {
                 "content": response_text,
                 "mode": route_result.classification,
-                "tool_used": tool_used,
+                "tool_used": tool_used, # Legacy single string
+                "tools_used": all_tools_used, # V17: Full list for UI
                 "metadata": {
                     "latency": f"{time.time()-start_time:.2f}s",
                     "status": "success",
-                    "async": True
+                    "async": True,
+                    "execution_status": exec_result.status.value if exec_result else "skipped"
                 }
             }
             
         except RateLimitExceeded:
             recorder.end_trace(success=False, response_preview="rate_limited")
+            error_response = "I'm working too hard and hit a rate limit. Please try again in a moment."
+            await emitter.emit(error_response, {"status": "rate_limited"})
             return {
-                "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+                "content": error_response,
                  "metadata": {"status": "rate_limited"}
              }
         except Exception as e:
             recorder.end_trace(success=False, response_preview=str(e)[:50])
-            print(f"\u274c Async Pipeline Error: {e}")
+            print(f" Async Pipeline Error: {e}")
             import traceback
             traceback.print_exc()
+            error_response = f"I encountered an error: {e}"
+            await emitter.emit(error_response, {"status": "error"})
             return {
-                "content": f"I encountered an error: {e}",
+                "content": error_response,
                  "metadata": {"status": "error"}
             }
+        finally:
+            # V17: Guaranteed emission safety net
+            if not emitter.was_emitted:
+                print(f"⚠️ [V17] Response not emitted - using fallback")
+                await emitter.emit(
+                    "I processed your request but encountered an issue. Please try again.",
+                    {"status": "unknown"}
+                )

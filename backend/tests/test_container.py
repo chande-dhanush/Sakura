@@ -16,7 +16,7 @@ class TestLLMConfig(unittest.TestCase):
     
     def test_default_values(self):
         """Test LLMConfig default values."""
-        from sakura_assistant.core.container import LLMConfig
+        from sakura_assistant.core.infrastructure.container import LLMConfig
         
         config = LLMConfig()
         
@@ -28,7 +28,7 @@ class TestLLMConfig(unittest.TestCase):
     
     def test_custom_values(self):
         """Test LLMConfig with custom values."""
-        from sakura_assistant.core.container import LLMConfig
+        from sakura_assistant.core.infrastructure.container import LLMConfig
         
         config = LLMConfig(
             router_model="custom-model",
@@ -44,12 +44,12 @@ class TestContainer(unittest.TestCase):
     
     def setUp(self):
         """Reset container before each test."""
-        from sakura_assistant.core.container import reset_container
+        from sakura_assistant.core.infrastructure.container import reset_container
         reset_container()
     
     def test_get_container_singleton(self):
         """Test get_container returns same instance."""
-        from sakura_assistant.core.container import get_container
+        from sakura_assistant.core.infrastructure.container import get_container
         
         c1 = get_container()
         c2 = get_container()
@@ -58,7 +58,7 @@ class TestContainer(unittest.TestCase):
     
     def test_reset_container(self):
         """Test reset_container clears instance."""
-        from sakura_assistant.core.container import get_container, reset_container
+        from sakura_assistant.core.infrastructure.container import get_container, reset_container
         
         c1 = get_container()
         reset_container()
@@ -68,7 +68,7 @@ class TestContainer(unittest.TestCase):
     
     def test_has_api_keys_detection(self):
         """Test API key detection from environment."""
-        from sakura_assistant.core.container import Container
+        from sakura_assistant.core.infrastructure.container import Container
         
         # Without any env vars set explicitly
         container = Container()

@@ -106,7 +106,7 @@ def audit_imports():
         test("ProactiveState import", False, str(e))
     
     try:
-        from sakura_assistant.core.scheduler import (
+        from sakura_assistant.core.infrastructure.scheduler import (
             schedule_cognitive_tasks,
             precompute_initiations,
             run_hourly_desire_tick,
@@ -123,20 +123,20 @@ def audit_imports():
         test("ReflectionEngine import", False, str(e))
     
     try:
-        from sakura_assistant.core.world_graph import get_world_graph
+        from sakura_assistant.core.graph.world_graph import get_world_graph
         test("WorldGraph import", True)
     except Exception as e:
         test("WorldGraph import", False, str(e))
     
-    # V15.2.2 Security imports
+    # V17 Security imports
     try:
-        from sakura_assistant.core.executor import (
+        from sakura_assistant.core.execution.executor import (
             validate_path, SecurityError, DANGEROUS_PATTERNS
         )
-        test("V15.2.2 SecurityError import", True)
-        test("V15.2.2 DANGEROUS_PATTERNS import", len(DANGEROUS_PATTERNS) > 10, f"{len(DANGEROUS_PATTERNS)} patterns")
+        test("V17 SecurityError import", True)
+        test("V17 DANGEROUS_PATTERNS import", len(DANGEROUS_PATTERNS) > 10, f"{len(DANGEROUS_PATTERNS)} patterns")
     except Exception as e:
-        test("V15.2.2 Security imports", False, str(e))
+        test("V17 Security imports", False, str(e))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -284,7 +284,7 @@ def audit_security():
     # 5.1 Path Injection Defense (CWE-22)
     print("\n  --- 5.1 Path Traversal Defense (CWE-22) ---")
     
-    from sakura_assistant.core.executor import validate_path, SecurityError, DANGEROUS_PATTERNS
+    from sakura_assistant.core.execution.executor import validate_path, SecurityError, DANGEROUS_PATTERNS
     
     # Test dangerous paths are blocked
     dangerous_paths = [
@@ -376,7 +376,7 @@ def audit_prompts():
     
     # Router prompt (V15.2.1 temporal grounding)
     try:
-        from sakura_assistant.core.router import ROUTER_SYSTEM_PROMPT_TEMPLATE
+        from sakura_assistant.core.routing.router import ROUTER_SYSTEM_PROMPT_TEMPLATE
         test("Router has datetime placeholder", "{current_datetime}" in ROUTER_SYSTEM_PROMPT_TEMPLATE)
     except:
         warn("Could not check Router prompt template")
@@ -390,7 +390,7 @@ def audit_world_graph():
     """Audit World Graph configuration."""
     section("7. WORLD GRAPH")
     
-    from sakura_assistant.core.world_graph import WorldGraph, EntityType, EntityLifecycle
+    from sakura_assistant.core.graph.world_graph import WorldGraph, EntityType, EntityLifecycle
     
     # Test atomic save
     wg = WorldGraph()
@@ -465,7 +465,7 @@ def audit_performance():
     section("9. PERFORMANCE BENCHMARKS")
     
     # 9.1 Path validation speed
-    from sakura_assistant.core.executor import validate_path
+    from sakura_assistant.core.execution.executor import validate_path
     
     test_path = "/home/user/documents/safe_file.txt"
     iterations = 1000
@@ -545,7 +545,7 @@ def audit_cognitive():
     test("Has analyze_turn_async method", hasattr(re, 'analyze_turn_async'))
     
     # 10.4 World Graph context injection
-    from sakura_assistant.core.world_graph import get_world_graph
+    from sakura_assistant.core.graph.world_graph import get_world_graph
     
     wg = get_world_graph()
     context = wg.get_context_for_responder()
@@ -610,16 +610,16 @@ def audit_solid():
     print("\n  --- S: Single Responsibility ---")
     
     # Check that core modules have focused responsibilities
-    from sakura_assistant.core.router import IntentRouter
-    from sakura_assistant.core.executor import ToolExecutor
-    from sakura_assistant.core.responder import ResponseGenerator
-    from sakura_assistant.core.planner import Planner
+    from sakura_assistant.core.routing.router import IntentRouter
+    from sakura_assistant.core.execution.executor import ToolExecutor
+    from sakura_assistant.core.models.responder import ResponseGenerator
+    from sakura_assistant.core.execution.planner import Planner
     
     # Each class should have a clear single purpose
     test("Router: classify intent only", 
          hasattr(IntentRouter, 'route') and not hasattr(IntentRouter, 'execute'))
     test("Executor: tool execution only",
-         hasattr(ToolExecutor, 'execute_plan') and not hasattr(ToolExecutor, 'route'))
+         hasattr(ToolExecutor, 'execute') and not hasattr(ToolExecutor, 'route'))
     test("Responder: text generation only",
          hasattr(ResponseGenerator, 'generate') and not hasattr(ResponseGenerator, 'execute_plan'))
     test("Planner: plan generation only",
@@ -631,7 +631,7 @@ def audit_solid():
     print("\n  --- O: Open/Closed Principle ---")
     
     # Tools should be extensible without modifying core
-    from sakura_assistant.core.tools import get_all_tools
+    from sakura_assistant.core.tools_libs import get_all_tools
     tools = get_all_tools()
     test("Tools are plugin-style extensible", len(tools) > 30, f"{len(tools)} tools")
     
@@ -646,7 +646,7 @@ def audit_solid():
     print("\n  --- L: Liskov Substitution ---")
     
     # Enum types should be safely substitutable
-    from sakura_assistant.core.world_graph import EntityType, EntityLifecycle, EntitySource
+    from sakura_assistant.core.graph.world_graph import EntityType, EntityLifecycle, EntitySource
     
     # Check all enum values are strings (consistent substitution)
     test("EntityType values are strings", all(isinstance(e.value, str) for e in EntityType))
@@ -691,11 +691,11 @@ def audit_solid():
          'get_container()' in init_source or 'Container' in init_source)
     
     # World Graph uses singleton pattern with get_* accessor
-    from sakura_assistant.core.world_graph import get_world_graph, set_world_graph
+    from sakura_assistant.core.graph.world_graph import get_world_graph, set_world_graph
     test("WorldGraph supports injection (set_world_graph)", callable(set_world_graph))
     
     # Check broadcaster uses callback pattern (loose coupling)
-    from sakura_assistant.core.broadcaster import get_broadcaster
+    from sakura_assistant.core.infrastructure.broadcaster import get_broadcaster
     broadcaster = get_broadcaster()
     test("Broadcaster uses callback pattern", hasattr(broadcaster, 'add_listener'))
 

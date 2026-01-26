@@ -135,8 +135,8 @@ def start_metrics_server(port: int = 9090):
         _metrics_server = HTTPServer(("127.0.0.1", port), MetricsHandler)
         thread = threading.Thread(target=_metrics_server.serve_forever, daemon=True)
         thread.start()
-        logger.info(f"📊 Metrics server started on http://127.0.0.1:{port}/metrics")
-        print(f"📊 Metrics server started on http://127.0.0.1:{port}/metrics")
+        logger.info(f" Metrics server started on http://127.0.0.1:{port}/metrics")
+        print(f" Metrics server started on http://127.0.0.1:{port}/metrics")
     except Exception as e:
         logger.error(f"Failed to start metrics server: {e}")
 

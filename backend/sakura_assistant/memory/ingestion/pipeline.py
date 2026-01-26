@@ -154,7 +154,7 @@ Response Format (JSON):
                 "filename": filename,
                 "chunks": len(chunks),
                 "summary": full_metadata["description"],
-                "message": f"✅ Ingested {filename} ({len(chunks)} chunks)"
+                "message": f" Ingested {filename} ({len(chunks)} chunks)"
             }
 
         except Exception as e:

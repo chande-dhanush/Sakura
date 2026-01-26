@@ -54,13 +54,13 @@ class MockChromaClient:
         return self.collection
 
 async def run_test():
-    print("🧪 Starting V12 Verification...")
+    print(" Starting V12 Verification...")
     
     # 1. Setup Broadcaster Listener
     events = []
     def listener(event, data):
         events.append((event, data))
-        print(f"   📡 Event: {event}")
+        print(f"    Event: {event}")
     
     broadcaster = get_broadcaster()
     broadcaster.add_listener(listener)
@@ -86,16 +86,16 @@ async def run_test():
         
         # Verify Tavily called
         if mock_tavily_instance.search.called:
-            print("✅ PASS: Tavily called on cold start")
+            print(" PASS: Tavily called on cold start")
         else:
-            print("❌ FAIL: Tavily NOT called")
+            print(" FAIL: Tavily NOT called")
             
         # Verify "research_start" and "tool_start" events
         event_names = [e[0] for e in events]
         if "research_start" in event_names and "tool_start" in event_names:
-             print("✅ PASS: Broadcast events received (research_start, tool_start)")
+             print(" PASS: Broadcast events received (research_start, tool_start)")
         else:
-             print(f"❌ FAIL: Missing events. Got: {event_names}")
+             print(f" FAIL: Missing events. Got: {event_names}")
         
         # --- Run 2: Cache Hit (Should NOT call Tavily) ---
         print("\n[Run 2] Cached Research...")
@@ -106,18 +106,18 @@ async def run_test():
         
         # Verify Tavily NOT called
         if not mock_tavily_instance.search.called:
-            print("✅ PASS: Tavily SKIPPED on cache hit")
+            print(" PASS: Tavily SKIPPED on cache hit")
         else:
-            print("❌ FAIL: Tavily called despite cache")
+            print(" FAIL: Tavily called despite cache")
             
         # Verify "cache_hit" event
         event_names = [e[0] for e in events]
         if "cache_hit" in event_names:
-            print("✅ PASS: Broadcast event 'cache_hit' received")
+            print(" PASS: Broadcast event 'cache_hit' received")
         else:
-            print(f"❌ FAIL: Missing cache_hit event. Got: {event_names}")
+            print(f" FAIL: Missing cache_hit event. Got: {event_names}")
             
-    print("\n🎉 V12 Feature Verification Complete.")
+    print("\n V12 Feature Verification Complete.")
 
 if __name__ == "__main__":
     asyncio.run(run_test())

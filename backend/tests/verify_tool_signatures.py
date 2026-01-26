@@ -47,17 +47,17 @@ def verify_tools():
             failed.append(f"{name} - Missing description")
             continue
         
-        print(f"✅ {name}: {len(args)} args | {desc[:40]}...")
+        print(f" {name}: {len(args)} args | {desc[:40]}...")
     
     print("=" * 60)
     
     if failed:
-        print(f"❌ FAILED: {len(failed)} tool(s) have issues:")
+        print(f" FAILED: {len(failed)} tool(s) have issues:")
         for f in failed:
             print(f"   - {f}")
         return False
     else:
-        print(f"✅ ALL {len(tools)} TOOLS PASSED VERIFICATION")
+        print(f" ALL {len(tools)} TOOLS PASSED VERIFICATION")
         return True
 
 

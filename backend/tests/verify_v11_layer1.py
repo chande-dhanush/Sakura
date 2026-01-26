@@ -16,7 +16,7 @@ from sakura_assistant.core.tools_libs.research import SmartResearcher
 from sakura_assistant.core.memory.reflection import ReflectionEngine
 
 async def test_smart_research():
-    print("\n🕵️ Testing V11.1 Smart Researcher...")
+    print("\n️ Testing V11.1 Smart Researcher...")
     researcher = SmartResearcher()
     
     # Tier 1 Case
@@ -31,10 +31,10 @@ async def test_smart_research():
     print(f"   [Tier 2 Check] '{q2}' -> {t2} (Expected: advanced)")
     assert t2 == "advanced"
     
-    print("✅ Smart Research Logic: PASS")
+    print(" Smart Research Logic: PASS")
 
 async def test_reflection_engine():
-    print("\n🧠 Testing V11.2 Reflection Engine...")
+    print("\n Testing V11.2 Reflection Engine...")
     
     # 1. Mock World Graph
     mock_wg = MagicMock()
@@ -88,12 +88,12 @@ async def test_reflection_engine():
         args, kwargs = mock_wg.get_or_create_entity.call_args
         print(f"   Graph Update Triggered: {kwargs.get('name')} (Attributes: {kwargs.get('attributes')})")
         
-        print("✅ Reflection Engine Logic: PASS")
+        print(" Reflection Engine Logic: PASS")
 
 async def main():
     await test_smart_research()
     await test_reflection_engine()
-    print("\n🎉 V11 Layer 1 Verification COMPLETE.")
+    print("\n V11 Layer 1 Verification COMPLETE.")
 
 if __name__ == "__main__":
     asyncio.run(main())

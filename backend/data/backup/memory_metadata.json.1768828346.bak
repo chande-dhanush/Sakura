@@ -1,0 +1,176 @@
+{
+  "texts": [
+    "The project code name is Sakura V10.",
+    "The panic button code is 1999.",
+    "h100 5.5",
+    "H100 5.5 is the Nvidia Hopper‑based GPU, the “H100” model with 80 GB of HBM2e memory and a peak FP32 performance of around 3.2 TFLOPs.  \nThe “5.5” usually refers to the driver/firmware version that ships with that card, not a hardware change.  \nIf you need deeper specs or benchmark data, let me know."
+  ],
+  "metadata": [
+    {
+      "timestamp": "2026-01-16T13:35:39.137447",
+      "role": "system",
+      "hash": "c7794b1ec36ed57fcf6f82aa1d46aa437c04f0d9f925125f7d82021f488b9f43"
+    },
+    {
+      "timestamp": "2026-01-16T13:35:44.115261",
+      "role": "system",
+      "hash": "c5a929573d1b5cde1b93348d0fa9e3eeb6d2832093c04f858e70b25a4bcd2903"
+    },
+    {
+      "timestamp": "2026-01-19T18:42:18.519186",
+      "role": "user",
+      "hash": "a5dcebcc382be148052780657ef5cad6d47e0e1c498a3a0561e3e6c30c3fa201"
+    },
+    {
+      "timestamp": "2026-01-19T18:42:26.546892",
+      "role": "assistant",
+      "hash": "cb1e4e21b44db42441135addbaac0a449914d7a4ca9f129ae641ea0a85e33615"
+    }
+  ],
+  "inverted_index": {
+    "sakura": [
+      0
+    ],
+    "project": [
+      0
+    ],
+    "v10": [
+      0
+    ],
+    "code": [
+      0,
+      1
+    ],
+    "name": [
+      0
+    ],
+    "panic": [
+      1
+    ],
+    "1999": [
+      1
+    ],
+    "button": [
+      1
+    ],
+    "h100": [
+      2,
+      3
+    ],
+    "5": [
+      2,
+      3
+    ],
+    "2": [
+      3
+    ],
+    "hopper": [
+      3
+    ],
+    "around": [
+      3
+    ],
+    "card": [
+      3
+    ],
+    "3": [
+      3
+    ],
+    "change": [
+      3
+    ],
+    "version": [
+      3
+    ],
+    "gb": [
+      3
+    ],
+    "driver": [
+      3
+    ],
+    "firmware": [
+      3
+    ],
+    "if": [
+      3
+    ],
+    "refers": [
+      3
+    ],
+    "tflops": [
+      3
+    ],
+    "fp32": [
+      3
+    ],
+    "based": [
+      3
+    ],
+    "specs": [
+      3
+    ],
+    "usually": [
+      3
+    ],
+    "model": [
+      3
+    ],
+    "performance": [
+      3
+    ],
+    "that": [
+      3
+    ],
+    "nvidia": [
+      3
+    ],
+    "need": [
+      3
+    ],
+    "data": [
+      3
+    ],
+    "benchmark": [
+      3
+    ],
+    "me": [
+      3
+    ],
+    "you": [
+      3
+    ],
+    "not": [
+      3
+    ],
+    "gpu": [
+      3
+    ],
+    "hardware": [
+      3
+    ],
+    "peak": [
+      3
+    ],
+    "deeper": [
+      3
+    ],
+    "hbm2e": [
+      3
+    ],
+    "let": [
+      3
+    ],
+    "memory": [
+      3
+    ],
+    "80": [
+      3
+    ],
+    "ships": [
+      3
+    ],
+    "know": [
+      3
+    ]
+  }
+}

@@ -13,14 +13,14 @@ def test_profile_injection():
     print("==============================")
     
     if "USER PROFILE (SIDECAR)" in context:
-        print("✅ Header Found")
+        print(" Header Found")
     else:
-        print("❌ Header Missing")
+        print(" Header Missing")
         
     if "Dhanush" in context and "AI Engineer" in context:
-        print("✅ Data Found")
+        print(" Data Found")
     else:
-        print("❌ Data Missing")
+        print(" Data Missing")
 
 if __name__ == "__main__":
     test_profile_injection()

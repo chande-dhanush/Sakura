@@ -26,14 +26,14 @@ def test(name):
                 print('='*50)
                 result = func()
                 if result:
-                    print(f"✅ PASSED: {name}")
+                    print(f" PASSED: {name}")
                     RESULTS["passed"] += 1
                 else:
-                    print(f"❌ FAILED: {name}")
+                    print(f" FAILED: {name}")
                     RESULTS["failed"] += 1
                     RESULTS["errors"].append(name)
             except Exception as e:
-                print(f"💥 ERROR: {name} - {e}")
+                print(f" ERROR: {name} - {e}")
                 RESULTS["failed"] += 1
                 RESULTS["errors"].append(f"{name}: {e}")
         return wrapper
@@ -78,7 +78,7 @@ def test_user_settings():
     print(f"   Expected path: {settings_path}")
     
     if not os.path.exists(settings_path):
-        print(f"   ❌ File not created!")
+        print(f"    File not created!")
         return False
     
     with open(settings_path, 'r') as f:
@@ -146,11 +146,11 @@ def test_google_credentials_path():
     
     # Check paths are absolute
     if not os.path.isabs(CREDENTIALS_PATH):
-        print("   ❌ CREDENTIALS_PATH is not absolute!")
+        print("    CREDENTIALS_PATH is not absolute!")
         return False
     
     if not os.path.isabs(TOKEN_PATH):
-        print("   ❌ TOKEN_PATH is not absolute!")
+        print("    TOKEN_PATH is not absolute!")
         return False
     
     # Check if credentials.json exists at expected location
@@ -190,7 +190,7 @@ def test_offline_logging():
 # ============================================================
 @test("Gemini 2.0 Flash Backup Priority")
 def test_gemini_backup():
-    from sakura_assistant.core.container import Container, LLMConfig
+    from sakura_assistant.core.infrastructure.container import Container, LLMConfig
     
     container = Container()
     
@@ -201,9 +201,9 @@ def test_gemini_backup():
     
     # If Google key exists, backup should use it first
     if container.google_api_key:
-        print("   ✓ Gemini will be used as backup (priority 1)")
+        print("    Gemini will be used as backup (priority 1)")
     elif container.openrouter_api_key:
-        print("   ✓ OpenRouter will be used as backup (priority 2)")
+        print("    OpenRouter will be used as backup (priority 2)")
     else:
         print("   ⚠️ No backup model available")
     
@@ -222,7 +222,7 @@ def main():
     try:
         requests.get(f"{BACKEND_URL}/health", timeout=2)
     except requests.exceptions.ConnectionError:
-        print("\n❌ Backend not running! Start with: python server.py")
+        print("\n Backend not running! Start with: python server.py")
         return
     
     # Run all tests
@@ -238,8 +238,8 @@ def main():
     print("\n" + "="*60)
     print("  SUMMARY")
     print("="*60)
-    print(f"  ✅ Passed: {RESULTS['passed']}")
-    print(f"  ❌ Failed: {RESULTS['failed']}")
+    print(f"   Passed: {RESULTS['passed']}")
+    print(f"   Failed: {RESULTS['failed']}")
     
     if RESULTS['errors']:
         print("\n  Failures:")

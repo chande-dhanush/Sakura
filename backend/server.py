@@ -24,10 +24,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sakura_assistant.core.memory.reflection import get_reflection_engine  # V14: Unified
 
 # V14: Sleep Cycle for startup crystallization
-from sakura_assistant.core.scheduler import run_sleep_cycle_on_startup, get_dream_journal
+from sakura_assistant.core.infrastructure.scheduler import run_sleep_cycle_on_startup, get_dream_journal
 
 # V15: Cognitive Architecture
-from sakura_assistant.core.scheduler import schedule_cognitive_tasks
+from sakura_assistant.core.infrastructure.scheduler import schedule_cognitive_tasks
 
 from fastapi import FastAPI, Request, BackgroundTasks, WebSocket, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -65,7 +65,7 @@ INIT_ERROR = None
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
     global assistant, SETUP_REQUIRED, INIT_ERROR
-    print("🚀 Starting Sakura Backend...")
+    print("[START] Sakura Backend starting...")
     
     # Import here to delay model loading until server starts
     from sakura_assistant.core.llm import SmartAssistant
@@ -85,25 +85,25 @@ async def lifespan(app: FastAPI):
         if not os.path.exists(target_bookmarks):
             bundled_bookmarks = get_bundled_path("data/bookmarks.json")
             if os.path.exists(bundled_bookmarks) and os.path.abspath(bundled_bookmarks) != os.path.abspath(target_bookmarks):
-                print(f"📦 Bootstrapping default bookmarks to: {target_bookmarks}")
+                print(f"[BOOTSTRAP] Copying default bookmarks to: {target_bookmarks}")
                 shutil.copy2(bundled_bookmarks, target_bookmarks)
                 
     except Exception as e:
-        print(f"⚠️ Data bootstrap warning: {e}")
+        print(f"[WARN] Data bootstrap warning: {e}")
 
     try:
         assistant = SmartAssistant()
-        print("✅ SmartAssistant initialized")
+        print("[OK] SmartAssistant initialized")
         
         # V11: Sync WorldGraph singleton for background threads
-        from sakura_assistant.core.world_graph import set_world_graph
+        from sakura_assistant.core.graph.world_graph import set_world_graph
         if hasattr(assistant, 'world_graph'):
             set_world_graph(assistant.world_graph)
             
     except Exception as e:
         import traceback
         err = traceback.format_exc()
-        print(f"⚠️ SmartAssistant Init Failed (Likely missing keys). Entering Setup Mode.")
+        print(f"[WARN] SmartAssistant Init Failed (Likely missing keys). Entering Setup Mode.")
         # Don't crash - allow UI to show Setup Screen
         SETUP_REQUIRED = True
         INIT_ERROR = str(e)
@@ -118,20 +118,20 @@ async def lifespan(app: FastAPI):
     # Start Voice Engine if enabled via flag AND assistant is ready
     if os.getenv("SAKURA_ENABLE_VOICE") == "true" and assistant:
         try:
-            from sakura_assistant.core.voice_engine import VoiceEngine
+            from sakura_assistant.core.infrastructure.voice import VoiceEngine
             global voice_engine
             voice_engine = VoiceEngine(assistant)
             voice_engine.start()
         except Exception as e:
-            print(f"❌ Failed to start Voice Engine: {e}")
+            print(f"[ERROR] Failed to start Voice Engine: {e}")
     
     # V13: Start Memory Maintenance Scheduler (Temporal Decay)
     if assistant:
         try:
-            from sakura_assistant.core.scheduler import schedule_memory_maintenance, start_scheduler
+            from sakura_assistant.core.infrastructure.scheduler import schedule_memory_maintenance, start_scheduler
             start_scheduler()
             schedule_memory_maintenance("03:00")  # Run at 3 AM daily
-            print("🧹 Memory maintenance scheduler started (3:00 AM daily)")
+            print("[SCHED] Memory maintenance scheduler started (3:00 AM daily)")
             
             # V14: Run Sleep Cycle on startup (24h cooldown)
             run_sleep_cycle_on_startup()
@@ -142,32 +142,40 @@ async def lifespan(app: FastAPI):
             # V15: Wire up proactive WebSocket callback
             setup_proactive_callback()
         except Exception as e:
-            print(f"⚠️ Scheduler init warning: {e}")
+            print(f"[WARN] Scheduler init warning: {e}")
     
     yield
     
     # Cleanup on shutdown
-    print("🛑 Shutting down Sakura Backend...")
+    print("[STOP] Shutting down Sakura Backend...")
     if assistant and hasattr(assistant, 'world_graph'):
         assistant.world_graph.save()
-        print("💾 World Graph saved")
+        print("[SAVE] World Graph saved")
     
     # Flash conversation history to disk
     try:
         from sakura_assistant.memory.faiss_store import get_memory_store
         store = get_memory_store()
         store.flush_saves()
-        print(f"💾 Conversation history saved ({len(store.conversation_history)} messages)")
+        print(f"[SAVE] Conversation history saved ({len(store.conversation_history)} messages)")
     except Exception as e:
-        print(f"⚠️ Failed to save history: {e}")
+        print(f"[WARN] Failed to save history: {e}")
+
+    # V17.1: Flush WorldGraph to ensure all changes are saved
+    try:
+        from sakura_assistant.core.graph.world_graph import get_world_graph
+        graph = get_world_graph()
+        graph.flush_and_close()
+    except Exception as e:
+        print(f"⚠️ [Shutdown] WorldGraph flush failed: {e}")
 
     # V11.3 Cleanup Ephemeral Stores
     try:
-        from sakura_assistant.core.ephemeral_manager import get_ephemeral_manager
-        print("🧹 Cleaning up ephemeral stores...")
+        from sakura_assistant.core.graph.ephemeral import get_ephemeral_manager
+        print("[CLEANUP] Cleaning up ephemeral stores...")
         get_ephemeral_manager().cleanup_old(max_age_minutes=0) # Force delete all
     except Exception as e:
-        print(f"⚠️ Ephemeral cleanup error: {e}")
+        print(f"[WARN] Ephemeral cleanup error: {e}")
 
 
 app = FastAPI(
@@ -192,23 +200,26 @@ async def websocket_status(websocket: WebSocket):
     
     V15.2.2: Origin validation to prevent WebSocket hijacking.
     """
-    # V15.2.2: Security - Validate origin to prevent hijacking from malicious websites
-    origin = websocket.headers.get("origin", "")
+    # V17.2 SECURITY FIX: Enforce origin whitelist, reject empty origins
+    origin = websocket.headers.get("origin", "").lower()
+    
     allowed_origins = [
         "tauri://localhost",
-        "http://localhost:1420",  # Tauri dev server
+        "http://localhost:1420",
         "http://127.0.0.1:1420",
-        "http://localhost:3210",  # Backend (for debugging)
-        "http://127.0.0.1:3210",
     ]
     
-    if origin and origin not in allowed_origins:
-        print(f"🛡️ [Security] Rejected WebSocket from origin: {origin}")
-        await websocket.close(code=1008, reason="Invalid origin")
+    # Normalize allowed origins to lowercase for comparison
+    allowed_origins_lower = [o.lower() for o in allowed_origins]
+    
+    # CRITICAL: Reject if origin is empty OR not in whitelist
+    if not origin or origin not in allowed_origins_lower:
+        await websocket.close(code=403)
+        print(f"⛔ [WebSocket] Rejected connection from origin: '{origin or 'EMPTY'}'")
         return
     
     await websocket.accept()
-    from sakura_assistant.core.broadcaster import get_broadcaster
+    from sakura_assistant.core.infrastructure.broadcaster import get_broadcaster
     import asyncio
     
     q = asyncio.Queue()
@@ -314,11 +325,11 @@ async def save_setup(request: Request):
         
         # V16: Refresh IdentityManager and broadcast via EventBus
         try:
-            from sakura_assistant.core.identity_manager import get_identity_manager
+            from sakura_assistant.core.graph.identity import get_identity_manager
             get_identity_manager().refresh()
-            print("✅ [V16] Identity refreshed and broadcasted")
+            print("[OK] [V16] Identity refreshed and broadcasted")
         except Exception as e:
-            print(f"⚠️ Identity refresh warning: {e}")
+            print(f"[WARN] Identity refresh warning: {e}")
             
         # 6. Reload Env (Update os.environ from merged values)
         for key, val in merged.items():
@@ -327,7 +338,7 @@ async def save_setup(request: Request):
         
         # 4. RESET CONTAINER & Re-init Assistant
         # Critical: Container caches LLM config at init. Must reset to pick up env vars.
-        from sakura_assistant.core.container import reset_container
+        from sakura_assistant.core.infrastructure.container import reset_container
         reset_container()
         
         from sakura_assistant.core.llm import SmartAssistant
@@ -339,7 +350,7 @@ async def save_setup(request: Request):
             # Start Voice Engine if previously failed or not started
             if os.getenv("SAKURA_ENABLE_VOICE") == "true":
                 try:
-                    from sakura_assistant.core.voice_engine import VoiceEngine
+                    from sakura_assistant.core.infrastructure.voice import VoiceEngine
                     global voice_engine
                     if 'voice_engine' not in globals() or voice_engine is None:
                         voice_engine = VoiceEngine(assistant)
@@ -515,7 +526,7 @@ async def upload_google_auth(file: UploadFile = File(...)):
         with open(creds_path, "wb") as f:
             f.write(contents)
         
-        print(f"✅ Google credentials saved to: {creds_path}")
+        print(f"[OK] Google credentials saved to: {creds_path}")
         
         return {
             "success": True,
@@ -616,7 +627,7 @@ async def upload_file(file: UploadFile = File(...)):
         with open(file_path, "wb") as f:
             f.write(contents)
         
-        print(f"📥 Saved uploaded file: {file_path}")
+        print(f"[UPLOAD] Saved uploaded file: {file_path}")
         
         # Check if audio file (handled by audio_tools, not RAG)
         audio_extensions = {'.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac'}
@@ -628,7 +639,7 @@ async def upload_file(file: UploadFile = File(...)):
                 "success": True,
                 "file_id": safe_name,
                 "filename": safe_name,
-                "message": f"✅ Audio file saved: '{safe_name}' (use transcribe_audio or summarize_audio)"
+                "message": f"[OK] Audio file saved: '{safe_name}' (use transcribe_audio or summarize_audio)"
             }
         
         # 2. Ingest into RAG (non-audio files)
@@ -645,12 +656,12 @@ async def upload_file(file: UploadFile = File(...)):
             "success": True,
             "file_id": result.get("file_id"),
             "filename": result.get("filename"),
-            "message": f"✅ Ingested '{result.get('filename')}'"
+            "message": f"[OK] Ingested '{result.get('filename')}'"
         }
         
     except Exception as e:
         import traceback
-        print(f"❌ Upload error: {traceback.format_exc()}")
+        print(f"[ERROR] Upload error: {traceback.format_exc()}")
         return JSONResponse({
             "success": False,
             "message": str(e)
@@ -716,7 +727,7 @@ async def record_voice_template():
                 frames_per_buffer=CHUNK
             )
             
-            print(f"🎙️ Recording template {existing + 1}...")
+            print(f"[VOICE] Recording template {existing + 1}...")
             frames = []
             for _ in range(int(RATE / CHUNK * RECORD_SECONDS)):
                 data = stream.read(CHUNK, exception_on_overflow=False)
@@ -737,11 +748,11 @@ async def record_voice_template():
             wf.writeframes(b''.join(frames))
             wf.close()
             
-            print(f"✅ Saved voice template: {filename}")
+            print(f"[OK] Saved voice template: {filename}")
             return {"success": True, "filename": filename, "template_count": existing + 1}
             
         except Exception as e:
-            print(f"❌ Recording failed: {e}")
+            print(f"[ERROR] Recording failed: {e}")
             return {"success": False, "error": str(e)}
     
     # Run recording in thread pool to not block async
@@ -767,144 +778,18 @@ async def _run_async_reflection(user_msg: str, assistant_response: str):
     try:
         if assistant and hasattr(assistant, 'reflection_engine'):
             await assistant.reflection_engine.analyze_turn_async(user_msg, assistant_response)
-            print(f"🔄 [Reflection] Async analysis completed")
+            print(f"[REFLECTION] Async analysis completed")
     except Exception as e:
         print(f"⚠️ [Reflection] Background analysis failed: {e}")
 
 
 # =============================================================================
-# V13: CONSTRAINT STATE API (For Svelte Frontend)
+# V14: CONSTRAINT SYSTEM (World Graph Integrated)
 # =============================================================================
 
-@app.get("/api/constraints")
-async def get_constraints():
-    """
-    Return all active constraints for UI visibility.
-    
-    Response:
-        {
-            "active": [
-                {
-                    "id": "phys_001",
-                    "type": "physical",
-                    "constraint": "Cannot walk - corn removal surgery",
-                    "implications": ["walking", "exercise"],
-                    "criticality": 0.9,
-                    "created_at": "2026-01-15T20:00:00",
-                    "expires_at": "2026-01-22T20:00:00"
-                }
-            ],
-            "count": 1
-        }
-    """
-    try:
-        state_manager = get_state_manager()
-        active_states = state_manager.get_all_active()
-        
-        return {
-            "active": active_states,
-            "count": len(active_states),
-            "token_budget": state_manager.token_budget,
-            "archived_count": len(state_manager.archived_states)
-        }
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+# Add/Retire functionality is now integrated into get_active_constraints below
+# to use WorldGraph as the single source of truth.
 
-
-@app.post("/api/constraints/{constraint_id}/retire")
-async def retire_constraint(constraint_id: str, request: Request):
-    """
-    Manually retire a constraint (user says "Mark as Resolved").
-    
-    Request body (optional):
-        {"reason": "User marked as resolved"}
-    """
-    try:
-        data = {}
-        try:
-            data = await request.json()
-        except:
-            pass
-        
-        reason = data.get("reason", "Manual retirement via UI")
-        
-        state_manager = get_state_manager()
-        success = state_manager.retire_state(constraint_id, reason=reason)
-        
-        if success:
-            return {"success": True, "message": f"Constraint {constraint_id} retired"}
-        else:
-            return JSONResponse(
-                {"success": False, "message": f"Constraint {constraint_id} not found"},
-                status_code=404
-            )
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-
-
-@app.post("/api/constraints/add")
-async def add_constraint(request: Request):
-    """
-    Manually add a constraint (emergency override / user-facing API).
-    
-    Request body:
-        {
-            "type": "physical|temporal|emotional|social|resource",
-            "constraint": "Description of constraint",
-            "implications": ["action1", "action2"],
-            "criticality": 0.8,
-            "duration_days": 7  (optional)
-        }
-    """
-    from datetime import datetime, timedelta
-    
-    try:
-        data = await request.json()
-        
-        # Validate required fields
-        if not data.get("constraint"):
-            return JSONResponse(
-                {"success": False, "message": "constraint field is required"},
-                status_code=400
-            )
-        
-        # Generate unique ID
-        state_id = f"manual_{datetime.now().strftime('%H%M%S')}"
-        
-        # Calculate expiry
-        expires_at = None
-        if data.get("duration_days"):
-            expires_at = datetime.now() + timedelta(days=int(data["duration_days"]))
-        
-        # Create constraint
-        state = ConstraintState(
-            id=state_id,
-            type=StateType(data.get("type", "physical")),
-            status=StateStatus.ACTIVE,
-            constraint=data.get("constraint", "")[:100],
-            implications=data.get("implications", [])[:10],
-            created_at=datetime.now(),
-            expires_at=expires_at,
-            last_mentioned=datetime.now(),
-            criticality=min(1.0, max(0.0, float(data.get("criticality", 0.8)))),
-            user_emphasis=1.0,  # Max priority for manual additions
-            auto_expire=expires_at is not None
-        )
-        
-        state_manager = get_state_manager()
-        success = state_manager.add_state(state)
-        
-        if success:
-            return {"success": True, "id": state_id, "message": "Constraint added"}
-        else:
-            return JSONResponse(
-                {"success": False, "message": "Failed to add constraint (duplicate ID?)"},
-                status_code=400
-            )
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
 @app.post("/chat")
@@ -976,11 +861,11 @@ async def chat(request: Request):
                 q.put_nowait({"type": "pipeline_result", "data": result})
                 
             except asyncio.CancelledError:
-                print("🛑 Pipeline cancelled")
+                print("[CANCEL] Pipeline cancelled")
                 q.put_nowait({"type": "pipeline_cancelled"})
             except Exception as e:
                 import traceback
-                print(f"❌ Pipeline Error: {e}")
+                print(f"[ERROR] Pipeline Error: {e}")
                 traceback.print_exc()
                 q.put_nowait({"type": "pipeline_error", "error": str(e)})
 
@@ -1019,9 +904,16 @@ async def chat(request: Request):
                         print(f"⚠️ Save failed: {e}")
                     
                     # Tool events (extracted from metadata or result if available)
-                    tool_used = result.get("tool_used", "None")
-                    if tool_used != "None":
-                        yield f"data: {json.dumps({'type': 'tool_used', 'tool': tool_used})}\n\n"
+                    # V17: Support multi-tool observability
+                    tools_used_list = result.get("tools_used", [])
+                    if not tools_used_list:
+                        # Fallback to legacy single tool
+                        single_tool = result.get("tool_used", "None")
+                        if single_tool != "None":
+                            tools_used_list = [single_tool]
+                            
+                    for tool_name in tools_used_list:
+                         yield f"data: {json.dumps({'type': 'tool_used', 'tool': tool_name})}\n\n"
                         
                     # Stream Content
                     yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
@@ -1111,14 +1003,14 @@ async def get_history():
     Return recent chat history for UI persistence.
     Loads from the conversation memory stored by SmartAssistant.
     """
-    # print("📜 [/history] Fetching chat history...")
+    # print("[HISTORY] Fetching chat history...")
     try:
         from sakura_assistant.memory.faiss_store import get_memory_store
         
         store = get_memory_store()
         history = getattr(store, 'conversation_history', [])
         
-        # print(f"📜 [/history] Found {len(history)} messages in memory")
+        # print(f"[HISTORY] Found {len(history)} messages in memory")
         
         # Convert to UI format and limit to last 50 messages
         messages = []
@@ -1135,7 +1027,7 @@ async def get_history():
                 "content": msg.get("content", "")
             })
         
-        # print(f"📜 [/history] Returning {len(messages)} messages to frontend")
+        # print(f"[HISTORY] Returning {len(messages)} messages to frontend")
         return {"messages": messages}
     except ImportError as e:
         print(f"⚠️ History module not available: {e}")
@@ -1160,20 +1052,20 @@ async def clear_all():
         # 1. Clear conversation memory (in-memory)
         if hasattr(assistant, 'memory') and assistant.memory:
             assistant.memory.clear()
-            print("🗑️ Conversation memory cleared")
+            print("[CLEAR] Conversation memory cleared")
         
         # 2. Reset World Graph
         if hasattr(assistant, 'world_graph'):
             assistant.world_graph.reset()
             assistant.world_graph.save()
-            print("🗑️ World Graph reset")
+            print("[CLEAR] World Graph reset")
         
         # 3. Clear FAISS store's in-memory conversation history
         try:
             from sakura_assistant.memory.faiss_store import get_memory_store
             store = get_memory_store()
             store.conversation_history.clear()
-            print("🗑️ FAISS conversation history cleared (in-memory)")
+            print("[CLEAR] FAISS conversation history cleared (in-memory)")
         except Exception as e:
             print(f"⚠️ FAISS clear failed: {e}")
         
@@ -1182,7 +1074,7 @@ async def clear_all():
         history_path = os.path.join(os.path.dirname(__file__), "data", "conversation_history.json")
         if os.path.exists(history_path):
             os.remove(history_path)
-            print(f"🗑️ Deleted {history_path}")
+            print(f"[CLEAR] Deleted {history_path}")
         
         return {"success": True, "message": "All memory cleared"}
     except Exception as e:
@@ -1198,14 +1090,14 @@ async def shutdown():
     """
     if assistant and hasattr(assistant, 'world_graph'):
         assistant.world_graph.save()
-        print("💾 World Graph saved via /shutdown")
+        print("[SAVE] World Graph saved via /shutdown")
     
     # CRITICAL: Flush conversation history to disk
     try:
         from sakura_assistant.memory.faiss_store import get_memory_store
         store = get_memory_store()
         store.flush_saves()
-        print(f"💾 Conversation history saved ({len(store.conversation_history)} messages)")
+        print(f"[SAVE] Conversation history saved ({len(store.conversation_history)} messages)")
     except Exception as e:
         print(f"⚠️ Failed to flush history on shutdown: {e}")
     
@@ -1235,6 +1127,38 @@ async def voice_speak(request: Request):
         return {"status": "speaking"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@app.post("/voice/generate")
+async def voice_generate(request: Request):
+    """
+    V18: Generate TTS audio and return file path (no playback).
+    Used by frontend for HTML5 Audio API playback.
+    """
+    try:
+        data = await request.json()
+        text = data.get("text", "").strip()
+        
+        # Validate text
+        if not text:
+            return {"status": "error", "message": "No text provided"}
+        if len(text) > 5000:
+            return {"status": "error", "message": "Text too long (max 5000 chars)"}
+        
+        # Generate audio file (no playback)
+        from sakura_assistant.utils.tts import generate_audio
+        audio_path = generate_audio(text)
+        
+        if audio_path:
+            print(f"[VOICE] Generated audio: {audio_path}")
+            return {"status": "success", "audio_path": audio_path}
+        
+        return {"status": "error", "message": "TTS generation failed"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+
 
 @app.post("/voice/trigger")
 async def voice_trigger():
@@ -1386,7 +1310,7 @@ async def proactive_websocket(websocket: WebSocket):
     """
     await websocket.accept()
     proactive_clients.append(websocket)
-    print(f"💌 [Proactive] Client connected ({len(proactive_clients)} total)")
+    print(f"[PROACTIVE] Client connected ({len(proactive_clients)} total)")
     
     try:
         while True:
@@ -1397,7 +1321,7 @@ async def proactive_websocket(websocket: WebSocket):
     finally:
         if websocket in proactive_clients:
             proactive_clients.remove(websocket)
-        print(f"💌 [Proactive] Client disconnected ({len(proactive_clients)} total)")
+        print(f"[PROACTIVE] Client disconnected ({len(proactive_clients)} total)")
 
 
 async def send_proactive_message(message: str):
@@ -1428,7 +1352,7 @@ async def send_proactive_message(message: str):
         if client in proactive_clients:
             proactive_clients.remove(client)
     
-    print(f"💌 [Proactive] Sent to {len(proactive_clients)} clients: {message[:50]}...")
+    print(f"[PROACTIVE] Sent to {len(proactive_clients)} clients: {message[:50]}...")
     
     # V15: Speak with Kokoro TTS, then offload
     await speak_and_offload(message)
@@ -1447,7 +1371,7 @@ async def speak_and_offload(message: str):
             import psutil
             cpu_usage = psutil.cpu_percent(interval=0.1)
             if cpu_usage > 80:
-                print(f"🛡️ [TTS] CPU Guard: {cpu_usage:.0f}% > 80%, skipping TTS")
+                print(f"[TTS] CPU Guard: {cpu_usage:.0f}% > 80%, skipping TTS")
                 return
         except ImportError:
             pass  # psutil not available, proceed without guard
@@ -1456,19 +1380,19 @@ async def speak_and_offload(message: str):
         
         tts = get_tts_engine()
         if tts is None:
-            print("🔇 [TTS] Not available, skipping voice")
+            print("[TTS] Not available, skipping voice")
             return
         
-        print(f"🔊 [TTS] Speaking: {message[:50]}...")
+        print(f"[TTS] Speaking: {message[:50]}...")
         await tts.speak_async(message)
         
         tts.offload()
-        print("💾 [TTS] Offloaded to conserve CPU")
+        print("[TTS] Offloaded to conserve CPU")
         
     except ImportError:
-        print("🔇 [TTS] Module not available")
+        print("[TTS] Module not available")
     except Exception as e:
-        print(f"⚠️ [TTS] Speak failed: {e}")
+        print(f"[WARN] [TTS] Speak failed: {e}")
 
 
 @app.get("/api/desire")
@@ -1531,9 +1455,9 @@ def setup_proactive_callback():
         from sakura_assistant.core.cognitive.proactive import get_proactive_scheduler
         scheduler = get_proactive_scheduler()
         scheduler.websocket_callback = send_proactive_message
-        print("🔗 [Proactive] WebSocket callback wired")
+        print("[PROACTIVE] WebSocket callback wired")
     except Exception as e:
-        print(f"⚠️ [Proactive] Callback setup failed: {e}")
+        print(f"[WARN] [Proactive] Callback setup failed: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1643,14 +1567,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     port = int(os.getenv("SAKURA_PORT", "3210"))
-    print(f"🚀 Sakura Backend starting on port {port}")
+    print(f"Sakura Backend starting on port {port}")
     
     # Start Voice Engine if requested
     if args.voice:
         try:
-            print("🎙️ Starting Voice Engine...")
+            print("Starting Voice Engine...")
             from sakura_assistant.core.llm import SmartAssistant
-            from sakura_assistant.core.voice_engine import VoiceEngine
+            from sakura_assistant.core.infrastructure.voice import VoiceEngine
             
             # We need to wait for 'assistant' to be init by lifespan, 
             # BUT uvicorn lifespan runs async.
@@ -1660,7 +1584,7 @@ if __name__ == "__main__":
             # So we set a global flag here.
             os.environ["SAKURA_ENABLE_VOICE"] = "true"
         except Exception as e:
-            print(f"❌ Failed to queue Voice Engine: {e}")
+            print(f"[ERROR] Failed to queue Voice Engine: {e}")
     
     uvicorn.run(
         app,

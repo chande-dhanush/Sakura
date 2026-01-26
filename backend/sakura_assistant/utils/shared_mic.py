@@ -61,7 +61,7 @@ class MicStreamManager:
         global _stream, _audio, _running
         
         if not _check_pyaudio():
-            print("❌ Shared Mic: PyAudio not available")
+            print(" Shared Mic: PyAudio not available")
             return False
         
         with _lock:
@@ -95,11 +95,11 @@ class MicStreamManager:
                 # Start frame dispatch thread
                 threading.Thread(target=MicStreamManager._frame_loop, daemon=True).start()
                 
-                print(f"🎤 Shared Mic: Started (rate={SAMPLE_RATE}, chunk={CHUNK_SIZE})")
+                print(f" Shared Mic: Started (rate={SAMPLE_RATE}, chunk={CHUNK_SIZE})")
                 return True
                 
             except Exception as e:
-                print(f"❌ Shared Mic: Failed to start - {e}")
+                print(f" Shared Mic: Failed to start - {e}")
                 return False
     
     @staticmethod
@@ -125,7 +125,7 @@ class MicStreamManager:
                     pass
                 _audio = None
             
-            print("🎤 Shared Mic: Stopped")
+            print(" Shared Mic: Stopped")
     
     @staticmethod
     def _frame_loop():
@@ -189,7 +189,7 @@ class MicStreamManager:
                 "exclusive": False
             })
         
-        print(f"🎤 Shared Mic: Registered consumer '{name}' (priority={priority})")
+        print(f" Shared Mic: Registered consumer '{name}' (priority={priority})")
         return consumer_id
     
     @staticmethod
@@ -200,7 +200,7 @@ class MicStreamManager:
                 if c["id"] == consumer_id:
                     c["active"] = True
                     c["exclusive"] = exclusive
-                    print(f"🎤 Shared Mic: Activated '{c['name']}' (exclusive={exclusive})")
+                    print(f" Shared Mic: Activated '{c['name']}' (exclusive={exclusive})")
                     return
     
     @staticmethod
@@ -211,7 +211,7 @@ class MicStreamManager:
                 if c["id"] == consumer_id:
                     c["active"] = False
                     c["exclusive"] = False
-                    print(f"🎤 Shared Mic: Deactivated '{c['name']}'")
+                    print(f" Shared Mic: Deactivated '{c['name']}'")
                     return
     
     @staticmethod

@@ -83,7 +83,8 @@
         width: 220px;
         height: 220px;
         position: relative;
-        /* pointer-events: none; If we want click-through on empty space (requires Tauri setup, skipping for now) */
+        /* V17: Enable click-through on empty space */
+        pointer-events: none;
     }
     
     .sakura-bubble {
@@ -92,7 +93,8 @@
         position: absolute;
         bottom: 0;
         right: 0;
-        /* pointer-events: auto; */
+        /* V17: Bubble itself catches clicks */
+        pointer-events: auto;
         
         background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(20, 20, 30, 0.98) 100%);
         border: 1.5px solid rgba(136, 136, 255, 0.4);
@@ -151,7 +153,8 @@
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
         backdrop-filter: blur(16px);
         z-index: 9999;
-        /* pointer-events: auto; */
+        /* V17: Menu catches clicks */
+        pointer-events: auto;
     }
 
     .bubble-menu button {

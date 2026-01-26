@@ -15,14 +15,14 @@ import os
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-from sakura_assistant.core.router import ROUTER_SYSTEM_PROMPT_TEMPLATE as ROUTER_SYSTEM_PROMPT
+from sakura_assistant.core.routing.router import ROUTER_SYSTEM_PROMPT_TEMPLATE as ROUTER_SYSTEM_PROMPT
 from sakura_assistant.config import (
     PLANNER_SYSTEM_PROMPT,
     SYSTEM_PERSONALITY,
     VERIFIER_SYSTEM_PROMPT,
 )
-from sakura_assistant.core.responder import RESPONDER_NO_TOOLS_RULE
-from sakura_assistant.core.rate_limiter import GlobalRateLimiter
+from sakura_assistant.core.models.responder import RESPONDER_NO_TOOLS_RULE
+from sakura_assistant.core.infrastructure.rate_limiter import GlobalRateLimiter
 
 # ============================================================================
 # TOKEN COUNTING

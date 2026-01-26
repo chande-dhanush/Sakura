@@ -37,7 +37,7 @@ class PerDocChromaStore:
                     metadata={"hnsw:space": "cosine"}
                 )
             except Exception as e:
-                print(f"❌ Failed to init Chroma for {self.doc_id}: {e}")
+                print(f" Failed to init Chroma for {self.doc_id}: {e}")
                 self.client = None
 
     def add_documents(self, ids: List[str], embeddings: List[Any], metadatas: List[dict], documents: List[str]) -> bool:
@@ -94,7 +94,7 @@ class PerDocChromaStore:
         import gc
         try:
             # 1. Unload Client
-            print(f"🗑️ Deleting store for {self.doc_id}...")
+            print(f"️ Deleting store for {self.doc_id}...")
             self.client = None 
             self.collection = None
             
@@ -115,7 +115,7 @@ class PerDocChromaStore:
             
             return False
         except Exception as e:
-            print(f"❌ Failed to delete store {self.doc_id}: {e}")
+            print(f" Failed to delete store {self.doc_id}: {e}")
             return False
 
 # Factory function

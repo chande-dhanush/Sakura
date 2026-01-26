@@ -47,7 +47,7 @@ def _validate_path(path: str) -> str:
     
     # 1. Check for directory traversal
     if ".." in path:
-         raise ValueError(f"❌ Security Violation: Directory traversal detected in '{path}'")
+         raise ValueError(f" Security Violation: Directory traversal detected in '{path}'")
     
     # 2. Check if path is within any allowed directory
     for allowed in ALLOWED_PATHS:
@@ -57,7 +57,7 @@ def _validate_path(path: str) -> str:
         except ValueError:
             continue
     
-    raise ValueError(f"❌ Security Violation: Access to '{path}' denied (Outside Sandbox).")
+    raise ValueError(f" Security Violation: Access to '{path}' denied (Outside Sandbox).")
 
 def retry_with_auth(func):
     """Decorator to retry Google API calls with re-auth if needed."""
@@ -67,8 +67,8 @@ def retry_with_auth(func):
             return func(*args, **kwargs)
         except Exception as e:
             if "invalid_grant" in str(e) or "Token has been expired" in str(e):
-                print("🔄 Token expired. Please re-authenticate.")
-                return "❌ Auth token expired. Please restart to re-login."
+                print(" Token expired. Please re-authenticate.")
+                return " Auth token expired. Please restart to re-login."
             return func(*args, **kwargs) # Retry once or fail
     return wrapper
 
@@ -88,7 +88,7 @@ def get_google_creds():
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
     except ImportError:
-        print("❌ Google Libs not available.")
+        print(" Google Libs not available.")
         return None
 
     try:
@@ -109,7 +109,7 @@ def get_google_creds():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
-                # print("🔄 Refreshing Google Token...")
+                # print(" Refreshing Google Token...")
                 creds.refresh(Request())
                 with open(token_path, 'w') as token:
                     token.write(creds.to_json())
@@ -123,18 +123,18 @@ def get_google_creds():
              if os.path.exists(cred_path):
                  try:
                      from google_auth_oauthlib.flow import InstalledAppFlow
-                     print(f"🔄 Initiating Google Auth Flow from {cred_path}...")
+                     print(f" Initiating Google Auth Flow from {cred_path}...")
                      flow = InstalledAppFlow.from_client_secrets_file(cred_path, SCOPES)
                      creds = flow.run_local_server(port=0)
                      # Save the credentials for the next run
                      with open(token_path, 'w') as token:
                          token.write(creds.to_json())
-                     print("✅ New token.json saved.")
+                     print(" New token.json saved.")
                  except Exception as flow_err:
-                     print(f"❌ OAuth Flow failed: {flow_err}")
+                     print(f" OAuth Flow failed: {flow_err}")
                      return None
              else:
-                 print(f"❌ No credentials.json found at {cred_path}")
+                 print(f" No credentials.json found at {cred_path}")
                  return None
 
     return creds

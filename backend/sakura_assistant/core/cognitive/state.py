@@ -63,7 +63,7 @@ class ProactiveState:
                 "content": content,
                 "timestamp": time.time()
             }
-            print(f"🤫 [State] Message queued: {content[:50]}...")
+            print(f" [State] Message queued: {content[:50]}...")
     
     def pop_pending_message(self) -> Optional[str]:
         """
@@ -84,11 +84,11 @@ class ProactiveState:
             # Check TTL
             if age_seconds > TTL_SECONDS:
                 age_hours = age_seconds / 3600
-                print(f"🗑️ [State] Message expired ({age_hours:.1f}h old, TTL={TTL_SECONDS/3600}h)")
+                print(f"️ [State] Message expired ({age_hours:.1f}h old, TTL={TTL_SECONDS/3600}h)")
                 self.on_message_expired()
                 return None
             
-            print(f"📬 [State] Delivering queued message ({age_seconds/60:.1f}m old)")
+            print(f" [State] Delivering queued message ({age_seconds/60:.1f}m old)")
             return content
     
     def set_visibility(self, visible: bool) -> Optional[str]:
@@ -100,7 +100,7 @@ class ProactiveState:
             was_visible = self.ui_visible
             self.ui_visible = visible
             
-            print(f"👁️ [State] Visibility: {was_visible} → {visible}")
+            print(f"️ [State] Visibility: {was_visible} → {visible}")
             
             # If becoming visible, check for pending messages
             if visible and not was_visible:
@@ -128,14 +128,14 @@ class ProactiveState:
         """Track failed initiation for exponential backoff."""
         self.failed_initiation_count += 1
         self._save_persistent_state()
-        print(f"📉 [State] Failed initiation #{self.failed_initiation_count}")
+        print(f" [State] Failed initiation #{self.failed_initiation_count}")
     
     def on_successful_interaction(self) -> None:
         """Reset backoff counter on successful user interaction."""
         if self.failed_initiation_count > 0:
             self.failed_initiation_count = 0
             self._save_persistent_state()
-            print("✅ [State] Backoff counter reset")
+            print(" [State] Backoff counter reset")
     
     def _get_state_path(self) -> str:
         """Get path for persisted state file."""
@@ -150,7 +150,7 @@ class ProactiveState:
                 with open(path, "r") as f:
                     data = json.load(f)
                     self.failed_initiation_count = data.get("failed_count", 0)
-                    print(f"📂 [State] Loaded backoff state: {self.failed_initiation_count} failures")
+                    print(f" [State] Loaded backoff state: {self.failed_initiation_count} failures")
         except Exception as e:
             print(f"⚠️ [State] Failed to load backoff state: {e}")
     
@@ -178,5 +178,5 @@ def get_proactive_state() -> ProactiveState:
     global _state
     if _state is None:
         _state = ProactiveState()
-        print("🧠 [State] ProactiveState initialized")
+        print(" [State] ProactiveState initialized")
     return _state

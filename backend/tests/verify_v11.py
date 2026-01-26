@@ -13,7 +13,7 @@ from sakura_assistant.core.tools_libs.research import SmartResearcher
 from sakura_assistant.core.memory.reflection import ReflectionEngine
 
 async def test_smart_researcher_logic():
-    print("\n🧪 Testing SmartResearcher Logic...")
+    print("\n Testing SmartResearcher Logic...")
     researcher = SmartResearcher()
     
     # Test Tier Logic
@@ -27,10 +27,10 @@ async def test_smart_researcher_logic():
     print(f"   Query: '{tier2_query}' -> Tier: {tier} (Expected: advanced)")
     assert tier == "advanced"
     
-    print("✅ SmartResearcher Tier Logic Passed")
+    print(" SmartResearcher Tier Logic Passed")
 
 async def test_reflection_logic():
-    print("\n🧪 Testing ReflectionEngine Logic...")
+    print("\n Testing ReflectionEngine Logic...")
     
     # Mock WorldGraph to prevent real writes
     mock_wg = MagicMock()
@@ -69,12 +69,12 @@ async def test_reflection_logic():
         assert engine.last_reflected_index == 4
         
         mock_wg.get_or_create_entity.assert_called()
-        print("✅ ReflectionEngine Graph Update Triggered")
+        print(" ReflectionEngine Graph Update Triggered")
 
 async def main():
     await test_smart_researcher_logic()
     await test_reflection_logic()
-    print("\n🎉 All V11 Logic Tests Passed!")
+    print("\n All V11 Logic Tests Passed!")
 
 if __name__ == "__main__":
     asyncio.run(main())
