@@ -3,7 +3,7 @@ Execution pipeline components.
 
 Exports:
 - ExecutionContext, ExecutionMode, ExecutionStatus, ExecutionResult, GraphSnapshot
-- ExecutionDispatcher
+- Executor
 - ToolExecutor (legacy), ReActLoop, ToolRunner
 - OneShotRunner
 - Planner
@@ -17,7 +17,7 @@ from .context import (
     ExecutionResult,
     GraphSnapshot
 )
-from .dispatcher import ExecutionDispatcher
+from .dispatcher import Executor
 from .executor import ToolExecutor, ReActLoop, ToolRunner, OutputHandler, ExecutionPolicy
 from .oneshot_runner import OneShotRunner, OneShotArgsIncomplete
 from .planner import Planner
@@ -29,7 +29,7 @@ __all__ = [
     "ExecutionStatus",
     "ExecutionResult",
     "GraphSnapshot",
-    "ExecutionDispatcher",
+    "Executor",
     "ToolExecutor",
     "ReActLoop",
     "ToolRunner",

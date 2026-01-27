@@ -1,11 +1,11 @@
-# Sakura V17 — Technical Documentation
-*System Certified: January 19, 2026*
+# Sakura V17.5 — Technical Documentation
+*System Certified: January 27, 2026*
 
 ---
 
 ## 🎯 Overview
 **Sakura** is a production-grade personal AI assistant optimized for cost, performance, and CPU-only deployment.
-**V16.2 "Polished Soul":** Featuring **Stable Soul Architecture** (Reactive Identity, EventBus), **Dependency Injection Refactor**, **Search Cascade**, and **Deterministic Hallucination Blocks**. Includes **V15.4** unified context and cognitive systems.
+**V17.5 "Precise Soul":** Featuring **Model-Specific Token Counting**, **SSE Tool Streaming**, V17.4 **Observability Fix**, plus all prior architecture (Stable Soul, Dependency Injection, Search Cascade).
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
 
@@ -71,6 +71,11 @@
 | **Execution V17** | **V17.0** | Unified Sync/Async paths, Contractual Latency Budgets, `ExecutionDispatcher` |
 | **Core Refactor** | **V17.0** | Bloated `core/` split into 6 logical subdirectories (Encryption, Graph, Routing...) |
 | **Guaranteed Emission** | **V17.0** | `ResponseEmitter` ensures 0% silent failures (UI safety net) |
+| **Token Tracking Fix** | **V17.4** | `FlightRecorder.log_llm_call()` invoked from `ReliableLLM` wrapper |
+| **Cost Calculation** | **V17.4** | Real-time cost tracking per LLM call using `MODEL_COSTS` |
+| **Groq XML Recovery Logging** | **V17.4** | Estimated tokens logged for recovered Groq API errors |
+| **Precise Token Counting** | **V17.5** | Model-specific tokenizers: tiktoken (GPT), calibrated heuristics (Llama/Gemini/Claude) |
+| **SSE Tool Streaming** | **V17.5** | Real-time progress updates during slow tool execution via `ProgressEmitter` |
 
 ---
 
@@ -561,6 +566,83 @@ graph TD
 
 ---
 
+## 📊 Observability System (V17.4 / V17.5)
+
+### Flight Recorder Architecture
+
+The Flight Recorder provides comprehensive logging for debugging, cost tracking, and performance analysis.
+
+```mermaid
+graph LR
+    LLM[ReliableLLM] -->|log_llm_call| FR[FlightRecorder]
+    Tools[Tool Execution] -->|span| FR
+    FR -->|callback| SSE[SSE Stream]
+    FR -->|write| JSONL[flight_recorder.jsonl]
+    SSE --> UI[Sakura Sight UI]
+```
+
+### Token Tracking (V17.4)
+
+| Component | Function | Purpose |
+|-----------|----------|----------|
+| `_extract_tokens()` | wrapper.py | Extract tokens from 4 LangChain response formats |
+| `_log_llm_tokens()` | wrapper.py | Safe wrapper for FlightRecorder logging |
+| `log_llm_call()` | flight_recorder.py | Calculate cost, accumulate trace totals |
+
+### Precise Token Counting (V17.5)
+
+| Model Family | Method | Accuracy |
+|--------------|--------|----------|
+| GPT/OpenAI | tiktoken (cached) | ±1% |
+| Llama/Mistral | 3.5 chars/token | ±5% |
+| Gemini | 3.8 chars/token | ±5% |
+| Claude | 3.7 chars/token | ±5% |
+
+**File:** `backend/sakura_assistant/utils/token_counter.py`
+
+```python
+from sakura_assistant.utils.token_counter import count_tokens, estimate_cost
+
+tokens = count_tokens("Hello world", model="gpt-4o")  # Returns 3
+cost = estimate_cost({"prompt": 1000, "completion": 500}, model="llama-3.1-8b-instant")
+```
+
+### SSE Tool Streaming (V17.5)
+
+Slow tools emit real-time progress updates via `ProgressEmitter`.
+
+**File:** `backend/sakura_assistant/utils/progress_emitter.py`
+
+| Tool | Progress Events |
+|------|-----------------|
+| `web_search` | 🔍 Searching → ✅ Found N results |
+| `search_wikipedia` | 🔍 Searching → 📖 Found article → ✅ Retrieved summary |
+| `web_scrape` | 🌐 Connecting → 📥 Downloaded → 🔍 Extracting → ✅ Complete |
+| `research_topic` | 🔬 Starting → 📂 Cache check → 🔍 Phase 1/3 → 🧠 Phase 3/3 → ✅ Complete |
+
+**Usage in Tools:**
+```python
+from sakura_assistant.utils.progress_emitter import get_progress_emitter
+
+emitter = get_progress_emitter()
+emitter.tool_progress("web_search", "🔍 Searching web...")
+emitter.tool_success("web_search", "✅ Found 5 results")
+```
+
+### Model Cost Table
+
+```python
+MODEL_COSTS = {
+    "llama-3.1-8b-instant": {"input": 0.05, "output": 0.08},
+    "llama-3.3-70b-versatile": {"input": 0.59, "output": 0.79},
+    "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
+    "gpt-4o": {"input": 2.50, "output": 10.00},
+    "default": {"input": 0.50, "output": 1.00},
+}  # USD per 1M tokens
+```
+
+---
+
 ## 📋 Test Suite
 
 | Test File | Coverage |
@@ -743,7 +825,9 @@ python tools/system_reset.py
 | **V15.4** | **Deterministic Context Router, ContextSignals, Unified Context API** |
 | **V16.2** | Dependency Injection, Stable Soul Architecture |
 | **V17.0** | **Execution V17 (Dispatcher, Budgets), Core Refactor (6 subdirs), Guaranteed Emission** |
+| **V17.4** | **Observability Fix: Token Tracking, Cost Calculation, Groq XML Recovery Logging** |
+| **V17.5** | **Precise Token Counting (tiktoken), SSE Tool Streaming (ProgressEmitter)** |
 
 ---
 
-*Documentation updated for Sakura V17.0 — January 19, 2026*
+*Documentation updated for Sakura V17.5 — January 27, 2026*

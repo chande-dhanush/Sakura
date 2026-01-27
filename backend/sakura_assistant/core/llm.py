@@ -16,7 +16,7 @@ from .models import ResponseGenerator, ResponseContext
 from .tools import get_all_tools
 
 # V17: Execution architecture
-from .execution import ExecutionDispatcher, OneShotRunner, ResponseEmitter, EmitterFactory
+from .execution import Executor, OneShotRunner, ResponseEmitter, EmitterFactory
 
 # V7: World Graph
 from .graph import WorldGraph
@@ -40,10 +40,10 @@ class SmartAssistant:
     Sakura V17 Facade
     =================
     Orchestrates the V17 execution architecture:
-    Router -> ExecutionDispatcher -> Responder
+    Router -> Executor -> Responder
     
     V17 Changes:
-    - ExecutionDispatcher replaces direct ToolExecutor calls
+    - Executor replaces direct ToolExecutor calls
     - ExecutionContext threads mode/budget through pipeline
     - ResponseEmitter guarantees exactly one message per request
     """
@@ -99,8 +99,8 @@ class SmartAssistant:
             identity_manager=get_identity_manager()
         )
         
-        # V17: Create ExecutionDispatcher (unified entry point)
-        self.dispatcher = ExecutionDispatcher(
+        # V17: Create Executor (unified entry point)
+        self.executor_layer = Executor(
             one_shot_runner=self.oneshot_runner,
             react_loop=self.executor.react_loop,
             world_graph=self.world_graph,
@@ -132,7 +132,7 @@ class SmartAssistant:
         # Store last response for async reflection (picked up by server.py BackgroundTask)
         self._last_turn_data = {"user_msg": "", "assistant_response": ""}
         
-        print(" SmartAssistant Initialized (V17 - ExecutionDispatcher)")
+        print(" SmartAssistant Initialized (V17 - Executor)")
 
     def run(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -162,11 +162,11 @@ class SmartAssistant:
         1. Vision Check
         2. Graph Update (Sync - fast)
         3. Router (Async)
-        4. ExecutionDispatcher (Async) - NEW in V17
+        4. Executor (Async) - NEW in V17
         5. Responder (Async)
         
         V17 Changes:
-        - ExecutionDispatcher replaces Executor
+        - Executor replaces ToolExecutor calls
         - ResponseEmitter guarantees exactly one message
         - ExecutionContext threads mode/budget through pipeline
         """
@@ -207,7 +207,7 @@ class SmartAssistant:
             
             state.current_intent = route_result.classification
             
-            # 4. Execution (V17: Use ExecutionDispatcher)
+            # 4. Execution (V17: Use Executor)
             tool_outputs = ""
             tool_used = "None"
             exec_result = None
@@ -216,8 +216,8 @@ class SmartAssistant:
                 print(f"⚙️ V17 Dispatch Phase: {route_result.classification}")
                 state.record_llm_call("execution")
                 
-                with span("ExecutionDispatcher"):
-                    exec_result = await self.dispatcher.dispatch(
+                with span("Executor"):
+                    exec_result = await self.executor_layer.dispatch(
                         user_input=user_input,
                         classification=route_result.classification,
                         tool_hint=route_result.tool_hint,

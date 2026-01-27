@@ -42,12 +42,23 @@ class SmartResearcher:
     async def research(self, query: str) -> str:
         """
         Execute Two-Tier Research with Smart Caching.
+        V17.5: Emits progress updates for SSE streaming.
         """
         from tavily import TavilyClient
         from ..infrastructure.broadcaster import broadcast
         
+        # V17.5: Get progress emitter
+        emitter = None
+        try:
+            from ...utils.progress_emitter import get_progress_emitter
+            emitter = get_progress_emitter()
+        except:
+            pass
+        
         # 0. Broadcasting Start
         broadcast("research_start", {"query": query, "step": "Checking Cache..."})
+        if emitter:
+            emitter.tool_progress("research_topic", f"🔬 Starting research on '{query[:40]}...'")
         
         # --- SMART CACHING START ---
         collection = None
@@ -58,6 +69,9 @@ class SmartResearcher:
             from sakura_assistant.memory.chroma_store.store import get_chroma_client
             client = get_chroma_client()
             collection = client.get_or_create_collection(name="search_cache")
+            
+            if emitter:
+                emitter.tool_progress("research_topic", "📂 Checking cache...")
             
             # Embed query
             try:
@@ -88,6 +102,8 @@ class SmartResearcher:
                     timestamp = results["metadatas"][0][0].get("timestamp")
                     print(f"⚡ SmartResearcher: Cache Hit (dist={distance:.4f})")
                     broadcast("cache_hit", {"query": query, "distance": distance})
+                    if emitter:
+                        emitter.tool_success("research_topic", f"⚡ Cache hit! Using cached result")
                     return f" **[Cached Result - {timestamp}]:**\n{cached_summary}"
         except Exception as e:
             print(f"⚠️ Cache check failed: {e}")
@@ -105,6 +121,9 @@ class SmartResearcher:
         print(f"️ SmartResearcher: Analyzing '{query}' via Tier: {tier.upper()}")
         broadcast("tool_start", {"tool": "Tavily", "tier": tier, "query": query})
         
+        if emitter:
+            emitter.tool_progress("research_topic", f"🔍 Phase 1/3: Searching with Tavily ({tier})...")
+        
         try:
             results = []
             final_output = ""
@@ -116,7 +135,12 @@ class SmartResearcher:
                 
                 # Simple summary for basic facts
                 if not results:
+                    if emitter:
+                        emitter.tool_progress("research_topic", "⚠️ No results found")
                     return " No results found."
+                
+                if emitter:
+                    emitter.tool_progress("research_topic", f"📄 Phase 2/3: Found {len(results)} sources")
                 
                 # Just return a neat list for basic facts, or simple synthesis
                 out = [f"**Research Results (Basic):**"]
@@ -130,7 +154,12 @@ class SmartResearcher:
                 results = response.get("results", [])
                 
                 if not results:
+                    if emitter:
+                        emitter.tool_progress("research_topic", "⚠️ No results found")
                     return " No results found."
+                
+                if emitter:
+                    emitter.tool_progress("research_topic", f"📄 Phase 2/3: Found {len(results)} sources, extracting content...")
                 
                 # Synthesize with LLM
                 context = []
@@ -140,6 +169,9 @@ class SmartResearcher:
                     context.append(f"Source: {r['title']} ({r['url']})\nContent: {content}\n---")
                 
                 context_str = "\n".join(context)
+                
+                if emitter:
+                    emitter.tool_progress("research_topic", "🧠 Phase 3/3: Synthesizing with LLM...")
                 
                 prompt = f"""You are a Research Synthesizer.
                 Query: {query}
@@ -177,10 +209,15 @@ class SmartResearcher:
                     print(f"⚠️ Cache save failed: {e}")
             else:
                  print("⚠️ Cache save skipped (collection/embedding missing)")
+            
+            if emitter:
+                emitter.tool_success("research_topic", f"✅ Research complete ({len(results)} sources)")
                 
             return final_output
 
         except Exception as e:
+            if emitter:
+                emitter.tool_error("research_topic", str(e))
             return f" Research Error: {e}"
 
 # Tool Wrapper

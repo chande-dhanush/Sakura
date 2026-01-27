@@ -11,14 +11,20 @@ V16 Features:
 from typing import List, Set, Optional, Tuple
 
 
-# =============================================================================
-# UNIVERSAL TOOLS - Always included in every toolset
-# =============================================================================
-
+# V17.3: web_search removed from universal to prevent Tavily Trap
 UNIVERSAL_TOOLS: Set[str] = {
-    "web_search",       # Fallback for any search need
     "get_system_info",  # Time/date queries
     "quick_math",       # Calculations
+    "get_time",         # Legacy support
+}
+
+# V17.3: Search tools separated for explicit gating
+SEARCH_TOOLS: Set[str] = {
+    "web_search",
+    "web_scrape",
+    "search_wikipedia",
+    "search_arxiv",
+    "get_news"
 }
 
 
@@ -164,9 +170,21 @@ def get_micro_toolset(intent: str, all_tools: list, tool_hint: str = None, fallb
             
         # V16.1: Add universal tools EXCEPT web_search (keep Tavily hidden)
         target_names.update(t for t in UNIVERSAL_TOOLS if t != "web_search")
+        
+        # V17.3: Explicit Search Gating (within semantic mode)
+        # If the tool_hint from the ROUTER (passed as tool_hint) is specifically for search,
+        # then we unlock the full search toolset even if a semantic category was found.
+        if tool_hint in ["web_search", "search", "research"]:
+            target_names.update(SEARCH_TOOLS)
+            print(f" [Search Gating] Unlocking SEARCH_TOOLS for explicit hint: {tool_hint}")
     else:
         # Add universal tools only when not in semantic gating mode
         target_names.update(UNIVERSAL_TOOLS)
+        
+        # V17.3: Explicit Search Gating (outside semantic mode)
+        if intent == "search" or tool_hint in ["search", "web_search", "research"]:
+            target_names.update(SEARCH_TOOLS)
+            print(f" [Search Gating] Unlocking SEARCH_TOOLS for intent: {intent}")
         
         # Add intent-specific tools
         if intent in MICRO_TOOLSETS:

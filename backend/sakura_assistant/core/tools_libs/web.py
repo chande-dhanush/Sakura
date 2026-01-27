@@ -6,6 +6,15 @@ from langchain_core.tools import tool
 from typing import Optional
 from .common import log_api_call
 
+# V17.5: Progress Emitter for SSE streaming
+def _get_emitter():
+    """Lazy-load progress emitter to avoid circular imports."""
+    try:
+        from ...utils.progress_emitter import get_progress_emitter
+        return get_progress_emitter()
+    except:
+        return None
+
 # --- Caching ---
 _weather_cache = {}  # {city_lower: (result, timestamp)}
 WEATHER_CACHE_TTL = 600  # 10 minutes
@@ -199,6 +208,7 @@ def save_bookmark(name: str, url: str, category: str = "custom") -> str:
 @tool
 def web_search(query: str, max_results: int = 5) -> str:
     """Search the web for information."""
+    emitter = _get_emitter()
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
         return " TAVILY_API_KEY missing."
@@ -206,13 +216,23 @@ def web_search(query: str, max_results: int = 5) -> str:
         from tavily import TavilyClient
         print(f"Called Search: {query}")
         
+        # V17.5: Emit progress
+        if emitter:
+            emitter.tool_progress("web_search", f"🔍 Searching web for '{query[:30]}...'")
+        
         max_results = min(max_results, 10)
         client = TavilyClient(api_key=api_key)
         response = client.search(query=query, max_results=max_results)
         
         results = response.get("results", [])
         if not results:
+            if emitter:
+                emitter.tool_progress("web_search", "⚠️ No results found")
             return " No search results found."
+        
+        # V17.5: Emit result count
+        if emitter:
+            emitter.tool_success("web_search", f"✅ Found {len(results)} results")
         
         out = []
         for r in results:
@@ -223,25 +243,47 @@ def web_search(query: str, max_results: int = 5) -> str:
         
         return "\n\n".join(out)
     except Exception as e:
+        if emitter:
+            emitter.tool_error("web_search", str(e))
         return f" Search failed: {e}"
 
 @tool
 def search_wikipedia(query: str) -> str:
     """Search Wikipedia for a summary."""
+    emitter = _get_emitter()
     print("Called Wikipedia search")
+    
+    # V17.5: Emit progress
+    if emitter:
+        emitter.tool_progress("search_wikipedia", f"🔍 Searching Wikipedia for '{query[:30]}...'")
+    
     try:
         import wikipedia
         wikipedia.set_lang("en")
         search_results = wikipedia.search(query, results=1)
         if not search_results:
+            if emitter:
+                emitter.tool_progress("search_wikipedia", "⚠️ No Wikipedia page found")
             return " No Wikipedia page found."
         
         page_title = search_results[0]
+        
+        # V17.5: Emit found page
+        if emitter:
+            emitter.tool_progress("search_wikipedia", f"📖 Found article: {page_title}")
+        
         summary = wikipedia.summary(page_title, sentences=3)
+        
+        # V17.5: Emit success
+        if emitter:
+            emitter.tool_success("search_wikipedia", f"✅ Retrieved summary ({len(summary)} chars)")
+        
         return f" Wikipedia ({page_title}):\n{summary}\n(Source: {wikipedia.page(page_title).url})"
     except ImportError:
         return " 'wikipedia' library not installed."
     except Exception as e:
+        if emitter:
+            emitter.tool_error("search_wikipedia", str(e))
         return f" Wikipedia error: {e}"
 
 @tool
@@ -273,12 +315,20 @@ def search_arxiv(query: str) -> str:
 @tool
 def get_news(topic: str = "technology") -> str:
     """Get latest news headlines."""
+    emitter = _get_emitter()
     import requests
+    
+    # V17.5: Emit progress
+    if emitter:
+        emitter.tool_progress("get_news", f"📰 Fetching {topic} news...")
+    
     try:
         url = f"https://news.google.com/rss/search?q={topic}&hl=en-IN&gl=IN&ceid=IN:en"
         response = requests.get(url, timeout=5)
         
         if response.status_code != 200:
+            if emitter:
+                emitter.tool_error("get_news", f"HTTP {response.status_code}")
             return f" News fetch failed"
         
         import re
@@ -286,7 +336,13 @@ def get_news(topic: str = "technology") -> str:
         headlines = titles[1:6]  # Top 5 headlines
         
         if not headlines:
+            if emitter:
+                emitter.tool_progress("get_news", f"⚠️ No news found for '{topic}'")
             return f" No news found for '{topic}'"
+        
+        # V17.5: Emit success
+        if emitter:
+            emitter.tool_success("get_news", f"✅ Found {len(headlines)} headlines")
         
         result = [f" **Top {topic} news:**"]
         for i, title in enumerate(headlines, 1):
@@ -295,6 +351,8 @@ def get_news(topic: str = "technology") -> str:
         
         return "\n".join(result)
     except Exception as e:
+        if emitter:
+            emitter.tool_error("get_news", str(e))
         return f" News fetch failed: {e}"
 
 @tool
@@ -303,7 +361,13 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
     
     V15.2.2: Sanitizes content to prevent indirect prompt injection.
     """
+    emitter = _get_emitter()
     print(f"Called web_scrape: {url}")
+    
+    # V17.5: Emit progress
+    if emitter:
+        emitter.tool_progress("web_scrape", f"🌐 Connecting to {url[:40]}...")
+    
     try:
         import requests
         import re
@@ -313,6 +377,11 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         
+        # V17.5: Emit download complete
+        if emitter:
+            size_kb = len(response.content) / 1024
+            emitter.tool_progress("web_scrape", f"📥 Downloaded {size_kb:.1f} KB")
+        
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # Cleanup junk tags
@@ -320,6 +389,10 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
                      "iframe", "noscript", "form", "button", "input", "select"]
         for tag in soup(junk_tags):
             tag.decompose()
+        
+        # V17.5: Emit extraction progress
+        if emitter:
+            emitter.tool_progress("web_scrape", "🔍 Extracting content...")
         
         # Try to find main content
         main_content = None
@@ -339,6 +412,10 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         lines = [line.strip() for line in text.splitlines() if len(line.strip()) > 15]
         clean_text = '\n'.join(lines)
         
+        # V17.5: Emit success
+        if emitter:
+            emitter.tool_success("web_scrape", f"✅ Extracted {len(clean_text)} characters")
+        
         if len(clean_text) > 2000:
             return f" Content (Truncated, {len(clean_text)} chars):\n{clean_text[:2000]}...\n(Full auto-ingest moved to Memory tools)"
             
@@ -347,6 +424,8 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         
         return clean_text
     except Exception as e:
+        if emitter:
+            emitter.tool_error("web_scrape", str(e))
         return f" Scraping failed: {e}"
 
 

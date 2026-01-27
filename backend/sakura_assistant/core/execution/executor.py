@@ -26,6 +26,7 @@ from langchain_core.messages import ToolMessage
 
 # V17: Import ExecutionResult from execution_context (uses ExecutionStatus)
 from .context import ExecutionResult, ExecutionStatus
+from ...utils.flight_recorder import get_recorder
 
 if TYPE_CHECKING:
     from .context import ExecutionContext
@@ -619,7 +620,7 @@ class ReActLoop:
                 break
             
             # 2. ACT
-            exec_result = await self._aexecute_steps(steps, user_input, state)
+            exec_result = await self._aexecute_steps(steps, user_input, state, trace_id=ctx.request_id if ctx else None)
             
             # 3. OBSERVE
             all_tool_messages.extend(exec_result.tool_messages)
@@ -731,9 +732,14 @@ class ReActLoop:
         self,
         steps: List[Dict],
         user_input: str,
-        state
+        state,
+        trace_id: Optional[str] = None
     ) -> ExecutionResult:
         """Execute a list of steps asynchronously."""
+        recorder = get_recorder()
+        # Ensure trace_id exists for UI correlation
+        trace_id = trace_id or f"trace_{int(time.time() * 1000)}"
+        
         results_text = []
         tool_messages = []
         tool_used = "None"
@@ -741,10 +747,17 @@ class ReActLoop:
         all_succeeded = True
         any_succeeded = False
         
-        for step in steps[:self.max_iterations]:
+        for i, step in enumerate(steps[:self.max_iterations]):
             tool_name = step.get("tool")
             tool_args = step.get("args", {})
             call_id = step.get("tool_call_id", f"call_{step.get('id', 0)}")
+            
+            # Log step start to FlightRecorder
+            recorder.log(
+                stage="Planner",
+                status="INFO",
+                content=f"Step {i+1}/{len(steps)}: {tool_name}({tool_args})",
+            )
             
             print(f"▶️ Async Executing Step {step.get('id')}: {tool_name} {tool_args}")
             
@@ -752,7 +765,8 @@ class ReActLoop:
             if step.get('id', 0) > 1:
                 try:
                     from ..infrastructure.broadcaster import broadcast
-                    broadcast("pacing", {"step": step.get('id'), "tool": tool_name})
+                    # V17.2: Propagate trace_id to broadcaster for UI real-time sync
+                    broadcast("pacing", {"step": step.get('id'), "tool": tool_name, "trace_id": trace_id})
                 except ImportError:
                     pass
                 await asyncio.sleep(0.5)
@@ -760,13 +774,31 @@ class ReActLoop:
             # Broadcast tool start
             try:
                 from ..infrastructure.broadcaster import broadcast
-                broadcast("tool_start", {"tool": tool_name, "args": tool_args})
+                broadcast("tool_start", {"tool": tool_name, "args": tool_args, "trace_id": trace_id})
             except ImportError:
                 pass
             
             # Run tool
             run_result = await self.tool_runner.arun(tool_name, tool_args, user_input)
             
+            # V17.4: Truncate result for metadata safety
+            result_str = str(run_result.output) if run_result.output else ""
+            result_preview = result_str[:500] if len(result_str) > 500 else result_str
+            if len(result_str) > 500:
+                result_preview += "... (truncated)"
+
+            # Log to FlightRecorder with enhanced metadata
+            recorder.span(
+                stage="Executor",
+                status="SUCCESS" if run_result.success else "ERROR",
+                content=f"Tool {tool_name} {'succeeded' if run_result.success else 'failed'}",
+                trace_id=trace_id,
+                tool=tool_name,
+                args=tool_args,
+                result=result_preview,
+                error=result_str if not run_result.success else None
+            )
+
             if run_result.success:
                 any_succeeded = True
             else:

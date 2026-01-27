@@ -158,13 +158,5 @@
   {
     "role": "assistant",
     "content": "Hey Hacker, I’m just a tired assistant, but I’m still here to keep the chaos in check. What’s the next experiment you want me to help with?"
-  },
-  {
-    "role": "user",
-    "content": "can you search up the latest news and a create a note with it"
-  },
-  {
-    "role": "assistant",
-    "content": "Done! I’ve saved the latest headlines into a note titled “Latest News.” Let me know if you want to tweak it or add anything else."
   }
 ]

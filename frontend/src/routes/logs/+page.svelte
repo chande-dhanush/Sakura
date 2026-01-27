@@ -162,23 +162,93 @@
                                                 {@const events = trace.phases[phase] || []}
                                                 {#if events.length > 0}
                                                     {@const phaseKey = `${trace.id}-${phase}`}
+                                                    <!-- V17.4: Add aggregate badges -->
+                                                    {@const totalTokens = events.reduce((sum, e) => sum + (e.metadata?.tokens || 0), 0)}
+                                                    {@const totalCost = events.reduce((sum, e) => sum + (e.metadata?.cost || 0), 0)}
+                                                    
                                                     <div class="phase-section">
                                                         <button class="phase-header {phase.toLowerCase()}" on:click={() => togglePhase(trace.id, phase)}>
                                                             <span class="phase-icon">{phase === 'Router' ? '🚥' : phase === 'Executor' ? '⚙️' : '🗣️'}</span>
                                                             <span class="phase-name">{phase}</span>
                                                             <span class="event-count">{events.length} events</span>
+                                                            
+                                                            {#if totalTokens > 0}
+                                                                <span class="phase-badge tokens">🪙 {totalTokens}</span>
+                                                            {/if}
+                                                            {#if totalCost > 0}
+                                                                <span class="phase-badge cost">💰 ${totalCost.toFixed(4)}</span>
+                                                            {/if}
+                                                            
                                                             <span class="chevron">{expandedPhases.has(phaseKey) ? '▼' : '▶'}</span>
                                                         </button>
                                                         {#if expandedPhases.has(phaseKey)}
                                                             <div class="phase-events" transition:slide>
                                                                 {#each events as event}
-                                                                    <div class="event-row" class:error={event.status === 'ERROR'}>
-                                                                        <span class="event-time">T+{event.elapsed_s}s</span>
-                                                                        <span class="event-content">{event.content}</span>
+                                                                    <div class="event-item" class:has-metadata={event.metadata}>
+                                                                        <!-- Event Header Row -->
+                                                                        <div class="event-row" class:error={event.status === 'ERROR'}>
+                                                                            <span class="event-time">T+{event.elapsed_s}s</span>
+                                                                            
+                                                                            {#if event.metadata?.tool}
+                                                                                <span class="event-icon">🔧</span>
+                                                                                <span class="event-tool">{event.metadata.tool}</span>
+                                                                            {:else}
+                                                                                <span class="event-content">{event.content}</span>
+                                                                            {/if}
+                                                                            
+                                                                            {#if event.duration_s > 0}
+                                                                                <span class="event-duration">{event.duration_s.toFixed(3)}s</span>
+                                                                            {/if}
+                                                                            
+                                                                            <span class="status-badge {event.status.toLowerCase()}">
+                                                                                {event.status === 'SUCCESS' ? '✅' : event.status === 'ERROR' ? '❌' : 'ℹ️'}
+                                                                            </span>
+                                                                        </div>
+                                                                        
+                                                                        <!-- Metadata Details (if available) -->
+                                                                        {#if event.metadata}
+                                                                            <div class="metadata-panel" transition:slide>
+                                                                                {#if event.metadata.args}
+                                                                                    <details class="metadata-section">
+                                                                                        <summary class="metadata-summary">
+                                                                                            📥 Input Arguments
+                                                                                            <span class="arg-count">({Object.keys(event.metadata.args).length} params)</span>
+                                                                                        </summary>
+                                                                                        <pre class="metadata-content">{JSON.stringify(event.metadata.args, null, 2)}</pre>
+                                                                                    </details>
+                                                                                {/if}
+                                                                                
+                                                                                {#if event.metadata.result}
+                                                                                    <details class="metadata-section">
+                                                                                        <summary class="metadata-summary">
+                                                                                            📤 Result
+                                                                                            <span class="result-length">({event.metadata.result.length} chars)</span>
+                                                                                        </summary>
+                                                                                        <pre class="metadata-content result-text">{event.metadata.result}</pre>
+                                                                                    </details>
+                                                                                {/if}
+                                                                                
+                                                                                {#if event.metadata.error}
+                                                                                    <div class="error-metadata">
+                                                                                        <div class="error-header">❌ Error Details</div>
+                                                                                        <pre class="error-content">{event.metadata.error}</pre>
+                                                                                    </div>
+                                                                                {/if}
+                                                                                
+                                                                                <div class="metadata-footer">
+                                                                                    {#if event.metadata.tokens > 0}
+                                                                                        <span class="meta-badge tokens">🪙 {event.metadata.tokens} tokens</span>
+                                                                                    {/if}
+                                                                                    {#if event.metadata.cost > 0}
+                                                                                        <span class="meta-badge cost">💰 ${event.metadata.cost.toFixed(4)}</span>
+                                                                                    {/if}
+                                                                                    {#if event.metadata.model}
+                                                                                        <span class="meta-badge model">🤖 {event.metadata.model}</span>
+                                                                                    {/if}
+                                                                                </div>
+                                                                            </div>
+                                                                        {/if}
                                                                     </div>
-                                                                    {#if event.metadata}
-                                                                        <pre class="metadata">{JSON.stringify(event.metadata, null, 2)}</pre>
-                                                                    {/if}
                                                                 {/each}
                                                             </div>
                                                         {/if}
@@ -475,5 +545,189 @@
         border-radius: 10px; 
         color: #f85149; 
         text-align: center; 
+    }
+
+    /* V17.4: Enhanced Event Display */
+    .event-item {
+        margin-bottom: 12px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .event-item.has-metadata {
+        background: rgba(56, 139, 253, 0.03);
+        border: 1px solid rgba(56, 139, 253, 0.1);
+    }
+
+    .event-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(56, 139, 253, 0.05);
+        font-size: 0.85rem;
+    }
+
+    .event-icon {
+        font-size: 1.1rem;
+    }
+
+    .event-tool {
+        font-family: 'JetBrains Mono', monospace;
+        color: #79c0ff;
+        font-weight: 600;
+    }
+
+    .event-duration {
+        margin-left: auto;
+        font-family: 'JetBrains Mono', monospace;
+        color: #56d4dd;
+        background: rgba(86, 212, 221, 0.1);
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+
+    .status-badge {
+        font-size: 1rem;
+    }
+
+    /* Metadata Panel */
+    .metadata-panel {
+        padding: 12px 14px;
+        background: rgba(13, 17, 23, 0.6);
+        border-top: 1px solid rgba(56, 139, 253, 0.1);
+    }
+
+    .metadata-section {
+        margin: 8px 0;
+        border: 1px solid rgba(56, 139, 253, 0.15);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .metadata-summary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: rgba(22, 27, 34, 0.8);
+        cursor: pointer;
+        font-weight: 500;
+        color: #8b949e;
+        font-size: 0.85rem;
+        transition: background 0.2s;
+    }
+
+    .metadata-summary:hover {
+        background: rgba(56, 139, 253, 0.08);
+        color: #79c0ff;
+    }
+
+    .arg-count, .result-length {
+        color: #484f58;
+        font-size: 0.75rem;
+        font-weight: 400;
+    }
+
+    .metadata-content {
+        margin: 0;
+        padding: 12px 14px;
+        background: rgba(13, 17, 23, 0.9);
+        color: #8b949e;
+        font-size: 0.75rem;
+        line-height: 1.5;
+        overflow-x: auto;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .result-text {
+        color: #c9d1d9;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    /* Error Metadata */
+    .error-metadata {
+        margin: 8px 0;
+        border: 1px solid rgba(248, 81, 73, 0.3);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .error-header {
+        padding: 10px 14px;
+        background: rgba(248, 81, 73, 0.15);
+        color: #f85149;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .error-content {
+        margin: 0;
+        padding: 12px 14px;
+        background: rgba(248, 81, 73, 0.05);
+        color: #ffa198;
+        font-size: 0.75rem;
+        overflow-x: auto;
+    }
+
+    /* Metadata Footer Badges */
+    .metadata-footer {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(56, 139, 253, 0.08);
+    }
+
+    .meta-badge {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .meta-badge.tokens {
+        background: rgba(121, 192, 255, 0.1);
+        border: 1px solid rgba(121, 192, 255, 0.2);
+        color: #79c0ff;
+    }
+
+    .meta-badge.cost {
+        background: rgba(251, 191, 36, 0.1);
+        border: 1px solid rgba(251, 191, 36, 0.2);
+        color: #fbbf24;
+    }
+
+    .meta-badge.model {
+        background: rgba(163, 113, 247, 0.1);
+        border: 1px solid rgba(163, 113, 247, 0.2);
+        color: #bc8cff;
+    }
+
+    /* Phase Header Badges */
+    .phase-badge {
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-left: 8px;
+    }
+
+    .phase-badge.tokens {
+        background: rgba(121, 192, 255, 0.1);
+        border: 1px solid rgba(121, 192, 255, 0.2);
+        color: #79c0ff;
+    }
+
+    .phase-badge.cost {
+        background: rgba(251, 191, 36, 0.1);
+        border: 1px solid rgba(251, 191, 36, 0.2);
+        color: #fbbf24;
     }
 </style>

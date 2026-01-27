@@ -95,32 +95,55 @@ class FlightRecorder:
         
         return self.trace_id
     
-    def log(self, stage: str, content: str, status: str = "INFO", 
-            duration_ms: Optional[float] = None, metadata: Optional[Dict] = None):
-        """Log an event within the current trace."""
+    def span(self, stage: str, content: str, status: str = "INFO", 
+             duration_ms: Optional[float] = None, metadata: Optional[Dict] = None, **kwargs):
+        """
+        Log an event within the current trace.
+        V17.4: Supports enhanced metadata via kwargs.
+        """
         elapsed = (time.perf_counter() - self.trace_start) * 1000
         
-        entry = {
+        event = {
             "event": "span",
-            "trace_id": self.trace_id,
+            "trace_id": kwargs.get("trace_id", self.trace_id),
             "stage": stage,
             "status": status,
             "content": content[:500],  # Truncate long content
             "elapsed_ms": round(elapsed, 2),
+            "duration_ms": duration_ms or kwargs.get("duration_ms"),
+            "metadata": metadata
         }
         
-        if duration_ms is not None:
-            entry["duration_ms"] = round(duration_ms, 2)
-            
-        if metadata:
-            entry["metadata"] = metadata
+        # V17.4: Build metadata if any relevant fields are present in kwargs
+        metadata_fields = {
+            "tool": kwargs.get("tool"),
+            "args": kwargs.get("args"),
+            "result": kwargs.get("result"),
+            "tokens": kwargs.get("tokens", 0),
+            "cost": kwargs.get("cost", 0.0),
+            "error": kwargs.get("error"),
+            "model": kwargs.get("model"),
+        }
         
-        self._write(entry)
-        self.spans.append(entry)
+        # Only set/update metadata if at least one field is not None
+        if any(v is not None and v != 0 and v != 0.0 for v in metadata_fields.values()):
+            if event["metadata"] is None:
+                event["metadata"] = {}
+            for k, v in metadata_fields.items():
+                if v is not None and v != 0 and v != 0.0:
+                    event["metadata"][k] = v
+        
+        self._write(event)
+        self.spans.append(event)
         
         # Also print to console for immediate feedback
         status_icon = {"INFO": ".", "SUCCESS": "+", "ERROR": "!", "WARN": "?"}
         print(f"[{status_icon.get(status, '.')}] {stage}: {content[:60]}... ({elapsed:.0f}ms)")
+
+    def log(self, stage: str, content: str, status: str = "INFO", 
+            duration_ms: Optional[float] = None, metadata: Optional[Dict] = None, **kwargs):
+        """Alias for span() to maintain backward compatibility."""
+        return self.span(stage, content, status, duration_ms, metadata, **kwargs)
     
     def log_llm_call(self, stage: str, model: str = "unknown", 
                      tokens: Optional[Dict[str, int]] = None,
@@ -155,7 +178,7 @@ class FlightRecorder:
         self.trace_models_used.add(model)
         
         # Log as span with metadata
-        self.log(
+        self.span(
             stage=stage,
             content=f"LLM Call: {model} ({tokens.get('total', 0)} tokens, ${call_cost:.6f})",
             status="SUCCESS" if success else "ERROR",
@@ -333,16 +356,16 @@ class FlightRecorder:
             return {"traces": [], "stats": {"total_queries": 0, "success_rate": 100, "avg_latency_s": 0}}
     
     @contextmanager
-    def span(self, stage: str):
+    def span_ctx(self, stage: str):
         """Context manager for timing a span."""
         start = time.perf_counter()
         try:
             yield
             duration = (time.perf_counter() - start) * 1000
-            self.log(stage, "completed", "SUCCESS", duration_ms=duration)
+            self.span(stage, "completed", "SUCCESS", duration_ms=duration)
         except Exception as e:
             duration = (time.perf_counter() - start) * 1000
-            self.log(stage, f"error: {e}", "ERROR", duration_ms=duration)
+            self.span(stage, f"error: {e}", "ERROR", duration_ms=duration)
             raise
     
     def _write(self, entry: Dict[str, Any]):
@@ -425,16 +448,24 @@ def start_trace(query: str) -> str:
     return get_recorder().start_trace(query)
 
 
-def log(stage: str, content: str, status: str = "INFO", duration_ms: float = None):
-    return get_recorder().log(stage, content, status, duration_ms)
+def log(stage: str, content: str, status: str = "INFO", duration_ms: float = None, **kwargs):
+    return get_recorder().span(stage, content, status, duration_ms, **kwargs)
 
 
 def end_trace(success: bool = True, response_preview: str = ""):
     return get_recorder().end_trace(success, response_preview)
 
 
-def span(stage: str):
-    return get_recorder().span(stage)
+def span(stage: str, status: str = None, content: str = None, **kwargs):
+    """
+    Unified span entry point.
+    If called with just stage, returns context manager.
+    Otherwise, logs an event directly.
+    """
+    recorder = get_recorder()
+    if status is None and content is None:
+        return recorder.span_ctx(stage)
+    return recorder.span(stage, content, status, **kwargs)
 
 
 def log_llm_call(stage: str, model: str = "unknown", tokens: dict = None,

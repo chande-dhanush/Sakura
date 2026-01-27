@@ -1,9 +1,10 @@
-
 """
 Reliable LLM Wrapper
 ====================
 Provides a failover-safe wrapper for LLM calls with timeout protection.
 Handles primary/backup switching and specific provider error recovery (e.g., Groq XML leaks).
+
+V17.4: Added token tracking and cost logging to FlightRecorder.
 
 Extracted from llm.py.
 """
@@ -17,6 +18,141 @@ from langchain_core.messages import AIMessage
 
 # Timeout in seconds
 LLM_TIMEOUT = 60
+
+
+def _extract_tokens(result: Any, messages: Any = None, model: str = "unknown") -> Dict[str, int]:
+    """
+    V17.5: Extract token usage from LLM response with precise counting fallback.
+    
+    Handles multiple LangChain response formats:
+    - usage_metadata (newer LangChain)
+    - response_metadata.token_usage (older LangChain)
+    - llm_output.token_usage (alternative format)
+    - Groq-specific response.usage
+    
+    If API doesn't report tokens, uses model-specific tokenizer for precise counting.
+    """
+    tokens = {"prompt": 0, "completion": 0, "total": 0}
+    
+    try:
+        # Format 1: LangChain newer (usage_metadata)
+        if hasattr(result, 'usage_metadata') and result.usage_metadata:
+            usage = result.usage_metadata
+            tokens = {
+                "prompt": usage.get('input_tokens', 0),
+                "completion": usage.get('output_tokens', 0),
+                "total": usage.get('total_tokens', 0)
+            }
+            # Fallback total calculation
+            if tokens["total"] == 0:
+                tokens["total"] = tokens["prompt"] + tokens["completion"]
+            if tokens["total"] > 0:
+                return tokens
+        
+        # Format 2: LangChain older (response_metadata.token_usage)
+        if hasattr(result, 'response_metadata') and result.response_metadata:
+            if 'token_usage' in result.response_metadata:
+                usage = result.response_metadata['token_usage']
+                tokens = {
+                    "prompt": usage.get('prompt_tokens', 0),
+                    "completion": usage.get('completion_tokens', 0),
+                    "total": usage.get('total_tokens', 0)
+                }
+                if tokens["total"] == 0:
+                    tokens["total"] = tokens["prompt"] + tokens["completion"]
+                if tokens["total"] > 0:
+                    return tokens
+        
+        # Format 3: llm_output (alternative)
+        if hasattr(result, 'llm_output') and result.llm_output:
+            usage = result.llm_output.get('token_usage', {})
+            tokens = {
+                "prompt": usage.get('prompt_tokens', 0),
+                "completion": usage.get('completion_tokens', 0),
+                "total": usage.get('total_tokens', 0)
+            }
+            if tokens["total"] == 0:
+                tokens["total"] = tokens["prompt"] + tokens["completion"]
+            if tokens["total"] > 0:
+                return tokens
+        
+        # Format 4: Groq-specific (response.usage)
+        if hasattr(result, 'response') and hasattr(result.response, 'usage'):
+            usage = result.response.usage
+            tokens = {
+                "prompt": getattr(usage, 'prompt_tokens', 0),
+                "completion": getattr(usage, 'completion_tokens', 0),
+                "total": getattr(usage, 'total_tokens', 0)
+            }
+            if tokens["total"] == 0:
+                tokens["total"] = tokens["prompt"] + tokens["completion"]
+            if tokens["total"] > 0:
+                return tokens
+        
+        # V17.5: If API didn't report tokens, use precise token counting
+        if tokens["total"] == 0 and messages is not None:
+            try:
+                from ...utils.token_counter import count_tokens
+                
+                # Count prompt tokens from messages
+                prompt_tokens = count_tokens(messages, model)
+                
+                # Count completion tokens from result
+                completion_text = ""
+                if hasattr(result, 'content'):
+                    completion_text = result.content
+                elif hasattr(result, 'text'):
+                    completion_text = result.text
+                else:
+                    completion_text = str(result)
+                
+                completion_tokens = count_tokens(completion_text, model)
+                
+                tokens = {
+                    "prompt": prompt_tokens,
+                    "completion": completion_tokens,
+                    "total": prompt_tokens + completion_tokens
+                }
+                
+                print(f"🔢 [TokenCounter] Calculated tokens: {tokens['total']} (prompt: {tokens['prompt']}, completion: {tokens['completion']}) [PRECISE]")
+                return tokens
+                
+            except Exception as tc_err:
+                print(f"⚠️ [TokenCounter] Precise counting failed: {tc_err}")
+            
+    except Exception as e:
+        print(f"⚠️ [Token Extract] Failed: {e}")
+    
+    return tokens
+
+
+def _log_llm_tokens(stage: str, model_name: str, result: Any, messages: Any, duration_ms: float, success: bool = True):
+    """
+    V17.5: Log token usage to FlightRecorder with precise counting.
+    
+    Safe wrapper that won't break on errors.
+    """
+    try:
+        from ...utils.flight_recorder import get_recorder
+        from ...utils.token_counter import estimate_cost
+        
+        tokens = _extract_tokens(result, messages, model_name)
+        
+        # Only log if we have meaningful token data
+        if tokens["total"] > 0:
+            recorder = get_recorder()
+            recorder.log_llm_call(
+                stage=stage,
+                model=model_name,
+                tokens=tokens,
+                duration_ms=duration_ms,
+                success=success
+            )
+            cost = estimate_cost(tokens, model_name)
+            print(f"📊 [{stage}] Logged {tokens['total']} tokens (${cost:.6f})")
+    except Exception as e:
+        # Never break the request due to logging failures
+        print(f"⚠️ [Token Log] Failed (non-fatal): {e}")
 
 def invoke_with_timeout(llm, messages, timeout=LLM_TIMEOUT, **kwargs):
     """
@@ -75,21 +211,43 @@ class ReliableLLM:
             bucket.total_requests += 1
         
         print(f" [{self.name}] Invoking LLM...")
+        start_time = time.time()
         try:
             result = invoke_with_timeout(self.primary, messages, timeout=timeout, **kwargs)
+            duration_ms = (time.time() - start_time) * 1000
             print(f" [{self.name}] LLM call succeeded")
+            
+            # V17.5: Log token usage to FlightRecorder with precise counting
+            _log_llm_tokens(self.name, model_name, result, messages, duration_ms, success=True)
+            
             return result
         except (TimeoutError, Exception) as e:
             # FIX: Recover from Groq "tool_use_failed" error with <function=...>
             # Llama 3 sometimes leaks XML tool calls that Groq API rejects.
             # We catch this rejection and parse the intent manually.
             err_str = str(e)
+            duration_ms = (time.time() - start_time) * 1000
             if "failed_generation" in err_str and "<function=" in err_str:
                 print(f" [{self.name}] Recovering from Groq XML tool call...")
                 try:
                     # Parse kwargs like: query="git change origin"
                     match_tools = self._recover_groq_xml(err_str)
                     if match_tools:
+                        # V17.4: Log estimated tokens for recovered call
+                        try:
+                            from ...utils.flight_recorder import get_recorder
+                            recorder = get_recorder()
+                            estimated_tokens = {"prompt": 400, "completion": 100, "total": 500}
+                            recorder.log_llm_call(
+                                stage=f"{self.name} (Recovered)",
+                                model=model_name,
+                                tokens=estimated_tokens,
+                                duration_ms=duration_ms,
+                                success=True
+                            )
+                            print(f"📊 [{self.name}] Logged ~500 estimated tokens (recovered from XML)")
+                        except:
+                            pass
                         return match_tools
                 except Exception as parse_err:
                     print(f" Recovery failed: {parse_err}")
@@ -97,7 +255,16 @@ class ReliableLLM:
             if self.backup:
                 print(f"⚠️ {self.name} Primary failed: {e}. Switching to Backup (Gemini)...")
                 try:
-                    return invoke_with_timeout(self.backup, messages, timeout=timeout, **kwargs)
+                    backup_start = time.time()
+                    backup_model = getattr(self.backup, 'model_name', None) or \
+                                   getattr(self.backup, 'model', 'backup-unknown')
+                    result = invoke_with_timeout(self.backup, messages, timeout=timeout, **kwargs)
+                    backup_duration = (time.time() - backup_start) * 1000
+                    
+                    # V17.5: Log backup model tokens
+                    _log_llm_tokens(f"{self.name} (Backup)", backup_model, result, messages, backup_duration, success=True)
+                    
+                    return result
                 except Exception as backup_err:
                     print(f" {self.name} Backup also failed: {backup_err}")
                     raise backup_err
@@ -183,6 +350,7 @@ class ReliableLLM:
             print(f"⏳ [{self.name}] Rate limited: waited {wait_time:.2f}s")
         
         print(f" [{self.name}] Async invoking LLM...")
+        start_time = time.time()
         
         try:
             # LangChain models have native ainvoke() support
@@ -193,11 +361,17 @@ class ReliableLLM:
                 import asyncio
                 result = await asyncio.to_thread(self.primary.invoke, messages, **kwargs)
             
+            duration_ms = (time.time() - start_time) * 1000
             print(f" [{self.name}] Async LLM call succeeded")
+            
+            # V17.5: Log token usage to FlightRecorder with precise counting
+            _log_llm_tokens(self.name, model_name, result, messages, duration_ms, success=True)
+            
             return result
             
         except Exception as e:
             err_str = str(e)
+            duration_ms = (time.time() - start_time) * 1000
             
             # Try XML recovery for Groq errors
             if "failed_generation" in err_str and "<function=" in err_str:
@@ -205,6 +379,22 @@ class ReliableLLM:
                 try:
                     match_tools = self._recover_groq_xml(err_str)
                     if match_tools:
+                        # V17.4: Log estimated tokens for recovered call
+                        # Groq doesn't provide usage in error responses, estimate ~500 tokens
+                        try:
+                            from ...utils.flight_recorder import get_recorder
+                            recorder = get_recorder()
+                            estimated_tokens = {"prompt": 400, "completion": 100, "total": 500}
+                            recorder.log_llm_call(
+                                stage=f"{self.name} (Recovered)",
+                                model=model_name,
+                                tokens=estimated_tokens,
+                                duration_ms=duration_ms,
+                                success=True
+                            )
+                            print(f"📊 [{self.name}] Logged ~500 estimated tokens (recovered from XML)")
+                        except:
+                            pass
                         return match_tools
                 except Exception as parse_err:
                     print(f" Recovery failed: {parse_err}")
@@ -213,11 +403,22 @@ class ReliableLLM:
             if self.backup:
                 print(f"⚠️ {self.name} Primary async failed: {e}. Switching to Backup...")
                 try:
+                    backup_start = time.time()
+                    backup_model = getattr(self.backup, 'model_name', None) or \
+                                   getattr(self.backup, 'model', 'backup-unknown')
+                    
                     if hasattr(self.backup, 'ainvoke'):
-                        return await self.backup.ainvoke(messages, **kwargs)
+                        result = await self.backup.ainvoke(messages, **kwargs)
                     else:
                         import asyncio
-                        return await asyncio.to_thread(self.backup.invoke, messages, **kwargs)
+                        result = await asyncio.to_thread(self.backup.invoke, messages, **kwargs)
+                    
+                    backup_duration = (time.time() - backup_start) * 1000
+                    
+                    # V17.5: Log backup model tokens
+                    _log_llm_tokens(f"{self.name} (Backup)", backup_model, result, messages, backup_duration, success=True)
+                    
+                    return result
                 except Exception as backup_err:
                     print(f" {self.name} Backup async also failed: {backup_err}")
                     raise backup_err

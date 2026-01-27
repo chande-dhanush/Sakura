@@ -180,6 +180,29 @@ class OneShotRunner:
         
         success = result.success if hasattr(result, 'success') else True
         
+        # V17.4: Log to FlightRecorder with enhanced metadata (same as ReActLoop)
+        try:
+            from ...utils.flight_recorder import get_recorder
+            recorder = get_recorder()
+            
+            # Truncate result for metadata safety
+            result_preview = output[:500] if len(output) > 500 else output
+            if len(output) > 500:
+                result_preview += "... (truncated)"
+            
+            recorder.span(
+                stage="Executor",
+                status="SUCCESS" if success else "ERROR",
+                content=f"Tool {actual_tool} {'succeeded' if success else 'failed'}",
+                trace_id=recorder.trace_id,
+                tool=actual_tool,
+                args=args,
+                result=result_preview,
+                error=output if not success else None
+            )
+        except Exception as log_err:
+            logger.warning(f"⚠️ [OneShotRunner] Flight recorder logging failed: {log_err}")
+        
         # 5. Create ToolMessage
         tool_msg = ToolMessage(
             tool_call_id=f"oneshot_{tool_name}_{int(time.time())}",

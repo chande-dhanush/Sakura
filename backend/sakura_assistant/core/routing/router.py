@@ -39,31 +39,21 @@ PLAN - Requires multiple steps, research, reasoning chains, or complex compariso
 User: "Play Numb by Linkin Park"
 {{"classification": "DIRECT", "tool_hint": "spotify_control", "reason": "Single media action"}}
 
-User: "Play Numb and open Visual Studio Code"
-{{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step chained request"}}
+User: "hi sakura"
+{{"classification": "CHAT", "tool_hint": null, "reason": "Greeting"}}
 
 User: "What is the weather in Tokyo?"
 {{"classification": "DIRECT", "tool_hint": "get_weather", "reason": "Single lookup"}}
-
-User: "What is the weather in Tokyo and tell me a joke?"
-{{"classification": "PLAN", "tool_hint": null, "reason": "Two separate intents"}}
-
-User: "Explain quantum physics"
-{{"classification": "CHAT", "tool_hint": null, "reason": "Knowledge explanation, no tool"}}
-
-User: "Who is the CEO of OpenAI?"
-{{"classification": "PLAN", "tool_hint": "web_search", "reason": "Fact lookup"}}
-
-User: "Set a reminder for tomorrow at 3pm"
-{{"classification": "DIRECT", "tool_hint": "set_reminder", "reason": "Single reminder action"}}
-
-User: "Create a calendar event for tomorrow at 12pm"
-{{"classification": "DIRECT", "tool_hint": "calendar_create_event", "reason": "Single calendar action"}}
 
 User: "Research quantum computing and summarize the key concepts"
 {{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Research -> Summarize"}}
 
 === END EXAMPLES ===
+
+CRITICAL RULES:
+1. Greetings ("hi", "hello", "hey") are ALWAYS CHAT.
+2. If mode is DIRECT, you MUST provide a specific tool hint.
+3. If mode is PLAN but you can't identify tools, use CHAT instead.
 
 Return JSON only:
 {{"classification": "DIRECT|PLAN|CHAT", "tool_hint": "tool_name or null"}}
@@ -145,7 +135,10 @@ class IntentRouter:
             # Use async invoke
             response = await self.llm.ainvoke(messages)
             classification, tool_hint = self._parse_response(response.content)
-            return RouteResult(classification, tool_hint, urgency)
+            
+            # V17.2: Apply safety checks to prevent Tavily Trap
+            route_result = RouteResult(classification, tool_hint, urgency)
+            return self._apply_safety_checks(query, route_result)
             
         except Exception as e:
             print(f"⚠️ [Router] Async Error: {e}, defaulting to CHAT")
@@ -186,7 +179,9 @@ class IntentRouter:
             response = self.llm.invoke(messages)
             classification, tool_hint = self._parse_response(response.content)
             
-            return RouteResult(classification, tool_hint, urgency)
+            # V17.2: Apply safety checks to prevent Tavily Trap
+            route_result = RouteResult(classification, tool_hint, urgency)
+            return self._apply_safety_checks(query, route_result)
             
         except Exception as e:
             print(f"⚠️ [Router] Error: {e}, defaulting to CHAT")
@@ -241,9 +236,19 @@ class IntentRouter:
         """Guess which tool an action command needs."""
         text = query.lower()
         
-        # Tool mapping heuristics
+        # V17.4: Priority-based platform detection (check BEFORE generic mappings)
+        # YouTube takes precedence over Spotify when explicitly mentioned
+        if "youtube" in text:
+            if any(verb in text for verb in ["play", "watch", "open", "search"]):
+                return "play_youtube"
+        
+        # Spotify detection (explicit mention OR generic play without platform)
+        if "spotify" in text:
+            return "spotify_control"
+        
+        # Tool mapping heuristics (fallback for commands without explicit platform)
         mappings = {
-            "play": "spotify_control",
+            "play": "spotify_control",  # Default media player
             "queue": "spotify_control",
             "pause": "spotify_control",
             "email": "gmail_read_email",
@@ -300,3 +305,50 @@ class IntentRouter:
             else:
                 print(f"⚠️ [Router] Parse failed, defaulting to CHAT")
                 return "CHAT", None
+
+    def _apply_safety_checks(self, query: str, decision: RouteResult) -> RouteResult:
+        """
+        V17.2: Safety checks to prevent misclassification.
+        
+        Rules:
+        1. Greetings MUST be CHAT, never DIRECT/PLAN
+        2. DIRECT without hint is suspicious → force CHAT
+        3. PLAN without hint defaults to CHAT (prevents Tavily Trap)
+        """
+        query_lower = query.lower().strip()
+        
+        # Check 1: Explicit greeting patterns
+        GREETING_PATTERNS = [
+            "hi", "hello", "hey", "good morning", "good evening",
+            "what's up", "how are you", "how are you doing",
+            "yo", "sup", "greetings", "hi there", "hey there"
+        ]
+        
+        # If query starts with greeting or is just a greeting
+        is_greeting = any(
+            query_lower.startswith(g) or query_lower == g 
+            for g in GREETING_PATTERNS
+        )
+        
+        if is_greeting:
+            if decision.classification != "CHAT":
+                print(f"⚠️ [Router Safety] Greeting misclassified as {decision.classification} → forcing CHAT: {query}")
+                decision.classification = "CHAT"
+                decision.tool_hint = None
+            return decision
+        
+        # Check 2: DIRECT without hint is suspicious
+        if decision.classification == "DIRECT" and not decision.tool_hint:
+            print(f"⚠️ [Router Safety] DIRECT without hint → forcing CHAT: {query}")
+            decision.classification = "CHAT"
+            return decision
+        
+        # Check 3: PLAN without hint might trigger Tavily Trap
+        if decision.classification == "PLAN" and not decision.tool_hint:
+            # Allow PLAN if query is clearly complex
+            complex_indicators = ["and then", "after that", "first", "also", "calculate", "search"]
+            if not any(ind in query_lower for ind in complex_indicators):
+                print(f"⚠️ [Router Safety] PLAN without hint on simple query → forcing CHAT: {query}")
+                decision.classification = "CHAT"
+        
+        return decision

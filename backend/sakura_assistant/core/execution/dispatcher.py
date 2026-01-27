@@ -1,5 +1,5 @@
 """
-Sakura V17: Execution Dispatcher
+Sakura V17: Executor
 ================================
 Single entry point for execution mode dispatch.
 
@@ -34,7 +34,7 @@ from ..routing.micro_toolsets import get_micro_toolset, detect_semantic_intent
 logger = get_logger(__name__)
 
 
-class ExecutionDispatcher:
+class Executor:
     """
     Single Responsibility: Decide HOW to execute, then delegate.
     
@@ -64,7 +64,7 @@ class ExecutionDispatcher:
         tools: List[Any]
     ):
         """
-        Initialize dispatcher.
+        Initialize Executor.
         
         Args:
             one_shot_runner: OneShotRunner for fast-lane execution
@@ -122,7 +122,7 @@ class ExecutionDispatcher:
         )
         
         logger.info(
-            f" [Dispatcher] Mode: {mode.value}, "
+            f" [Executor] Mode: {mode.value}, "
             f"Tool: {tool_hint or 'None'}, "
             f"Budget: {ctx.budget_ms}ms, "
             f"Research: {is_research}"
@@ -141,14 +141,14 @@ class ExecutionDispatcher:
                 is_complex = self._is_multi_step_query(user_input)
                 
                 if is_complex:
-                    logger.info(" [Dispatcher] Complex query detected: Bypassing sharding to provide full toolset")
+                    logger.info(" [Executor] Complex query detected: Bypassing sharding to provide full toolset")
                     available_tools = self.tools
                 else:
                     # V17: TOOL SHARDING (Optimization for single-intent iterative)
                     intent, hint = detect_semantic_intent(user_input)
                     micro_tools = get_micro_toolset(intent, self.tools, tool_hint=hint or tool_hint)
                     available_tools = micro_tools if micro_tools else self.tools
-                    logger.info(f" [Dispatcher] Sharded {len(available_tools)} tools for intent: {intent}")
+                    logger.info(f" [Executor] Sharded {len(available_tools)} tools for intent: {intent}")
                 
                 result = await self._dispatch_iterative(ctx, available_tools)
             
@@ -156,13 +156,13 @@ class ExecutionDispatcher:
                 result = ExecutionResult.error(f"Unknown mode: {mode}")
         
         except Exception as e:
-            logger.error(f" [Dispatcher] Execution failed: {e}")
+            logger.error(f" [Executor] Execution failed: {e}")
             result = ExecutionResult.error(str(e))
         
         # 6. Log completion
         elapsed_ms = (time.time() - start_time) * 1000
         logger.info(
-            f" [Dispatcher] Completed in {elapsed_ms:.0f}ms, "
+            f" [Executor] Completed in {elapsed_ms:.0f}ms, "
             f"Status: {result.status.value}"
         )
         
@@ -183,7 +183,7 @@ class ExecutionDispatcher:
         
         except OneShotArgsIncomplete as e:
             logger.warning(
-                f"⚠️ [Dispatcher] ONE_SHOT failed for '{e.tool_name}', "
+                f"⚠️ [Executor] ONE_SHOT failed for '{e.tool_name}', "
                 f"missing: {e.missing_fields}. Falling back to ITERATIVE."
             )
             # Create new context with ITERATIVE mode
@@ -231,7 +231,7 @@ class ExecutionDispatcher:
             # Check 1: Tool exists
             if actual_tool not in self.tool_names:
                 logger.warning(
-                    f"⚠️ [Dispatcher] Tool '{tool_hint}' (resolved to '{actual_tool}') not found, "
+                    f"⚠️ [Executor] Tool '{tool_hint}' (resolved to '{actual_tool}') not found, "
                     f"downgrading to ITERATIVE"
                 )
                 return ExecutionMode.ITERATIVE
@@ -239,7 +239,7 @@ class ExecutionDispatcher:
             # Check 2: Tool is extractable (has known regex patterns)
             if not OneShotRunner.can_handle(tool_hint):
                 logger.info(
-                    f"ℹ️ [Dispatcher] Tool '{tool_hint}' not in EXTRACTABLE_TOOLS, "
+                    f"ℹ️ [Executor] Tool '{tool_hint}' not in EXTRACTABLE_TOOLS, "
                     f"using ITERATIVE"
                 )
                 return ExecutionMode.ITERATIVE
@@ -247,7 +247,7 @@ class ExecutionDispatcher:
             # Check 3: Query isn't too complex (multi-step)
             if self._is_multi_step_query(user_input):
                 logger.info(
-                    f"ℹ️ [Dispatcher] Multi-step query detected, "
+                    f"ℹ️ [Executor] Multi-step query detected, "
                     f"using ITERATIVE"
                 )
                 return ExecutionMode.ITERATIVE
