@@ -68,14 +68,56 @@
     function getSparkline(trace) {
         const total = trace.total_ms || 1;
         const phases = trace.phases || {};
-        const routerMs = phases.Router?.reduce((sum, e) => sum + ((e.duration_s || 0) * 1000), 0) || 0;
-        const executorMs = phases.Executor?.reduce((sum, e) => sum + ((e.duration_s || 0) * 1000), 0) || 0;
-        const responderMs = phases.Responder?.reduce((sum, e) => sum + ((e.duration_s || 0) * 1000), 0) || 0;
+        
+        let knownSum = 0;
+        const getDur = (key) => {
+            const ms = phases[key]?.reduce((sum, e) => sum + ((e.duration_s || 0) * 1000), 0) || 0;
+            knownSum += ms;
+            return ms;
+        };
+
+        const routerMs = getDur('Router');
+        const executorMs = getDur('Executor');
+        const responderMs = getDur('Responder');
+        
+        // Calculate "Other" (Tools, custom phases)
+        const otherMs = Math.max(0, trace.total_ms - knownSum); // Estimate from total
+        
         return {
             router: Math.min((routerMs / total) * 100, 100),
             executor: Math.min((executorMs / total) * 100, 100),
-            responder: Math.min((responderMs / total) * 100, 100)
+            responder: Math.min((responderMs / total) * 100, 100),
+            other: Math.min((otherMs / total) * 100, 100)
         };
+    }
+
+    function getPhases(trace) {
+        // Semantic order for core phases
+        const order = ['Router', 'Executor', 'Responder'];
+        const core = order.filter(p => trace.phases[p]);
+        
+        // Alphabetical for dynamic/tool phases
+        const dynamic = Object.keys(trace.phases)
+            .filter(p => !order.includes(p))
+            .sort();
+            
+        return [...core, ...dynamic];
+    }
+    
+    function getPhaseClass(phase) {
+        if (phase === 'Router') return 'router';
+        if (phase === 'Executor') return 'executor';
+        if (phase === 'Responder') return 'responder';
+        if (phase.startsWith('Tool:')) return 'tool';
+        return 'generic';
+    }
+    
+    function getPhaseIcon(phase) {
+        if (phase === 'Router') return '🚥';
+        if (phase === 'Executor') return '⚙️';
+        if (phase === 'Responder') return '🗣️';
+        if (phase.startsWith('Tool:')) return '🔧';
+        return '📦';
     }
 </script>
 
@@ -132,6 +174,10 @@
                                 <div class="sparkline">
                                     <div class="spark spark-router" style="width: {sparkline.router}%"></div>
                                     <div class="spark spark-executor" style="width: {sparkline.executor}%"></div>
+                                    <!-- V17.5: Dynamic phases in sparkline -->
+                                    {#if sparkline.other > 0}
+                                        <div class="spark spark-other" style="width: {sparkline.other}%"></div>
+                                    {/if}
                                     <div class="spark spark-responder" style="width: {sparkline.responder}%"></div>
                                 </div>
                                 {#if expandedTraces.has(trace.id)}
@@ -146,11 +192,11 @@
                                         <div class="pipeline-metrics">
                                             <h4>Pipeline Performance</h4>
                                             <div class="metrics-grid">
-                                                {#each ['Router', 'Executor', 'Responder'] as phase}
+                                                {#each getPhases(trace) as phase}
                                                     {@const events = trace.phases[phase] || []}
                                                     {@const duration = events.reduce((sum, e) => sum + (e.duration_s || 0), 0)}
-                                                    <div class="metric-card {phase.toLowerCase()}">
-                                                        <span class="metric-icon">{phase === 'Router' ? '🚥' : phase === 'Executor' ? '⚙️' : '🗣️'}</span>
+                                                    <div class="metric-card {getPhaseClass(phase)}">
+                                                        <span class="metric-icon">{getPhaseIcon(phase)}</span>
                                                         <span class="metric-value">{duration.toFixed(2)}s</span>
                                                         <span class="metric-label">{phase}</span>
                                                     </div>
@@ -158,7 +204,7 @@
                                             </div>
                                         </div>
                                         <div class="phases">
-                                            {#each ['Router', 'Executor', 'Responder'] as phase}
+                                            {#each getPhases(trace) as phase}
                                                 {@const events = trace.phases[phase] || []}
                                                 {#if events.length > 0}
                                                     {@const phaseKey = `${trace.id}-${phase}`}
@@ -167,8 +213,8 @@
                                                     {@const totalCost = events.reduce((sum, e) => sum + (e.metadata?.cost || 0), 0)}
                                                     
                                                     <div class="phase-section">
-                                                        <button class="phase-header {phase.toLowerCase()}" on:click={() => togglePhase(trace.id, phase)}>
-                                                            <span class="phase-icon">{phase === 'Router' ? '🚥' : phase === 'Executor' ? '⚙️' : '🗣️'}</span>
+                                                        <button class="phase-header {getPhaseClass(phase)}" on:click={() => togglePhase(trace.id, phase)}>
+                                                            <span class="phase-icon">{getPhaseIcon(phase)}</span>
                                                             <span class="phase-name">{phase}</span>
                                                             <span class="event-count">{events.length} events</span>
                                                             
@@ -422,6 +468,7 @@
     .spark { height: 100%; }
     .spark-router { background: linear-gradient(90deg, #a371f7, #bc8cff); }
     .spark-executor { background: linear-gradient(90deg, #f78166, #ffa657); }
+    .spark-other { background: linear-gradient(90deg, #58a6ff, #79c0ff); }
     .spark-responder { background: linear-gradient(90deg, #3fb950, #56d364); }
     
     /* Trace Body */
@@ -474,6 +521,8 @@
     .metric-card.router { border-color: #a371f7; }
     .metric-card.executor { border-color: #f78166; }
     .metric-card.responder { border-color: #3fb950; }
+    .metric-card.tool { border-color: #58a6ff; }
+    .metric-card.generic { border-color: #8b949e; }
     
     .metric-icon { font-size: 1.5rem; margin-bottom: 8px; }
     .metric-value { font-size: 1.5rem; font-weight: 700; color: #e6edf3; }
@@ -499,6 +548,8 @@
     .phase-header.router { border-left-color: #a371f7; }
     .phase-header.executor { border-left-color: #f78166; }
     .phase-header.responder { border-left-color: #3fb950; }
+    .phase-header.tool { border-left-color: #58a6ff; }
+    .phase-header.generic { border-left-color: #8b949e; }
     .phase-header:hover { background: rgba(56, 139, 253, 0.05); }
     
     .phase-name { font-weight: 500; }
