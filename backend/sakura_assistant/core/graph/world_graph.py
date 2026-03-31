@@ -366,6 +366,38 @@ class ActionNode:
 
 
 @dataclass
+class ResponseNode:
+    """
+    V17.1: Track responder outputs for reference resolution.
+    Enables "what did you just say" and "write that to a note" queries.
+    """
+    turn: int
+    content: str
+    timestamp: float
+    mode: str  # "chat", "after_tool", "error"
+    tool_context: Optional[str] = None  # What tools were just executed
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "turn": self.turn,
+            "content": self.content,
+            "timestamp": self.timestamp,
+            "mode": self.mode,
+            "tool_context": self.tool_context,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ResponseNode":
+        return cls(
+            turn=data["turn"],
+            content=data["content"],
+            timestamp=data["timestamp"],
+            mode=data.get("mode", "chat"),
+            tool_context=data.get("tool_context"),
+        )
+
+
+@dataclass
 class ResolutionResult:
     """Result of reference resolution."""
     resolved: Optional[Union[EntityNode, ActionNode]] = None
@@ -422,6 +454,7 @@ class WorldGraph:
         # Core storage
         self.entities: Dict[str, EntityNode] = {}
         self.actions: List[ActionNode] = []
+        self.responses: List[ResponseNode] = []  # V17.1: Track responder outputs
         
         # State
         self.current_turn: int = 0
@@ -843,10 +876,37 @@ class WorldGraph:
         user = self.get_user_identity()
         parts.append(f"[USER IDENTITY]\n{user.summary}")
         
-        # Preferences
-        prefs = self.entities.get("pref:communication")
-        if prefs:
-            parts.append(f"[PREFERENCES]\n{prefs.summary}")
+        # V17.1: ALL Preferences (not just pref:communication)
+        likes = []
+        dislikes = []
+        facts = []
+        
+        for eid, entity in self.entities.items():
+            if eid.startswith("pref:like:"):
+                likes.append(entity.summary or entity.name)
+            elif eid.startswith("pref:dislike:"):
+                dislikes.append(entity.summary or entity.name)
+            elif eid.startswith("fact:") and entity.confidence > 0.7:
+                facts.append(entity.summary or entity.name)
+        
+        # Legacy: Also include pref:communication if present
+        legacy_prefs = self.entities.get("pref:communication")
+        if legacy_prefs:
+            parts.append(f"[COMMUNICATION STYLE]\n{legacy_prefs.summary}")
+        
+        if likes:
+            parts.append("[LIKES]\n• " + "\n• ".join(likes[:10]))
+        if dislikes:
+            parts.append("[DISLIKES]\n• " + "\n• ".join(dislikes[:10]))
+        if facts:
+            parts.append("[KNOWN FACTS]\n• " + "\n• ".join(facts[:5]))
+        
+        # V17.1: Recent Actions (moved from PLAN-only gating)
+        recent_actions = self.get_recent_actions(3)
+        if recent_actions:
+            action_strs = [f"• Turn {a.turn}: {a.summary}" for a in recent_actions if a.summary]
+            if action_strs:
+                parts.append("[RECENT ACTIONS]\n" + "\n".join(action_strs))
         
         # Last action context
         last = self.get_last_action()
@@ -1058,9 +1118,33 @@ class WorldGraph:
             # V17.1: Mark dirty to trigger debounced save
             self._mark_dirty()
             
-            print(f" [WorldGraph] Recorded action: {action_id} (focus={action.focus_entity})")
+            print(f"✅ [WorldGraph] Recorded action: {action_id} (focus={action.focus_entity})")
             
             return action
+    
+    def record_response(self, content: str, mode: str = "chat", tool_context: str = None) -> None:
+        """
+        V17.1: Store responder output for future reference.
+        Enables Planner to see what was previously said.
+        """
+        with self._lock:
+            response = ResponseNode(
+                turn=self.current_turn,
+                content=content[:1000],  # Truncate to prevent bloat
+                timestamp=time.time(),
+                mode=mode,
+                tool_context=tool_context[:200] if tool_context else None
+            )
+            self.responses.append(response)
+            
+            # Memory management: Keep last 10 only
+            if len(self.responses) > 10:
+                self.responses = self.responses[-10:]
+            
+            # V17.1: Mark dirty to trigger debounced save
+            self._mark_dirty()
+            
+            print(f"✅ [WorldGraph] Recorded response: Turn {self.current_turn}, mode={mode}")
     
     def _infer_focus_entity(self, tool: Optional[str], args: Dict[str, Any]) -> Optional[str]:
         """
@@ -1413,11 +1497,12 @@ class WorldGraph:
             }
             
             data = {
-                "version": "v7",
+                "version": "v7.1",  # V17.1: Schema update for responses
                 "current_turn": self.current_turn,
                 "current_session": self.current_session,
                 "entities": entities_to_persist,
                 "actions": [a.to_dict() for a in self.actions[-100:]],  # Keep last 100
+                "responses": [r.to_dict() for r in self.responses[-10:]],  # V17.1: Keep last 10
             }
             
             os.makedirs(os.path.dirname(self.persist_path), exist_ok=True)
@@ -1484,7 +1569,7 @@ class WorldGraph:
             with open(self.persist_path, "r") as f:
                 data = json.load(f)
             
-            if data.get("version") != "v7":
+            if data.get("version") not in ("v7", "v7.1"):  # V17.1: Accept both versions
                 print(f"⚠️ [WorldGraph] Version mismatch, starting fresh")
                 return
             
@@ -1506,7 +1591,11 @@ class WorldGraph:
             for adata in data.get("actions", []):
                 self.actions.append(ActionNode.from_dict(adata))
             
-            print(f" [WorldGraph] Loaded {len(self.entities)} entities, {len(self.actions)} actions")
+            # V17.1: Load responses
+            for rdata in data.get("responses", []):
+                self.responses.append(ResponseNode.from_dict(rdata))
+            
+            print(f"✅ [WorldGraph] Loaded {len(self.entities)} entities, {len(self.actions)} actions, {len(self.responses)} responses")
             
         except Exception as e:
             print(f"⚠️ [WorldGraph] Load failed: {e}")

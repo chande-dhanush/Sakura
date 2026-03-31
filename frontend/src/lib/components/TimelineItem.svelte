@@ -65,8 +65,24 @@
             {/if}
         </div>
         
-        {#if message.mode && !isUser}
-            <span class="mode-badge">{message.mode}</span>
+        <!-- Metadata Row (Mode + Metrics) -->
+        {#if !isUser && (message.mode || message.metadata)}
+            <div class="metadata-row">
+                {#if message.mode}
+                    <span class="mode-badge">{message.mode}</span>
+                {/if}
+                
+                {#if message.metadata}
+                    <div class="metrics">
+                        {#if message.metadata.latency}
+                            <span class="metric" title="Latency">⏱️ {message.metadata.latency}</span>
+                        {/if}
+                        {#if message.metadata.tokens && message.metadata.tokens.total}
+                            <span class="metric" title="Total Tokens">🎫 {message.metadata.tokens.total}</span>
+                        {/if}
+                    </div>
+                {/if}
+            </div>
         {/if}
     </div>
 </div>
@@ -181,6 +197,39 @@
         color: rgba(255, 255, 255, 0.35);
         text-transform: uppercase;
         letter-spacing: 1px;
+    }
+
+    .metadata-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
         padding-left: 4px;
+        margin-top: -4px;
+    }
+
+    .metrics {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    /* Show metrics on hover of the whole item */
+    .item:hover .metrics {
+        opacity: 1;
+    }
+
+    .metric {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: help;
+    }
+
+    .metric:hover {
+        color: rgba(255, 255, 255, 0.6);
     }
 </style>

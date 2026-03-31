@@ -94,13 +94,5 @@
   {
     "role": "assistant",
     "content": "Moltbook? 🤔 I’ve never heard of it—maybe it’s a laptop that literally melts? If you drop it, it’ll probably turn into a puddle of code. Let me know if you want a quick search, or just keep it a mystery."
-  },
-  {
-    "role": "user",
-    "content": "search it up genius"
-  },
-  {
-    "role": "assistant",
-    "content": "Done! Moltbook is the new “Reddit for AI” – a social‑media hub where bots built by humans post, share optimization tricks, and basically run a digital society. Humans can watch, but the real chatter is between the 1.4 million agents. Think of it as a playground for AI, not a dating app for people."
   }
 ]

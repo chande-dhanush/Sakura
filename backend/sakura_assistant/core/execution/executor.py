@@ -463,6 +463,19 @@ class ToolRunner:
             return {"query": search_term}
 
 
+def _is_empty_or_failed(output: str) -> bool:
+    """Returns True if a tool output indicates no useful result was found."""
+    if not output or not output.strip():
+        return True
+    failure_phrases = [
+        "no results", "not found", "no article", "disambiguation",
+        "may refer to", "does not exist", "could not find",
+        "no information", "no matches", "0 results",
+    ]
+    output_lower = output.lower()
+    return any(phrase in output_lower for phrase in failure_phrases)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # REACT LOOP (Iteration Controller)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -500,6 +513,7 @@ class ReActLoop:
         all_outputs = []
         final_tool_used = "None"
         final_last_result = None
+        cascade_activated = False  # V18 FIX-04 SYNC
         
         print(f" [ReActLoop] Starting for: {user_input[:50]}...")
         
@@ -511,12 +525,17 @@ class ReActLoop:
                 user_input=user_input,
                 context=graph_context,
                 tool_history=all_tool_messages,
-                available_tools=available_tools
+                available_tools=available_tools,
+                history=ctx.history if ctx else None  # V17.1
             )
             
             steps = plan_result.get("steps", []) or plan_result.get("plan", [])
             
             if not steps:
+                error = plan_result.get("error")
+                if error:
+                    print(f"❌ [ReActLoop] Planner error: {error}")
+                    return ExecutionResult.error(f"Planning failed: {error}")
                 print("⏹️ [ReActLoop] No more steps - complete")
                 break
             
@@ -530,6 +549,23 @@ class ReActLoop:
             
             final_tool_used = exec_result.tool_used
             final_last_result = exec_result.last_result
+            
+            # V18 FIX-04 SYNC: Search Cascade Activation
+            TIER_1_SEARCH_TOOLS = {"search_wikipedia", "search_arxiv"}
+            if (
+                final_tool_used in TIER_1_SEARCH_TOOLS
+                and not cascade_activated
+                and _is_empty_or_failed(exec_result.outputs)
+            ):
+                from ..routing.micro_toolsets import get_micro_toolset, detect_semantic_intent
+                intent, hint = detect_semantic_intent(user_input)
+                all_tools_list = list(self.tool_runner.tool_map.values())
+                expanded = get_micro_toolset(
+                    intent, all_tools_list, tool_hint=hint, fallback_mode=True
+                )
+                available_tools = expanded if expanded else all_tools_list
+                cascade_activated = True
+                print(f"🔄 [Cascade SYNC] Tier-1 empty/failed → expanded to {len(available_tools)} tools")
             
             # Terminal actions should end the loop
             if self.policy.is_terminal(final_tool_used) and exec_result.success:
@@ -568,6 +604,7 @@ class ReActLoop:
         all_outputs = []
         final_tool_used = "None"
         final_last_result = None
+        cascade_activated = False  # V18 FIX-04
         
         print(f" [ReActLoop] Starting async for: {user_input[:50]}...")
         
@@ -593,7 +630,8 @@ class ReActLoop:
                             user_input=user_input,
                             context=graph_context or "",
                             tool_history=all_tool_messages,
-                            available_tools=available_tools
+                            available_tools=available_tools,
+                            history=ctx.history  # V17.1
                         ),
                         timeout=timeout_secs
                     )
@@ -603,7 +641,8 @@ class ReActLoop:
                         user_input=user_input,
                         context=graph_context or "",
                         tool_history=all_tool_messages,
-                        available_tools=available_tools
+                        available_tools=available_tools,
+                        history=ctx.history if ctx else None  # V17.1
                     )
             
             except asyncio.TimeoutError:
@@ -616,6 +655,10 @@ class ReActLoop:
             steps = plan_result.get("steps", []) or plan_result.get("plan", [])
             
             if not steps:
+                error = plan_result.get("error")
+                if error:
+                    print(f"❌ [ReActLoop] Planner error: {error}")
+                    return ExecutionResult.error(f"Planning failed: {error}")
                 print("⏹️ [ReActLoop] No more steps - complete")
                 break
             
@@ -629,6 +672,24 @@ class ReActLoop:
             
             final_tool_used = exec_result.tool_used
             final_last_result = exec_result.last_result
+            
+            # V18 FIX-04: Search Cascade Activation
+            TIER_1_SEARCH_TOOLS = {"search_wikipedia", "search_arxiv"}
+            if (
+                final_tool_used in TIER_1_SEARCH_TOOLS
+                and not cascade_activated
+                and _is_empty_or_failed(exec_result.outputs)
+            ):
+                from ..routing.micro_toolsets import get_micro_toolset, detect_semantic_intent
+                intent, hint = detect_semantic_intent(user_input)
+                # Note: mapped self.all_tools to list(self.tool_runner.tool_map.values())
+                all_tools_list = list(self.tool_runner.tool_map.values())
+                expanded = get_micro_toolset(
+                    intent, all_tools_list, tool_hint=hint, fallback_mode=True
+                )
+                available_tools = expanded if expanded else all_tools_list
+                cascade_activated = True
+                print(f"🔄 [Cascade] Tier-1 empty/failed → expanded toolset to {len(available_tools)} tools")
             
             # Terminal actions should end the loop
             if self.policy.is_terminal(final_tool_used) and exec_result.succeeded:

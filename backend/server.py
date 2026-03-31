@@ -180,7 +180,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Sakura Backend",
-    version="10.0",
+    version="18.0",
     lifespan=lifespan
 )
 
@@ -548,7 +548,7 @@ async def health_check():
         
     return {
         "status": status,
-        "system": "Sakura V10",
+        "system": "Sakura V18.0",
         "ready": assistant is not None,
         "error": INIT_ERROR
     }
@@ -918,12 +918,29 @@ async def chat(request: Request):
                     # Stream Content
                     yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
                     
-                    # TTS Trigger
+                    # TTS Trigger (V17.1 Cleaned up)
                     if data.get("tts_enabled", False) and content:
                         try:
-                            from sakura_assistant.utils.tts import speak_async
-                            speak_async(content)
-                        except: pass
+                            # Use generate_audio to get file + broadcast event for Frontend Playback
+                            from sakura_assistant.utils.tts import generate_audio
+                            
+                            # Run generation in thread pool to avoid blocking stream
+                            audio_path = await asyncio.to_thread(generate_audio, content)
+                            
+                            if audio_path:
+                                import os
+                                # Normalize path for Frontend (Windows backslashes -> URL forward slashes)
+                                relative_path = os.path.relpath(audio_path, start=os.getcwd())
+                                url_path = relative_path.replace('\\', '/')
+                                if not url_path.startswith('/'):
+                                    url_path = f"/{url_path}"
+                                    
+                                # Broadcast event to UI
+                                yield f"data: {json.dumps({'type': 'audio_ready', 'path': url_path, 'filename': os.path.basename(audio_path)})}\n\n"
+                                print(f"🐛 [TTS DEBUG] Broadcasted audio_ready: {url_path}")
+                                
+                        except Exception as tts_err:
+                            print(f"⚠️ TTS Error: {tts_err}")
                         
                     # V13: Schedule async reflection (BackgroundTask - doesn't block response)
                     try:

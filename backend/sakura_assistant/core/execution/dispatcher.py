@@ -1,5 +1,5 @@
 """
-Sakura V17: Executor
+Sakura V18.0: Executor
 ================================
 Single entry point for execution mode dispatch.
 
@@ -13,7 +13,7 @@ v2.1 Design:
 import re
 import time
 import uuid
-from typing import Optional, List, Any, Set, TYPE_CHECKING
+from typing import Optional, List, Dict, Any, Set, TYPE_CHECKING
 
 from ...utils.logging import get_logger
 
@@ -83,7 +83,8 @@ class Executor:
         user_input: str,
         classification: str,
         tool_hint: Optional[str] = None,
-        request_id: Optional[str] = None
+        request_id: Optional[str] = None,
+        history: Optional[List[Dict]] = None  # V17.1: Conversation history
     ) -> ExecutionResult:
         """
         Main dispatch entry point.
@@ -93,6 +94,7 @@ class Executor:
             classification: Router classification (CHAT, DIRECT, PLAN)
             tool_hint: Optional tool hint from router
             request_id: Optional request ID for tracing
+            history: V17.1 - Conversation history for Planner reference resolution
         
         Returns:
             ExecutionResult
@@ -112,13 +114,14 @@ class Executor:
         # 3. Check if research query (affects budget)
         is_research = self._is_research_query(user_input)
         
-        # 4. Create execution context
+        # 4. Create execution context (V17.1: includes history for Planner)
         ctx = ExecutionContext.create(
             mode=mode,
             request_id=request_id,
             user_input=user_input,
             snapshot=snapshot,
-            is_research=is_research
+            is_research=is_research,
+            history=history  # V17.1
         )
         
         logger.info(

@@ -1,8 +1,8 @@
-# 🌸 Sakura V16.2
+# 🌸 Sakura V18.0
 
-> A production-grade personal AI assistant with voice, vision, code execution, cognitive architecture, and 54 tools.
+> A production-grade personal AI assistant with voice, vision, code execution, cognitive architecture, and over 60 tools.
 
-![Version](https://img.shields.io/badge/version-16.2-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-18.0-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)
@@ -32,6 +32,8 @@ Sakura is a **desktop AI assistant** that can:
 - 🚦 **Search Cascade** — Fallback logic for Wikipedia > Tavily (V16.1)
 - 🧠 **Deterministic Context** — segmented Planner/Responder pruning (V15.4)
 - 🔄 **Unified Context API** — single source of truth for LLM data (V15.4)
+- 🛡️ **Ironclad Reliability** — LLM Core Budgets (6 calls), Fidelity checks, Search Cascade Parity (V18)
+- 👁️ **AI Vision (Llama 4 Scout)** — High-performance screenshot & image analysis (V18)
 
 **Free to run** — Uses Groq (Llama 3.3 70B) and Google Gemini free tiers.
 
@@ -187,7 +189,7 @@ cd frontend
 npm run tauri build
 ```
 
-**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_15.4_x64-setup.exe`
+**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_18.0_x64-setup.exe`
 
 ---
 
@@ -203,6 +205,16 @@ npm run tauri build
 | **Bubble-Gate UX** | Respects your focus — won't interrupt when hidden |
 | **Reactive Themes** | UI colors shift based on mood (5 palettes) |
 | **Port 3210** | Optimized port to avoid conflicts |
+
+## 🆕 What's New in V18.0
+
+| Feature | Description |
+|---------|-------------|
+| **AI Vision Layer** | Dedicated Llama 4 Scout 17B (primary) + Llama 3.2 90B (fallback) for screen analysis |
+| **LLM Core Budgets** | Hard limit of 6 LLM calls per turn via `contextvars` (no more infinite loops) |
+| **High Fidelity Results** | Deterministic regex verification forces Responder regeneration if tool data is ignored |
+| **Hallucination Gateways** | Intercepts malformed tool inputs and Wh-question CHAT hallucinations |
+| **Search Cascade Parity** | Multi-tier fallback (Wikipedia > Web) now supported in both Sync and Async paths |
 
 ### Previous Versions
 

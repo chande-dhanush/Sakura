@@ -32,10 +32,10 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "search the web for X",
     },
     {
-        "pattern": r"\bsearch\s+(for\s+)?(.+)$",
+        "pattern": r"\bsearch\s+(for\s+)?(?!my calendar|my email|my notes|wikipedia|arxiv|my inbox)(.+)$",
         "tool": "web_search",
         "args_extractor": lambda m, text: {"query": m.group(2).strip() if m.group(2) else text},
-        "description": "search for X",
+        "description": "search for X (excludes specialized targets)",
     },
     
     # ═══════════════════════════════════════════════════════════════════════

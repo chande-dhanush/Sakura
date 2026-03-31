@@ -54,6 +54,10 @@ CRITICAL RULES:
 1. Greetings ("hi", "hello", "hey") are ALWAYS CHAT.
 2. If mode is DIRECT, you MUST provide a specific tool hint.
 3. If mode is PLAN but you can't identify tools, use CHAT instead.
+4. Factual questions (who, what, when, where, how, weather, define, news, 
+   time, date, price, score) are ALWAYS DIRECT or PLAN — NEVER CHAT.
+5. If uncertain between CHAT and DIRECT/PLAN, always choose DIRECT/PLAN. 
+   A redundant tool call is always less harmful than a hallucinated answer.
 
 Return JSON only:
 {{"classification": "DIRECT|PLAN|CHAT", "tool_hint": "tool_name or null"}}
@@ -141,8 +145,9 @@ class IntentRouter:
             return self._apply_safety_checks(query, route_result)
             
         except Exception as e:
-            print(f"⚠️ [Router] Async Error: {e}, defaulting to CHAT")
-            return RouteResult("CHAT", None, urgency)
+            # V18 FIX-01: Default to PLAN (not CHAT) so tools are still available
+            print(f"⚠️ [Router] Async Error: {e}, defaulting to PLAN (safer than CHAT)")
+            return RouteResult("PLAN", "web_search", urgency)
 
     def route(self, query: str, context: str = "", history: List[Dict] = None) -> RouteResult:
         """
@@ -184,8 +189,9 @@ class IntentRouter:
             return self._apply_safety_checks(query, route_result)
             
         except Exception as e:
-            print(f"⚠️ [Router] Error: {e}, defaulting to CHAT")
-            return RouteResult("CHAT", None, urgency)
+            # V18 FIX-01: Default to PLAN (not CHAT) so tools are still available
+            print(f"⚠️ [Router] Error: {e}, defaulting to PLAN (safer than CHAT)")
+            return RouteResult("PLAN", "web_search", urgency)
     
     def _is_action_command(self, user_input: str) -> bool:
         """
@@ -260,12 +266,22 @@ class IntentRouter:
             "screenshot": "read_screen",
             "clipboard": "clipboard_read",
             "calendar": "calendar_get_events",
-            "note": "note_read",
+            # V17.1: Note mapping removed - handled by verb analysis below
         }
         
         for keyword, tool in mappings.items():
             if keyword in text:
                 return tool
+        
+        # V17.1: Note verb analysis (priority: destructive -> additive -> read)
+        if "note" in text:
+            if any(v in text for v in ["edit", "update", "modify", "overwrite", "change", "fix", "rewrite"]):
+                return "note_overwrite"
+            elif any(v in text for v in ["add to", "append", "insert", "put in", "include"]):
+                return "note_append"
+            elif any(v in text for v in ["create", "make", "new", "write"]):
+                return "note_create"
+            return "note_read"
         
         return None
     
@@ -303,8 +319,10 @@ class IntentRouter:
             elif "simple" in lower:
                 return "CHAT", None
             else:
-                print(f"⚠️ [Router] Parse failed, defaulting to CHAT")
-                return "CHAT", None
+                # V18 FIX-01: Default to PLAN (not CHAT) — a redundant tool call
+                # is always less harmful than a hallucinated text answer
+                print(f"⚠️ [Router] Parse failed, defaulting to PLAN (safer than CHAT)")
+                return "PLAN", None
 
     def _apply_safety_checks(self, query: str, decision: RouteResult) -> RouteResult:
         """
@@ -345,8 +363,19 @@ class IntentRouter:
         
         # Check 3: PLAN without hint might trigger Tavily Trap
         if decision.classification == "PLAN" and not decision.tool_hint:
-            # Allow PLAN if query is clearly complex
-            complex_indicators = ["and then", "after that", "first", "also", "calculate", "search"]
+            # Allow PLAN if query is clearly complex or a factual/tool-requiring query
+            # V18: Expanded from 6 to 26 indicators to prevent over-demotion
+            complex_indicators = [
+                # Original V17.2 indicators
+                "and then", "after that", "first", "also", "calculate", "search",
+                # Question words (factual queries NEED tools)
+                "who", "what", "when", "where", "how", "why",
+                # Research/lookup verbs
+                "tell me", "explain", "define", "describe", "compare",
+                "find", "look up", "research",
+                # Common tool triggers
+                "weather", "news", "email", "calendar", "play", "open", "remind",
+            ]
             if not any(ind in query_lower for ind in complex_indicators):
                 print(f"⚠️ [Router Safety] PLAN without hint on simple query → forcing CHAT: {query}")
                 decision.classification = "CHAT"

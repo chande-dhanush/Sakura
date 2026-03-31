@@ -174,7 +174,7 @@ class GlobalRateLimiter:
     MODEL_LIMITS = {
         # Groq models
         "llama-3.3-70b-versatile": RateLimitConfig(
-            rpm=30, burst=5, tpm=10000, context_window=128000, name="Llama-70B"
+            rpm=30, burst=5, tpm=25000, context_window=128000, name="Llama-70B"
         ),
         "llama-3.1-8b-instant": RateLimitConfig(
             rpm=30, burst=10, tpm=16000, context_window=128000, name="Llama-8B"

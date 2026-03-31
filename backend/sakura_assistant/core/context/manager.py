@@ -171,10 +171,9 @@ class ContextManager:
             mem = self._build_episodic_block(user_input, signals, force=(mode == "CHAT"))
             if mem: parts.append(mem)
             
-            # Add actions for reasoning
-            if mode == "PLAN":
-                act = self._build_action_block()
-                if act: parts.append(act)
+            # V17.1: Always include recent actions (removed PLAN-only gating)
+            act = self._build_action_block()
+            if act: parts.append(act)
                 
             planner_dynamic = "\n\n".join(parts)
 

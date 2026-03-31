@@ -37,7 +37,7 @@ from .memory.reflection import get_reflection_engine
 
 class SmartAssistant:
     """
-    Sakura V17 Facade
+    Sakura V18.0 Facade
     =================
     Orchestrates the V17 execution architecture:
     Router -> Executor -> Responder
@@ -221,7 +221,8 @@ class SmartAssistant:
                         user_input=user_input,
                         classification=route_result.classification,
                         tool_hint=route_result.tool_hint,
-                        request_id=request_id
+                        request_id=request_id,
+                        history=history  # V17.1: Planner reference resolution
                     )
                 
                 # V17: Use ExecutionStatus instead of bool
@@ -270,6 +271,12 @@ class SmartAssistant:
             # Hygiene: Use descriptive variable name for responder-specific context
             responder_context = f"{mood_prompt}\n\n{resp_ctx['responder_context']}"
             
+            # V18 FIX-12: Detect ephemeral handle in tool outputs
+            has_ephemeral = (
+                "Ephemeral Store ID:" in tool_outputs 
+                if tool_outputs else False
+            )
+            
             resp_context = ResponseContext(
                 user_input=user_input,
                 tool_outputs=tool_outputs,
@@ -278,6 +285,7 @@ class SmartAssistant:
                 intent_adjustment=resp_ctx["intent_adjustment"],
                 current_mood=resp_ctx["current_mood"],
                 study_mode=study_mode_active,
+                data_reasoning=has_ephemeral,
                 session_summary=resp_ctx["summary_context"]
             )
             
@@ -313,10 +321,22 @@ class SmartAssistant:
 
             recorder.end_trace(success=True, response_preview=response_text[:80])
             
+            # V17.5: Calculate token usage
+            from ..utils.token_counter import count_messages_tokens
+            
+            # Reconstruct prompt messages for verified counting
+            prompt_msgs = history + [{"role": "user", "content": user_input}]
+            
+            # Get model name from container config
+            model_name = self.container.config.responder_model
+            
+            usage = count_messages_tokens(prompt_msgs + [{"role": "assistant", "content": response_text}], model_name)
+            
             # V17: Emit response via ResponseEmitter (guaranteed emission)
             await emitter.emit(response_text, {
                 "status": "success",
-                "latency": f"{time.time()-start_time:.2f}s"
+                "latency": f"{time.time()-start_time:.2f}s",
+                "tokens": usage  # Inject token metrics
             })
             
             return {

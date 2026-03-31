@@ -2,17 +2,68 @@ from langchain_core.tools import tool
 from typing import List, Dict, Any, Optional
 from .common import log_api_call
 
+import re
+
 # --- Memory & RAG ---
+
+def _slugify(text: str) -> str:
+    """Convert text to valid entity ID."""
+    slug = re.sub(r'[^a-z0-9]+', '_', text.lower())
+    return slug[:50]
 
 @tool
 def update_user_memory(category: str, key: str, value: str) -> str:
-    """Save a fact about the user for long-term memory."""
+    """
+    Save a fact about the user for long-term memory.
+    V17.1: Now writes to BOTH PreferenceStore AND WorldGraph.
+    """
     try:
         from ...utils.preferences import update_preference
+        
+        # Keep: Existing PreferenceStore update (backward compatibility)
         update_preference(category, key, value)
-        return f" Memory updated: {category} -> {key}={value}"
+        
+        # V17.1: Also update WorldGraph
+        try:
+            from ..graph.world_graph import get_world_graph
+            from ..graph.nodes import EntityType, EntitySource
+            
+            wg = get_world_graph()
+            
+            # Detect preference type via keyword analysis
+            fact = f"{key}: {value}"
+            fact_lower = fact.lower()
+            
+            if any(kw in fact_lower for kw in ["love", "like", "enjoy", "prefer", "favorite", "fond of"]):
+                entity_id = f"pref:like:{_slugify(key)}"
+                summary = f"Likes: {value}"
+                entity_type = EntityType.PREFERENCE
+            elif any(kw in fact_lower for kw in ["hate", "dislike", "avoid", "can't stand", "detest"]):
+                entity_id = f"pref:dislike:{_slugify(key)}"
+                summary = f"Dislikes: {value}"
+                entity_type = EntityType.PREFERENCE
+            else:
+                entity_id = f"fact:{category}:{_slugify(key)}"
+                summary = f"{key}: {value}"
+                entity_type = EntityType.FACT
+            
+            # Create or update entity
+            wg.get_or_create_entity(
+                type=entity_type,
+                name=summary,
+                source=EntitySource.USER_STATED,
+                attributes={"category": category, "key": key, "value": value}
+            )
+            wg.save()
+            
+        except Exception as wg_err:
+            print(f"⚠️ [update_user_memory] WorldGraph sync failed: {wg_err}")
+            # Non-fatal, preference still saved to JSON
+        
+        return f"✅ Remembered: {key} = {value}"
     except Exception as e:
-        return f" Failed: {e}"
+        return f"❌ Failed: {e}"
+
 
 @tool
 def ingest_document(path: str) -> str:

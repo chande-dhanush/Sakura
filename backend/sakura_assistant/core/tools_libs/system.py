@@ -6,6 +6,16 @@ from typing import Optional
 from langchain_core.tools import tool
 from .common import log_api_call, log_api_result, _validate_path
 
+# V18 Vision Integration
+try:
+    from ..models.vision_client import VisionClient
+    from ..execution.context import execution_context_var
+    from ...utils.flight_recorder import get_recorder
+    _vision_client = VisionClient(flight_recorder=get_recorder())
+except ImportError:
+    _vision_client = None
+    execution_context_var = None
+
 try:
     from AppOpener import open as app_open
 except ImportError:
@@ -54,30 +64,58 @@ def get_system_info() -> str:
 
 @tool
 def read_screen(prompt: str = "Describe what is on the screen in detail.", monitor: int = 0) -> str:
-    """Take a screenshot and analyze it using Gemini Vision (with OCR fallback)."""
+    """Take a screenshot and analyze it with AI vision."""
     try:
-        # Capture logic simplified for refactor correctness
-        try:
-            import mss
-            with mss.mss() as sct:
-                if monitor >= len(sct.monitors):
-                    return f" Monitor {monitor} not found."
-                img = sct.grab(sct.monitors[monitor])
-                from PIL import Image
-                img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
-        except ImportError:
-            if not ImageGrab: return " PIL required."
-            img = ImageGrab.grab()
+        import mss
+        from PIL import Image
         
-        # In a real scenario, we'd base64 encode and send to Gemini here.
-        # For this refactor step, we preserve the OCR fallback logic which is safer to copy-paste blindly.
-        if pytesseract:
-            text = pytesseract.image_to_string(img)
-            return f"⚠️ [OCR Result]:\n{text.strip()}" if text.strip() else "⚠️ OCR empty."
+        # 1. Capture screen (Keep existing logic as requested)
+        with mss.mss() as sct:
+            if monitor >= len(sct.monitors):
+                return f" Monitor {monitor} not found."
+            sct_img = sct.grab(sct.monitors[monitor])
+            img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
             
-        return " Vision/OCR not fully configured."
+        # 2. Vision analysis (New V18 logic)
+        if not _vision_client:
+            return " Vision analysis unavailable (module import error)."
+
+        # Try to pull context from execution_context_var
+        context_str = None
+        if execution_context_var:
+            try:
+                ctx = execution_context_var.get()
+                if ctx:
+                    context_str = ctx.user_input
+            except Exception:
+                pass # contextvar may not be set in this thread/task
+
+        # Prompt for detailed desktop analysis
+        vision_prompt = (
+            "Describe what is on the screen. List all visible text verbatim, "
+            "identify UI elements, buttons, and any error messages."
+        )
+        
+        # We use an event loop to run the async analyze in this sync tool
+        # Sakura tools are typically synchronous but can use asyncio if needed.
+        # Given system.py already uses threading/mss, we safely run the analyzer.
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # In async context? Unusual for current tool architecture, but safe
+                import nest_asyncio
+                nest_asyncio.apply()
+                description = loop.run_until_complete(_vision_client.analyze(img, prompt=vision_prompt, context=context_str))
+            else:
+                description = loop.run_until_complete(_vision_client.analyze(img, prompt=vision_prompt, context=context_str))
+        except RuntimeError:
+            description = asyncio.run(_vision_client.analyze(img, prompt=vision_prompt, context=context_str))
+
+        return description
+
     except Exception as e:
-        return f" Screen capture failed: {e}"
+        return f" Screen capture / analysis failed: {e}"
 
 # --- OS Tools ---
 

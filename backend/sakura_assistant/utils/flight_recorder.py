@@ -33,7 +33,8 @@ MODEL_COSTS = {
     "llama3-8b-8192": {"input": 0.05, "output": 0.10},
     "gemma2-9b-it": {"input": 0.20, "output": 0.20},
     "mixtral-8x7b-32768": {"input": 0.24, "output": 0.24},
-    "OpenAI/OSS20b": {"input": 0.05, "output": 0.10},
+    "meta-llama/llama-4-scout-17b-16e-instruct": {"input": 0.11, "output": 0.34},
+    "llama-3.2-90b-vision-preview": {"input": 0.90, "output": 0.90},
     "OpenAI/OSS20b": {"input": 0.1, "output": 0.50},
     # OpenRouter / Others
     "gpt-4o": {"input": 2.50, "output": 10.00},
@@ -318,12 +319,9 @@ class FlightRecorder:
                                 'metadata': entry.get('metadata')
                             }
                             
-                            if stage in t['phases']:
-                                t['phases'][stage].append(span_data)
-                            else:
-                                if 'Other' not in t['phases']:
-                                    t['phases']['Other'] = []
-                                t['phases']['Other'].append(span_data)
+                            if stage not in t['phases']:
+                                t['phases'][stage] = []
+                            t['phases'][stage].append(span_data)
                             
                             # Capture first error
                             if entry.get('status') == 'ERROR' and not t['error']:

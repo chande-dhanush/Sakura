@@ -183,6 +183,15 @@ class ReliableLLM:
         
         V10.4: All models (Router, Planner, Responder) are rate limited.
         """
+        try:
+            from ..execution.context import execution_context_var, LLMBudgetExceededError
+            ctx = execution_context_var.get()
+            if ctx:
+                if not ctx.record_and_check_llm_call():
+                    raise LLMBudgetExceededError(f"LLM Budget limit ({ctx.max_llm_calls}) exceeded for this request in {self.name}.")
+        except ImportError:
+            pass
+
         from ..infrastructure.rate_limiter import get_rate_limiter
         import asyncio
         
@@ -336,6 +345,15 @@ class ReliableLLM:
         - Rate limits via token bucket (induces latency, not 429 crashes)
         - Enables parallel tool execution via asyncio.gather()
         """
+        try:
+            from ..execution.context import execution_context_var, LLMBudgetExceededError
+            ctx = execution_context_var.get()
+            if ctx:
+                if not ctx.record_and_check_llm_call():
+                    raise LLMBudgetExceededError(f"LLM Budget limit ({ctx.max_llm_calls}) exceeded for this request in {self.name}.")
+        except ImportError:
+            pass
+
         from ..infrastructure.rate_limiter import get_rate_limiter
         
         # Get model name for rate limiting

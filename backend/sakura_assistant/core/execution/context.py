@@ -1,5 +1,5 @@
 """
-Sakura V17: Execution Context
+Sakura V18.0: Execution Context
 =============================
 Immutable context passed through entire execution pipeline.
 
@@ -10,6 +10,13 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
+import contextvars
+
+class LLMBudgetExceededError(Exception):
+    """Raised when the LLM call limit is exceeded for a request."""
+    pass
+
+execution_context_var = contextvars.ContextVar("execution_context", default=None)
 
 if TYPE_CHECKING:
     from ..graph.world_graph import WorldGraph
@@ -120,6 +127,9 @@ class ExecutionContext:
     request_id: str
     snapshot: Optional[GraphSnapshot] = None
     user_input: str = ""
+    history: Optional[List[Dict]] = None  # V17.1: Conversation history for Planner
+    llm_call_count: int = 0
+    max_llm_calls: int = 6  # V18 FIX-08
     
     # Budgets by mode (class constants)
     BUDGET_CHAT_MS: int = 1000
@@ -133,7 +143,8 @@ class ExecutionContext:
         request_id: str,
         user_input: str = "",
         snapshot: Optional[GraphSnapshot] = None,
-        is_research: bool = False
+        is_research: bool = False,
+        history: Optional[List[Dict]] = None  # V17.1
     ) -> "ExecutionContext":
         """
         Factory method to create context with appropriate budget.
@@ -147,14 +158,17 @@ class ExecutionContext:
         else:
             budget = ExecutionContext.BUDGET_ITERATIVE_MS
         
-        return ExecutionContext(
+        ctx = ExecutionContext(
             mode=mode,
             budget_ms=budget,
             start_time=time.time(),
             request_id=request_id,
             snapshot=snapshot,
-            user_input=user_input
+            user_input=user_input,
+            history=history  # V17.1
         )
+        execution_context_var.set(ctx)
+        return ctx
     
     def remaining_budget_ms(self) -> int:
         """Get remaining time budget in milliseconds."""
@@ -166,8 +180,16 @@ class ExecutionContext:
         return (time.time() - self.start_time) * 1000
     
     def is_expired(self) -> bool:
-        """Check if time budget is exhausted."""
-        return self.remaining_budget_ms() <= 0
+        """Returns True if budget has expired."""
+        return self.remaining_budget_ms() == 0
+
+    def record_and_check_llm_call(self) -> bool:
+        """Returns True if budget is OK, False if limit exceeded."""
+        self.llm_call_count += 1
+        if self.llm_call_count > self.max_llm_calls:
+            print(f"🛑 [Budget] LLM call limit ({self.max_llm_calls}) exceeded")
+            return False
+        return True
     
     def is_one_shot(self) -> bool:
         """Check if this is ONE_SHOT mode (always terminal)."""

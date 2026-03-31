@@ -1,5 +1,5 @@
 """
-Sakura V17: One-Shot Runner
+Sakura V18.0: One-Shot Runner
 ===========================
 Execute a single tool without invoking the Planner.
 

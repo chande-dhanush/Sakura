@@ -16,3 +16,9 @@
 {"timestamp": "2026-01-27T18:57:56.011860", "date": "2026-01-27", "status": "skipped", "reason": "No summary to process"}
 {"timestamp": "2026-01-27T19:01:40.275618", "date": "2026-01-27", "status": "skipped", "reason": "No summary to process"}
 {"timestamp": "2026-01-27T19:22:49.280022", "date": "2026-01-27", "status": "skipped", "reason": "No summary to process"}
+{"timestamp": "2026-01-27T20:01:23.875845", "date": "2026-01-27", "status": "skipped", "reason": "No summary to process"}
+{"timestamp": "2026-01-27T20:10:21.209296", "date": "2026-01-27", "status": "skipped", "reason": "No summary to process"}
+{"timestamp": "2026-01-30T10:40:09.603080", "date": "2026-01-30", "status": "skipped", "reason": "No summary to process"}
+{"timestamp": "2026-01-30T11:45:47.505025", "date": "2026-01-30", "status": "skipped", "reason": "No summary to process"}
+{"timestamp": "2026-01-30T17:20:05.942376", "date": "2026-01-30", "status": "skipped", "reason": "No summary to process"}
+{"timestamp": "2026-02-03T09:42:26.516114", "date": "2026-02-03", "status": "success", "facts_crystallized": 3, "constraints_learned": 1, "summary_chars_processed": 428, "facts_detail": ["made a dumb mistake of forgetting to integrate wor", "tinkering with AI experiment", "want to create a note"], "constraints_detail": ["forgetting to integrate world"]}

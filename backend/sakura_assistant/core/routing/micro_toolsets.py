@@ -13,9 +13,10 @@ from typing import List, Set, Optional, Tuple
 
 # V17.3: web_search removed from universal to prevent Tavily Trap
 UNIVERSAL_TOOLS: Set[str] = {
-    "get_system_info",  # Time/date queries
-    "quick_math",       # Calculations
-    "get_time",         # Legacy support
+    "get_system_info", 
+    "quick_math", 
+    "get_time",
+    "query_ephemeral"  # V18 FIX-05: Planner must always see this to retrieve valve handles
 }
 
 # V17.3: Search tools separated for explicit gating
@@ -77,7 +78,7 @@ MICRO_TOOLSETS = {
         "description": "Calendar and reminders",
     },
     "notes": {
-        "primary": ["note_create", "note_read", "note_append", "note_list", "note_search"],
+        "primary": ["note_create", "note_read", "note_append", "note_overwrite", "note_list", "note_search"],
         "description": "Note-taking operations",
     },
     "search": {

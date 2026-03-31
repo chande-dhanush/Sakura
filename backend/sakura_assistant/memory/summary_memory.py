@@ -15,7 +15,7 @@ import json
 import os
 from typing import List, Dict, Optional
 from datetime import datetime
-
+import time as time_module  # v17.1 FIX: Explicit alias to prevent UnboundLocalError
 
 class SummaryMemory:
     """
@@ -73,6 +73,8 @@ class SummaryMemory:
         if not self.recent_messages:
             return self.summary
         
+        start_time = time_module.time()
+        
         # Build content to summarize
         msgs_text = "\n".join([
             f"{m['role']}: {m['content']}" 
@@ -105,10 +107,12 @@ New messages:
                 if len(self.summary) > 1000:
                     self.summary = self.summary[-1000:]
                 
-                print(f" [SummaryMemory] Compressed {len(self.recent_messages)} messages")
+                duration = time_module.time() - start_time
+                print(f" [SummaryMemory] Compressed {len(self.recent_messages)} messages in {duration:.2f}s")
                 
             except Exception as e:
-                print(f"⚠️ [SummaryMemory] LLM compression failed: {e}")
+                duration = time_module.time() - start_time
+                print(f"⚠️ [SummaryMemory] LLM compression failed ({duration:.2f}s): {e}")
                 # Fallback: just keep last few messages as-is
                 self.summary += f"\n[Recent: {msgs_text[:200]}...]"
         else:

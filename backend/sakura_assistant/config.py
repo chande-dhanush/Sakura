@@ -100,6 +100,13 @@ USE_MEMORY_JUDGER = True             # Enable LLM-based memory filtering
 MEMORY_JUDGER_MODEL = "llama-3.1-8b-instant"  # Lightweight model for classification
 MAX_MEMORY_JUDGER_TOKENS = 128       # Max tokens for judger response
 
+# V18 Vision Layer
+VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+VISION_MODEL_FALLBACK = "llama-3.2-90b-vision-preview"
+VISION_PROVIDER = "groq"
+VISION_MAX_TOKENS = 1024      # Cap output — screen descriptions don't need more
+VISION_TEMPERATURE = 0.1      # Low temp — we want factual descriptions, not creative
+
 # Advanced Memory Features (stability flags)
 ENABLE_MEMORY_WEIGHTING = True       # Use importance scores in retrieval
 ENABLE_MEMORY_REINFORCEMENT = True   # Boost score when memory is referenced
@@ -479,6 +486,7 @@ TOOL_SCHEMAS = {
         "note_list(folder: str = 'topics') - List notes in folder",
         "note_delete(title: str, folder: str = 'topics') - Delete a note (creates backup)",
         "note_search(keyword: str) - Search all notes for keyword",
+        "note_open(title: str) - Smart open a note (fuzzy match recursive search across all folders)",
     ],
     "files": [
         "file_read(path: str) - Read local file",
