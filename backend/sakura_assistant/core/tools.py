@@ -167,9 +167,14 @@ def currency_convert(amount: float, from_currency: str, to_currency: str) -> str
 
 @tool
 def clear_all_ephemeral_memory() -> str:
-    """Clear session memory."""
-    # Wrapper
-    return " Session memory cleared."
+    """Clear session memory and purge all temporary context collections."""
+    try:
+        from .graph.ephemeral import get_ephemeral_manager
+        manager = get_ephemeral_manager()
+        count = manager.clear_all()
+        return f" Session memory cleared ({count} stores purged)."
+    except Exception as e:
+        return f" Error clearing session memory: {e}"
 
 # --- Factory ---
 

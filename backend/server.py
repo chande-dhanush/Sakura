@@ -54,6 +54,7 @@ except ImportError:
 assistant = None
 voice_engine = None  # Initialized if SAKURA_ENABLE_VOICE=true
 current_task: Optional[asyncio.Task] = None
+reflection_task: Optional[asyncio.Task] = None # V18 FIX-08
 generation_cancelled = False
 
 
@@ -100,6 +101,34 @@ async def lifespan(app: FastAPI):
         if hasattr(assistant, 'world_graph'):
             set_world_graph(assistant.world_graph)
             
+        # V18 FIX-08: Activate Background Reflection Engine
+        async def reflection_loop():
+            from sakura_assistant.core.memory.reflection import get_reflection_engine
+            re = get_reflection_engine()
+            print("👁️ [Reflection] Background monitor started (60s tick)")
+            while True:
+                try:
+                    await asyncio.sleep(60)
+                    if assistant and assistant.summary_memory:
+                        history = assistant.summary_memory.conversation_history
+                        if history:
+                            # analyze_delta is wrapped by observe_background
+                            await re.observe_background(history)
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    log.warning(f"[Reflection] Loop error: {e}")
+        
+        global reflection_task
+        reflection_task = asyncio.create_task(reflection_loop())
+        
+        # V18.4 BUG-01: Confirm live Router prompt contains pronoun rules
+        from sakura_assistant.config import ROUTER_SYSTEM_PROMPT
+        print("\n" + "="*60)
+        print("🔍 [Router] Prompt Verification (First 600 chars):")
+        print(ROUTER_SYSTEM_PROMPT[:600])
+        print("="*60 + "\n")
+        
     except Exception as e:
         import traceback
         err = traceback.format_exc()
@@ -301,6 +330,10 @@ async def save_setup(request: Request):
             "user_name": data.get("USER_NAME", "").strip(),
             "user_location": data.get("USER_LOCATION", "").strip(),
             "user_bio": data.get("USER_BIO", "").strip(),
+            # V18.3 Personalization
+            "sakura_name": data.get("SAKURA_NAME", "Sakura").strip(),
+            "response_style": data.get("RESPONSE_STYLE", "balanced").strip(),
+            "system_prompt_override": data.get("SYSTEM_PROMPT_OVERRIDE", "").strip(),
         }
         
         # Merge with existing user_settings.json
@@ -401,6 +434,10 @@ async def get_settings():
         "USER_NAME": user_settings.get("user_name", ""),
         "USER_LOCATION": user_settings.get("user_location", ""),
         "USER_BIO": user_settings.get("user_bio", ""),
+        # V18.3 Personalization
+        "SAKURA_NAME": user_settings.get("sakura_name", "Sakura"),
+        "RESPONSE_STYLE": user_settings.get("response_style", "balanced"),
+        "SYSTEM_PROMPT_OVERRIDE": user_settings.get("system_prompt_override", ""),
         # Flags
         "has_groq": bool(os.getenv("GROQ_API_KEY")),
         "has_google": bool(os.getenv("GOOGLE_API_KEY")),
@@ -454,7 +491,14 @@ async def update_settings(request: Request):
             load_dotenv(env_path, override=True)
         
         # 4. Update user settings
-        user_fields = {"USER_NAME": "user_name", "USER_LOCATION": "user_location", "USER_BIO": "user_bio"}
+        user_fields = {
+            "USER_NAME": "user_name", 
+            "USER_LOCATION": "user_location", 
+            "USER_BIO": "user_bio",
+            "SAKURA_NAME": "sakura_name",
+            "RESPONSE_STYLE": "response_style",
+            "SYSTEM_PROMPT_OVERRIDE": "system_prompt_override"
+        }
         settings_path = os.path.join(get_project_root(), "data", "user_settings.json")
         
         user_settings = {}
@@ -811,11 +855,10 @@ async def chat(request: Request):
     global current_task, generation_cancelled
     generation_cancelled = False
     
-    # Note: Auth removed - localhost-only desktop app
-    
     try:
         data = await request.json()
-    except:
+    except Exception as e:
+        log.warning(f"[Server] Suppressed error during JSON parse: {e}")
         return JSONResponse({"error": "Invalid JSON"}, status_code=400)
     
     query = data.get("query", "").strip()
@@ -1059,6 +1102,8 @@ async def clear_all():
     """
     Clear all chat history, World Graph, and episodic memory.
     Used by UI "Clear Chat" button.
+    
+    V18.2: Added full FAISS wipe and SummaryMemory reset.
     """
     global assistant
     
@@ -1076,17 +1121,23 @@ async def clear_all():
             assistant.world_graph.reset()
             assistant.world_graph.save()
             print("[CLEAR] World Graph reset")
+            
+        # 3. Clear Summary Memory (V18.2)
+        if hasattr(assistant, 'summary_memory'):
+            assistant.summary_memory.clear()
+            print("[CLEAR] Summary Memory cleared")
         
-        # 3. Clear FAISS store's in-memory conversation history
+        # 4. Clear FAISS store's in-memory conversation history AND vector index (V18.2)
         try:
             from sakura_assistant.memory.faiss_store import get_memory_store
             store = get_memory_store()
-            store.conversation_history.clear()
-            print("[CLEAR] FAISS conversation history cleared (in-memory)")
+            # This handles both in-memory list and on-disk index files
+            store.clear_all_memory()
+            print("[CLEAR] FAISS Vector Store fully wiped (index + history)")
         except Exception as e:
             print(f"⚠️ FAISS clear failed: {e}")
         
-        # 4. Delete conversation_history.json file
+        # 5. Delete conversation_history.json file (legacy cleanup)
         import os
         history_path = os.path.join(os.path.dirname(__file__), "data", "conversation_history.json")
         if os.path.exists(history_path):
@@ -1094,9 +1145,9 @@ async def clear_all():
             print(f"[CLEAR] Deleted {history_path}")
         
         return {"success": True, "message": "All memory cleared"}
+        
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        print(f"⚠️ Clear failed: {e}")
         return {"success": False, "error": str(e)}
 
 @app.post("/shutdown")

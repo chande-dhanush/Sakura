@@ -22,6 +22,7 @@ from .execution import Executor, OneShotRunner, ResponseEmitter, EmitterFactory
 from .graph import WorldGraph
 from ..utils.study_mode import detect_study_mode
 from .context import AgentState, RateLimitExceeded
+from .execution.verifier import PlanVerifier  # FIX-5
 from ..utils.memory import cleanup_memory
 
 # V10.3: Summary Memory for long-context
@@ -34,6 +35,9 @@ from langchain_core.messages import HumanMessage
 
 # V14: Background ReflectionEngine (constraint detection moved to cold path)
 from .memory.reflection import get_reflection_engine
+
+# V18.2: Memory Judger for long-term FAISS persistence (BUG-03 FIX)
+from .memory.judger import MemoryJudger
 
 class SmartAssistant:
     """
@@ -99,6 +103,9 @@ class SmartAssistant:
             identity_manager=get_identity_manager()
         )
         
+        # V18.2: Memory Judger (BUG-03 FIX)
+        self.memory_judger = MemoryJudger(router_llm)
+        
         # V17: Create Executor (unified entry point)
         self.executor_layer = Executor(
             one_shot_runner=self.oneshot_runner,
@@ -128,6 +135,9 @@ class SmartAssistant:
         
         # V17: ResponseEmitter factory for guaranteed message emission
         self.emitter_factory = EmitterFactory()
+        
+        # V18 FIX-05: Plan Verifier
+        self.plan_verifier = PlanVerifier(router_llm)
         
         # Store last response for async reflection (picked up by server.py BackgroundTask)
         self._last_turn_data = {"user_msg": "", "assistant_response": ""}
@@ -188,6 +198,40 @@ class SmartAssistant:
             return await asyncio.to_thread(self._handle_vision, user_input, image_data, start_time)
             
         try:
+            # V18.3: Dynamic Personalization (FIX-C)
+            # Load FRESH user settings on every request
+            from sakura_assistant.utils.pathing import get_project_root
+            settings_path = os.path.join(get_project_root(), "data", "user_settings.json")
+            user_settings = {}
+            if os.path.exists(settings_path):
+                try:
+                    with open(settings_path, "r", encoding="utf-8") as f:
+                        user_settings = json.load(f)
+                except Exception as e:
+                    print(f"⚠️ [Settings] Load failed: {e}")
+
+            # 1. Identity Override
+            sakura_name = user_settings.get("sakura_name", "Sakura")
+            
+            # 2. Base Personality Override
+            custom_prompt = user_settings.get("system_prompt_override", "")
+            base_personality = custom_prompt if custom_prompt else SYSTEM_PERSONALITY
+            
+            # 3. Response Style Enforcement
+            style = user_settings.get("response_style", "balanced").lower()
+            style_blocks = {
+                "concise": "[STYLE: CONCISE] Keep responses under 2 sentences. No fluff, no filler.",
+                "balanced": "[STYLE: BALANCED] Normal response length. Be conversational but not verbose.",
+                "detailed": "[STYLE: DETAILED] Be thorough. Explain fully, use examples where helpful."
+            }
+            style_constraint = style_blocks.get(style, style_blocks["balanced"])
+            
+            # Update Responder Personality for THIS request
+            # (Note: self.responder is shared, but we update it here safely since 
+            # we are in an async task. For true thread-safety with concurrent requests 
+            # might need a more isolated approach, but this matches V17 singleton pattern)
+            self.responder.personality = f"{base_personality}\n\n{style_constraint}"
+            
             # 2. Graph & Context (Keep sync for now as it's pure logic + in-memory mostly)
             study_mode_active = detect_study_mode(user_input)
             
@@ -232,8 +276,9 @@ class SmartAssistant:
                     metadata={"mode": exec_result.last_result.get("mode") if exec_result.last_result else "unknown"}
                 )
                 
-                tool_outputs = exec_result.outputs
-                tool_used = exec_result.tool_used
+                # V18 FIX-05: Ensure tool result is unconditionally assigned for Responder acknowledgment
+                tool_outputs = str(exec_result.outputs) if exec_result and exec_result.outputs else ""
+                tool_used = exec_result.tool_used if exec_result else "None"
                 
                 if exec_result.tool_messages:
                      # Log actions to World Graph (Sync)
@@ -251,6 +296,22 @@ class SmartAssistant:
                              )
                          except Exception as wg_err:
                              print(f"⚠️ World Graph recording failed: {wg_err}")
+                
+                # V18 FIX-05: Plan Verification
+                if route_result.classification == "PLAN" and exec_result:
+                    with span("Verifier"):
+                        # Convert steps (List[Dict]) to a readable summary for the Verifier
+                        plan_steps = exec_result.last_result.get("steps", []) if exec_result.last_result else []
+                        verification = await self.plan_verifier.averify(
+                            user_query=user_input,
+                            plan=plan_steps,
+                            tool_results=tool_outputs
+                        )
+                        recorder.log(
+                            "Verifier", 
+                            f"Verdict: {verification['verdict']}", 
+                            metadata={"reason": verification['reason']}
+                        )
             
             # V10.3: Record turn (Sync)
             self.summary_memory.add_turn("user", user_input)
@@ -299,6 +360,18 @@ class SmartAssistant:
             
             # Record assistant response (Sync)
             self.summary_memory.add_turn("assistant", response_text)
+            
+            # V18.2: Memory Judger (BUG-03 FIX)
+            # Fire-and-forget: Evaluate if this turn should be stored in long-term memory.
+            # Runs on ALL routes (CHAT, DIRECT, PLAN).
+            import asyncio
+            asyncio.create_task(
+                self.memory_judger.evaluate(
+                    user_input=user_input,
+                    assistant_response=response_text,
+                    trace_id=recorder.current_trace_id()
+                )
+            )
             
             # V13: Store turn data for async reflection
             self._last_turn_data = {"user_msg": user_input, "assistant_response": response_text}

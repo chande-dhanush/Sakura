@@ -1,8 +1,9 @@
-# 🌸 Sakura V18.0
+# 🌸 Sakura V18.1 — Ironclad Reliability
 
-> A production-grade personal AI assistant with voice, vision, code execution, cognitive architecture, and over 60 tools.
+**Production-ready Personal AI Assistant.**
+*Tauri + Svelte (Frontend) | FastAPI + LangChain (Backend)*
 
-![Version](https://img.shields.io/badge/version-18.0-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-18.1-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)

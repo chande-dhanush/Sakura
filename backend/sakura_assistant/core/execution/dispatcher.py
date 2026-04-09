@@ -153,7 +153,7 @@ class Executor:
                     available_tools = micro_tools if micro_tools else self.tools
                     logger.info(f" [Executor] Sharded {len(available_tools)} tools for intent: {intent}")
                 
-                result = await self._dispatch_iterative(ctx, available_tools)
+                result = await self._dispatch_iterative(ctx, available_tools, tool_hint=tool_hint)
             
             else:
                 result = ExecutionResult.error(f"Unknown mode: {mode}")
@@ -199,11 +199,12 @@ class Executor:
             )
             return await self._dispatch_iterative(new_ctx)
     
-    async def _dispatch_iterative(self, ctx: ExecutionContext, available_tools: Optional[List] = None) -> ExecutionResult:
+    async def _dispatch_iterative(self, ctx: ExecutionContext, available_tools: Optional[List] = None, tool_hint: Optional[str] = None) -> ExecutionResult:
         """Dispatch to ReAct loop."""
         return await self.react_loop.arun(
             ctx=ctx,
-            available_tools=available_tools or self.tools
+            available_tools=available_tools or self.tools,
+            tool_hint=tool_hint
         )
     
     def _determine_mode(

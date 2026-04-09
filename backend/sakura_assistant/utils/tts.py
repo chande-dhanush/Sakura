@@ -181,7 +181,9 @@ def play_audio_file(file_path):
         _is_speaking = False
         if os.path.exists(file_path):
             try: os.remove(file_path)
-            except: pass
+            except Exception as e:
+                import logging
+                logging.getLogger("TTS").warning(f"[TTS] Suppressed audio cleanup error: {e}")
 
 # --- TTS Engines ---
 
@@ -333,7 +335,6 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
         
         size = temp_file.stat().st_size
         print(f"[TTS] ✓ Audio file created: {size} bytes", file=sys.stderr)
-        
         # === AGGRESSIVE MEMORY CLEANUP ===
         # Offload Kokoro immediately to save RAM
         del audio, gen
@@ -407,7 +408,9 @@ def text_to_speech(text, callback=None):
         speak(text)
         if callback:
              try: callback()
-             except: pass
+             except Exception as e:
+                import logging
+                logging.getLogger("TTS").warning(f"[TTS] Final cleanup error: {e}")
              
     threading.Thread(target=_run, daemon=True).start()
 

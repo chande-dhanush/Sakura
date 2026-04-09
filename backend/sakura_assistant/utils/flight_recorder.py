@@ -96,6 +96,10 @@ class FlightRecorder:
         
         return self.trace_id
     
+    def current_trace_id(self) -> Optional[str]:
+        """Get the ID of the current active trace."""
+        return self.trace_id
+    
     def span(self, stage: str, content: str, status: str = "INFO", 
              duration_ms: Optional[float] = None, metadata: Optional[Dict] = None, **kwargs):
         """

@@ -17,7 +17,7 @@ NOT Responsible For:
 
 from typing import Dict, Any, List, Optional
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
-from ...config import PLANNER_SYSTEM_PROMPT
+from ...config import PLANNER_SYSTEM_PROMPT, PLANNER_RETRY_PROMPT
 
 
 class Planner:
@@ -37,7 +37,10 @@ class Planner:
         user_input: str, 
         context: str = "",
         tool_history: Optional[List] = None,
-        history: Optional[List[Dict]] = None  # V17.1: Conversation history
+        history: Optional[List[Dict]] = None,  # V17.1: Conversation history
+        hindsight: Optional[str] = None, # FIX-4: Retry feedback
+        executed_tools: Optional[List[str]] = None, # BUG-02
+        tool_hint: Optional[str] = None # VERIFICATION-03
     ) -> List:
         """
         Build message chain for the LLM.
@@ -56,8 +59,14 @@ class Planner:
 
         # V17.1: Inject conversation context for reference resolution
         full_context = context
+        
+        # BUG-02: Inject already executed tools
+        if executed_tools:
+            already_ran_str = ", ".join(executed_tools)
+            full_context = f"{full_context}\n\n[ALREADY RAN]: {already_ran_str}"
+            
         if history:
-            recent_turns = history[-4:]  # Last 4 turns
+            recent_turns = history[-5:]  # VERIFICATION-03: Cap history at 5 turns
             conv_lines = []
             for turn in recent_turns:
                 role = turn.get("role", "unknown")
@@ -83,6 +92,18 @@ class Planner:
                 )
             )
         
+        # FIX-4: Inject Retry Prompt if hindsight provided
+        if hindsight:
+            messages.append(
+                SystemMessage(
+                    content=PLANNER_RETRY_PROMPT.format(
+                        hindsight=hindsight,
+                        user_input=user_input,
+                        context=context
+                    )
+                )
+            )
+        
         return messages
     
     def plan(
@@ -92,7 +113,10 @@ class Planner:
         tool_history: Optional[List] = None,
         available_tools: Optional[List] = None,
         intent_mode: str = "action",
-        history: Optional[List[Dict]] = None  # V17.1
+        history: Optional[List[Dict]] = None,  # V17.1
+        hindsight: Optional[str] = None,  # FIX-4
+        executed_tools: Optional[List[str]] = None, # BUG-02
+        tool_hint: Optional[str] = None # VERIFICATION-03
     ) -> Dict[str, Any]:
         """
         Generate a plan for the user's request.
@@ -114,12 +138,27 @@ class Planner:
             }
         """
         try:
+            # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
+            filtered_tools = available_tools
+            if tool_hint and available_tools:
+                filtered_tools = self._filter_tools(available_tools, tool_hint)
+                if len(filtered_tools) < len(available_tools):
+                    print(f"📉 [Planner] Filtered tools: {len(available_tools)} -> {len(filtered_tools)} (Hint: {tool_hint})")
+
             # Build conversation context (V17.1: include history)
-            messages = self._build_messages(user_input, context, tool_history, history)
+            messages = self._build_messages(
+                user_input, 
+                context, 
+                tool_history, 
+                history, 
+                hindsight, 
+                executed_tools, 
+                tool_hint
+            )
             
             # Bind tools if provided
-            if available_tools:
-                llm_with_tools = self.llm.bind_tools(available_tools)
+            if filtered_tools:
+                llm_with_tools = self.llm.bind_tools(filtered_tools)
             else:
                 llm_with_tools = self.llm
             
@@ -205,18 +244,34 @@ class Planner:
         tool_history: Optional[List] = None,
         available_tools: Optional[List] = None,
         intent_mode: str = "action",
-        history: Optional[List[Dict]] = None  # V17.1
+        history: Optional[List[Dict]] = None,
+        hindsight: Optional[str] = None,
+        executed_tools: Optional[List[str]] = None,
+        tool_hint: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Async version of plan().
-        
-        Same interface as plan() but uses ainvoke for async contexts.
-        """
+        """Async version of planning."""
         try:
-            messages = self._build_messages(user_input, context, tool_history, history)
+            # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
+            filtered_tools = available_tools
+            if tool_hint and available_tools:
+                filtered_tools = self._filter_tools(available_tools, tool_hint)
+                if len(filtered_tools) < len(available_tools):
+                    print(f"📉 [Planner] Filtered tools: {len(available_tools)} -> {len(filtered_tools)} (Hint: {tool_hint})")
+
+            # Build conversation context
+            messages = self._build_messages(
+                user_input, 
+                context, 
+                tool_history, 
+                history, 
+                hindsight, 
+                executed_tools, 
+                tool_hint
+            )
             
-            if available_tools:
-                llm_with_tools = self.llm.bind_tools(available_tools)
+            # Use async invoke
+            if filtered_tools:
+                llm_with_tools = self.llm.bind_tools(filtered_tools)
             else:
                 llm_with_tools = self.llm
             

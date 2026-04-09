@@ -1,6 +1,6 @@
 <# 
 .SYNOPSIS
-    Sakura V13 - Full Bundle Builder
+    Sakura V18.0 - Full Bundle Builder
 .DESCRIPTION
     Creates a complete distributable package with frontend and backend bundled together.
     Run from scripts/ folder.
@@ -13,7 +13,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 Set-Location $ProjectRoot
 
-Write-Host "Sakura V13 - Full Bundle Builder" -ForegroundColor Magenta
+Write-Host "Sakura V18.0 - Full Bundle Builder" -ForegroundColor Magenta
 Write-Host "=================================" -ForegroundColor Magenta
 
 # 1. Check venv exists
@@ -39,14 +39,16 @@ Set-Location (Join-Path $ProjectRoot "backend")
 Write-Host "  Installing PyInstaller..." -ForegroundColor Gray
 pip install pyinstaller --quiet
 
-# Run PyInstaller
-Write-Host "  Running PyInstaller..." -ForegroundColor Gray
-pyinstaller backend.spec --clean --noconfirm 2>&1 | Out-Null
+# Run PyInstaller (Using cmd /c to bypass PowerShell's aggressive stderr stream interception)
+Write-Host "  Running PyInstaller (Detailed log: backend/build.log)..." -ForegroundColor Gray
+$PyInstallerLog = Join-Path (Get-Location) "build.log"
+cmd /c "pyinstaller backend.spec --clean --noconfirm > ""$PyInstallerLog"" 2>&1"
 
 # Check if build succeeded
 $BackendExe = Join-Path $ProjectRoot "backend\dist\sakura-backend.exe"
 if (-not (Test-Path $BackendExe)) {
-    Write-Host "ERROR: Backend build failed! Check backend.spec" -ForegroundColor Red
+    Write-Host "ERROR: Backend build failed! Check backend\build.log" -ForegroundColor Red
+    if (Test-Path "$PyInstallerLog") { Get-Content "$PyInstallerLog" -Tail 20 }
     Set-Location $ProjectRoot
     exit 1
 }
@@ -79,4 +81,4 @@ Set-Location $ProjectRoot
 Write-Host ""
 Write-Host "BUILD COMPLETE!" -ForegroundColor Green
 Write-Host "===============" -ForegroundColor Green
-Write-Host "Installer: frontend\src-tauri\target\release\bundle\nsis\Sakura_13.0.0_x64-setup.exe" -ForegroundColor White
+Write-Host "Installer: frontend\src-tauri\target\release\bundle\nsis\Sakura_18.0.0_x64-setup.exe" -ForegroundColor White

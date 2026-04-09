@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Sakura V10 - Unified Pre-Build Script
+ * Sakura V18.0 - Unified Pre-Build Script
  * 
  * Called automatically by Tauri's beforeBuildCommand.
  * Builds the Python backend with PyInstaller and copies to sidecar location.

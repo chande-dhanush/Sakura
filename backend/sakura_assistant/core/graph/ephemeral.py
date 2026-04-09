@@ -8,6 +8,8 @@ import os
 import shutil
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
+import logging
+logger = logging.getLogger("Ephemeral")
 
 # Avoid circular imports by lazy loading Store
 from ...memory.chroma_store.store import get_doc_store
@@ -112,6 +114,23 @@ class EphemeralManager:
         
         return "\n---\n".join(docs)
 
+    def clear_all(self):
+        """Purge all active and legacy ephemeral stores."""
+        eph_ids = list(self.active_stores.keys())
+        # Also check disk for orphaned folders
+        from ...config import get_project_root
+        base_path = os.path.join(get_project_root(), "data", "chroma_store")
+        if os.path.exists(base_path):
+            for folder in os.listdir(base_path):
+                if folder.startswith("eph_") and folder not in eph_ids:
+                    eph_ids.append(folder)
+        
+        print(f" [Ephemeral] Purging {len(eph_ids)} stores...")
+        for eid in eph_ids:
+            self._delete_store(eid)
+        
+        return len(eph_ids)
+
     def cleanup_old(self, max_age_minutes: int = 10):
         """Delete stores older than X minutes."""
         now = time.time()
@@ -136,8 +155,8 @@ class EphemeralManager:
                     if hasattr(store.client, "_system"):
                         store.client._system.stop()
                     store.client.clear_system_cache()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"[Ephemeral] Suppressed client stop error: {e}")
                 store.client = None
                 store.collection = None
             
@@ -164,7 +183,8 @@ class EphemeralManager:
                 import stat
                 try:
                     os.chmod(path, stat.S_IWRITE)
-                except: pass
+                except Exception as e:
+                    logger.warning(f"[Ephemeral] Cleanup error: {e}")
 
             for i in range(5): # Polling 5 times
                 try:
@@ -177,6 +197,7 @@ class EphemeralManager:
                         deleted = True
                         break
                 except Exception as e:
+                    logger.warning(f"[Store] Secondary load failed (mmap={path}): {e}")
                     error_msg = str(e)
                     time.sleep(0.5) # Wait before retry
             

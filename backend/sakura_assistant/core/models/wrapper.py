@@ -51,8 +51,8 @@ def _extract_tokens(result: Any, messages: Any = None, model: str = "unknown") -
         
         # Format 2: LangChain older (response_metadata.token_usage)
         if hasattr(result, 'response_metadata') and result.response_metadata:
-            if 'token_usage' in result.response_metadata:
-                usage = result.response_metadata['token_usage']
+            usage = result.response_metadata.get('token_usage')
+            if usage:
                 tokens = {
                     "prompt": usage.get('prompt_tokens', 0),
                     "completion": usage.get('completion_tokens', 0),
@@ -80,8 +80,8 @@ def _extract_tokens(result: Any, messages: Any = None, model: str = "unknown") -
         if hasattr(result, 'response') and hasattr(result.response, 'usage'):
             usage = result.response.usage
             tokens = {
-                "prompt": getattr(usage, 'prompt_tokens', 0),
-                "completion": getattr(usage, 'completion_tokens', 0),
+                "prompt": getattr(usage, 'prompt_tokens', 0) or getattr(usage, 'input_tokens', 0),
+                "completion": getattr(usage, 'completion_tokens', 0) or getattr(usage, 'output_tokens', 0),
                 "total": getattr(usage, 'total_tokens', 0)
             }
             if tokens["total"] == 0:

@@ -23,6 +23,7 @@ from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass
 
 from langchain_core.messages import ToolMessage
+from ...config import PLANNER_RETRY_PROMPT
 
 # V17: Import ExecutionResult from execution_context (uses ExecutionStatus)
 from .context import ExecutionResult, ExecutionStatus
@@ -87,6 +88,9 @@ class ExecutionPolicy:
         "tasks_create", "note_create", "set_timer", "set_reminder"
     }
     
+    # Tools whose output content should NOT trigger soft-failure recovery
+    SOFT_FAILURE_EXEMPTIONS = {"read_screen", "execute_python", "web_scrape", "web_search"}
+    
     # Fallback chain for soft failures
     FALLBACK_MAP = {
         "spotify_control": "play_youtube",
@@ -109,8 +113,10 @@ class ExecutionPolicy:
         return ExecutionPolicy.FALLBACK_MAP.get(tool_name)
     
     @staticmethod
-    def is_soft_failure(output: str) -> bool:
+    def is_soft_failure(output: str, tool_name: str = None) -> bool:
         """Detect if output indicates a soft failure."""
+        if tool_name in ExecutionPolicy.SOFT_FAILURE_EXEMPTIONS:
+            return False
         output_lower = output.lower()
         return any(ind in output_lower for ind in ExecutionPolicy.FAILURE_INDICATORS)
 
@@ -300,7 +306,7 @@ class ToolRunner:
             result_str = str(result)
             
             # Check for soft failure
-            if self.policy.is_soft_failure(result_str):
+            if self.policy.is_soft_failure(result_str, tool_name):
                 fallback_result = self._try_fallback(tool_name, args, user_input)
                 if fallback_result:
                     return fallback_result
@@ -349,7 +355,7 @@ class ToolRunner:
             result_str = str(result)
             
             # Check for soft failure
-            if self.policy.is_soft_failure(result_str):
+            if self.policy.is_soft_failure(result_str, tool_name):
                 fallback_result = await self._atry_fallback(tool_name, args, user_input)
                 if fallback_result:
                     return fallback_result
@@ -506,7 +512,8 @@ class ReActLoop:
         user_input: str,
         graph_context: str,
         available_tools: List,
-        state=None
+        # V17.1: Pass tool_hint for Planner optimization
+        tool_hint: Optional[str] = None
     ) -> ExecutionResult:
         """Run the ReAct loop synchronously."""
         all_tool_messages = []
@@ -526,12 +533,19 @@ class ReActLoop:
                 context=graph_context,
                 tool_history=all_tool_messages,
                 available_tools=available_tools,
-                history=ctx.history if ctx else None  # V17.1
+                history=ctx.history if ctx else None,  # V17.1
+                tool_hint=tool_hint
             )
             
             steps = plan_result.get("steps", []) or plan_result.get("plan", [])
             
             if not steps:
+                # V18 BUG-07: If no steps in first iteration, it's a planning failure
+                if iteration == 0:
+                    status_msg = "Planning failed: No tools selected for action request"
+                    print(f"❌ [ReActLoop] {status_msg}")
+                    return ExecutionResult.error(status_msg)
+                
                 error = plan_result.get("error")
                 if error:
                     print(f"❌ [ReActLoop] Planner error: {error}")
@@ -586,7 +600,8 @@ class ReActLoop:
         user_input: str = None,  # Legacy fallback
         graph_context: str = None,  # Legacy fallback
         available_tools: List = None,
-        state=None
+        state=None,
+        tool_hint: Optional[str] = None # VERIFICATION-03
     ) -> ExecutionResult:
         """
         Run the ReAct loop asynchronously.
@@ -598,13 +613,20 @@ class ReActLoop:
         if ctx:
             user_input = ctx.user_input
             available_tools = available_tools or []
-            # TODO: Get graph_context from ctx.snapshot when ReferenceResolver updated
+            
+            # FIX-7: Populate graph_context from context snapshot
+            if ctx.snapshot:
+                actions = ctx.snapshot.recent_actions
+                action_lines = [f"  - {a['tool']}({a['args']}) -> {a['summary']}" for a in actions]
+                graph_context = f"[SYSTEM CONTEXT]\nRecent Actions:\n" + "\n".join(action_lines)
+                graph_context += f"\n\nUser Strategy: Focus on {ctx.snapshot.user_identity.get('name', 'User')}"
         
         all_tool_messages = []
         all_outputs = []
-        final_tool_used = "None"
         final_last_result = None
         cascade_activated = False  # V18 FIX-04
+        prev_hindsight = None # FIX-4
+        executed_tools = []   # BUG-02
         
         print(f" [ReActLoop] Starting async for: {user_input[:50]}...")
         
@@ -631,7 +653,10 @@ class ReActLoop:
                             context=graph_context or "",
                             tool_history=all_tool_messages,
                             available_tools=available_tools,
-                            history=ctx.history  # V17.1
+                            history=ctx.history, # V17.1
+                            hindsight=prev_hindsight,  # FIX-4
+                            executed_tools=executed_tools, # BUG-02
+                            tool_hint=tool_hint # VERIFICATION-03
                         ),
                         timeout=timeout_secs
                     )
@@ -642,7 +667,10 @@ class ReActLoop:
                         context=graph_context or "",
                         tool_history=all_tool_messages,
                         available_tools=available_tools,
-                        history=ctx.history if ctx else None  # V17.1
+                        history=ctx.history if ctx else None, # V17.1
+                        hindsight=prev_hindsight,  # FIX-4
+                        executed_tools=executed_tools, # BUG-02
+                        tool_hint=tool_hint # VERIFICATION-03
                     )
             
             except asyncio.TimeoutError:
@@ -655,6 +683,12 @@ class ReActLoop:
             steps = plan_result.get("steps", []) or plan_result.get("plan", [])
             
             if not steps:
+                # V18 BUG-07: If no steps in first iteration, it's a planning failure
+                if iteration == 0:
+                    status_msg = "Planning failed: No tools selected for action request (async)"
+                    print(f"❌ [ReActLoop] {status_msg}")
+                    return ExecutionResult.error(status_msg)
+
                 error = plan_result.get("error")
                 if error:
                     print(f"❌ [ReActLoop] Planner error: {error}")
@@ -673,6 +707,10 @@ class ReActLoop:
             final_tool_used = exec_result.tool_used
             final_last_result = exec_result.last_result
             
+            # BUG-02: minimal track tool name on success
+            if exec_result.succeeded:
+                executed_tools.append(f"{final_tool_used} ✓")
+            
             # V18 FIX-04: Search Cascade Activation
             TIER_1_SEARCH_TOOLS = {"search_wikipedia", "search_arxiv"}
             if (
@@ -690,6 +728,12 @@ class ReActLoop:
                 available_tools = expanded if expanded else all_tools_list
                 cascade_activated = True
                 print(f"🔄 [Cascade] Tier-1 empty/failed → expanded toolset to {len(available_tools)} tools")
+            
+            # FIX-4: Update hindsight for next iteration if not complete
+            if not exec_result.succeeded:
+                prev_hindsight = f"Iteration {iteration + 1} failed: {exec_result.outputs}"
+            else:
+                prev_hindsight = f"Iteration {iteration + 1} produced: {exec_result.outputs[:200]}"
             
             # Terminal actions should end the loop
             if self.policy.is_terminal(final_tool_used) and exec_result.succeeded:

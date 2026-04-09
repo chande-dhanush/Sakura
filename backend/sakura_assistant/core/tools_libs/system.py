@@ -64,7 +64,13 @@ def get_system_info() -> str:
 
 @tool
 def read_screen(prompt: str = "Describe what is on the screen in detail.", monitor: int = 0) -> str:
-    """Take a screenshot and analyze it with AI vision."""
+    """
+    Take a screenshot and analyze it with AI vision.
+    
+    monitor=0 -> primary/first/main screen (default)
+    monitor=1 -> second/secondary screen
+    monitor=2 -> third screen
+    """
     try:
         import mss
         from PIL import Image
@@ -111,6 +117,9 @@ def read_screen(prompt: str = "Describe what is on the screen in detail.", monit
                 description = loop.run_until_complete(_vision_client.analyze(img, prompt=vision_prompt, context=context_str))
         except RuntimeError:
             description = asyncio.run(_vision_client.analyze(img, prompt=vision_prompt, context=context_str))
+
+        if not description or len(description.strip()) < 5:
+             return "⚠️ Vision model returned an empty or invalid response."
 
         return description
 
@@ -240,7 +249,9 @@ def set_timer(minutes: float, label: str = "Timer") -> str:
             try:
                 import winsound
                 winsound.Beep(1000, 500)
-            except: pass
+            except Exception as e:
+                import logging
+                logging.getLogger("System").warning(f"[System] Windows Beep failed: {e}")
         else:
             print("\a") # Bell sound on Linux
 

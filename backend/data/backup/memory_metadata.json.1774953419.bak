@@ -1,0 +1,26 @@
+{
+  "texts": [
+    "EXPLICIT preference (favourite song)"
+  ],
+  "metadata": [
+    {
+      "timestamp": "2026-03-31T16:06:59.280208",
+      "role": "user",
+      "hash": "7858bc7977115255bd52e4adf4379bf15d4b50ec9426b15252d1f1a43d334c57"
+    }
+  ],
+  "inverted_index": {
+    "explicit": [
+      0
+    ],
+    "favourite": [
+      0
+    ],
+    "preference": [
+      0
+    ],
+    "song": [
+      0
+    ]
+  }
+}

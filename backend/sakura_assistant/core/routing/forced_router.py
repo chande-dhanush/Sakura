@@ -42,10 +42,10 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
     # YOUTUBE (Must come BEFORE generic "play X" pattern!)
     # ═══════════════════════════════════════════════════════════════════════
     {
-        "pattern": r"\b(play|open|watch)\s+(.+?)\s+on\s+youtube\b",
+        "pattern": r"\b(play|open|watch)\s+(?!it\b|my\b|the\b|that\b|some\b)(.+?)\s+on\s+youtube\b",
         "tool": "play_youtube",
         "args_extractor": lambda m, text: {"topic": m.group(2).strip()},
-        "description": "play X on youtube",
+        "description": "play explicit named content on youtube",
     },
     {
         "pattern": r"\b(play|open)\s+youtube\b",
@@ -57,18 +57,6 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
     # ═══════════════════════════════════════════════════════════════════════
     # MUSIC/SPOTIFY CONTROL
     # ═══════════════════════════════════════════════════════════════════════
-    {
-        "pattern": r"\b(play|start)\s+(some\s+)?(music|songs?|spotify|tracks?|playlist)\s*$",
-        "tool": "spotify_control",
-        "args_extractor": lambda m, text: {"action": "play"},
-        "description": "play music/spotify (generic)",
-    },
-    {
-        "pattern": r"\bplay\s+(?!music|song|spotify|track|youtube)(.+?)(\s+on\s+spotify)?\s*$",
-        "tool": "spotify_control",
-        "args_extractor": lambda m, text: {"action": "play", "song_name": m.group(1).strip()},
-        "description": "play [song name] on spotify",
-    },
     {
         # FIXED: Require explicit music context to avoid matching "stop talking"
         "pattern": r"\b(pause|stop)\s+(the\s+)?(music|song|spotify|playback|track)\b",
@@ -176,8 +164,14 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
     },
     
     # ═══════════════════════════════════════════════════════════════════════
-    # WEATHER
+    # WEATHER (V18.1 BUG-02: Hardened patterns)
     # ═══════════════════════════════════════════════════════════════════════
+    {
+        "pattern": r"\b(?:what(?:'s|s|\s+is)\s+the\s+weather|weather\s+(?:in|for|at)|current\s+weather|today(?:'s)?\s+weather|how(?:'s|s|\s+is)\s+it\s+(?:outside|today))\b",
+        "tool": "get_weather",
+        "args_extractor": lambda m, text: {"city": _extract_weather_city(text)},
+        "description": "generic weather query",
+    },
     {
         "pattern": r"\b(what('s|s| is) the )?weather\s*(in\s+(.+?))?(\?)?$",
         "tool": "get_weather",
@@ -249,6 +243,16 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "tool": "summarize_audio",
         "args_extractor": lambda m, text: {"style": "concise"},
         "description": "summarize audio file",
+    },
+    
+    # ═══════════════════════════════════════════════════════════════════════
+    # MEMORY RECALL (V18.1 BUG-08)
+    # ═══════════════════════════════════════════════════════════════════════
+    {
+        "pattern": r"\b(?:do\s+you\s+remember|what\s+did\s+i\s+(?:say|tell)|what(?:'s|\s+is)\s+my\s+favourite|have\s+i\s+(?:told|mentioned))\b",
+        "tool": "query_memory",
+        "args_extractor": lambda m, text: {"query": text},
+        "description": "recall from memory",
     },
 ]
 
@@ -325,6 +329,20 @@ def _extract_news_topic(text: str) -> str:
         if m:
             return m.group(2) if m.lastindex >= 2 else m.group(1)
     return ""  # Empty = general news
+
+
+def _extract_weather_city(text: str) -> str:
+    """Extract city name from weather query."""
+    text_lower = text.lower()
+    # Patterns: "weather in London", "weather for Tokyo", "what's the weather in Paris"
+    for pattern in [r"\bin\s+([a-zA-Z\s\-]+)", r"\bfor\s+([a-zA-Z\s\-]+)", r"\bat\s+([a-zA-Z\s\-]+)"]:
+        m = re.search(pattern, text_lower)
+        if m:
+            city = m.group(1).strip()
+            # Clean up trailing question marks or punctuation
+            city = re.sub(r'[?.,]$', '', city)
+            return city
+    return ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-# Sakura V13 - Windows Setup Script
+# Sakura V18.0 - Windows Setup Script
 # Run from project root: .\scripts\setup.ps1
 
 $ErrorActionPreference = "Stop"
@@ -8,7 +8,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 Set-Location $ProjectRoot
 
-Write-Host "🌸 Sakura V13 Setup Script" -ForegroundColor Magenta
+Write-Host "🌸 Sakura V18.0 Setup Script" -ForegroundColor Magenta
 Write-Host "==========================" -ForegroundColor Magenta
 Write-Host "Project Root: $ProjectRoot" -ForegroundColor Gray
 
@@ -21,30 +21,30 @@ if (-not $isAdmin) {
 
 # --- 1. Check Python ---
 Write-Host "`n📦 Checking Python..." -ForegroundColor Cyan
-try {
-    $pythonVersion = python --version 2>&1
+if (Get-Command "python" -ErrorAction SilentlyContinue) {
+    $pythonVersion = python --version 2>$null
     Write-Host "   ✅ $pythonVersion" -ForegroundColor Green
-} catch {
+} else {
     Write-Host "   ❌ Python not found. Installing via winget..." -ForegroundColor Red
     winget install Python.Python.3.11 --silent
 }
 
 # --- 2. Check Node.js ---
 Write-Host "`n📦 Checking Node.js..." -ForegroundColor Cyan
-try {
-    $nodeVersion = node --version 2>&1
+if (Get-Command "node" -ErrorAction SilentlyContinue) {
+    $nodeVersion = node --version 2>$null
     Write-Host "   ✅ Node.js $nodeVersion" -ForegroundColor Green
-} catch {
+} else {
     Write-Host "   ❌ Node.js not found. Installing via winget..." -ForegroundColor Red
     winget install OpenJS.NodeJS.LTS --silent
 }
 
 # --- 3. Check Rust ---
 Write-Host "`n📦 Checking Rust (for Tauri)..." -ForegroundColor Cyan
-try {
-    $rustVersion = rustc --version 2>&1
+if (Get-Command "rustc" -ErrorAction SilentlyContinue) {
+    $rustVersion = rustc --version 2>$null
     Write-Host "   ✅ $rustVersion" -ForegroundColor Green
-} catch {
+} else {
     Write-Host "   ❌ Rust not found. Installing via winget..." -ForegroundColor Red
     winget install Rustlang.Rustup --silent
     Write-Host "   ⚠️  Please restart your terminal after Rust installation!" -ForegroundColor Yellow

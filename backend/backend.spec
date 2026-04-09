@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Sakura V10 Backend - PyInstaller Spec
+# Sakura V18.0 Backend - PyInstaller Spec
 # Build command: pyinstaller backend.spec
 
 import os
@@ -56,6 +56,7 @@ a = Analysis(
         # models/
         'sakura_assistant.core.models',
         'sakura_assistant.core.models.responder',
+        'sakura_assistant.core.models.vision_client',
         'sakura_assistant.core.models.wrapper',
         # routing/
         'sakura_assistant.core.routing',
@@ -87,6 +88,8 @@ a = Analysis(
         'langchain_openai',
         'langchain_groq',
         'langchain_google_genai',
+        'groq',
+        'nest_asyncio',
         # FastAPI/Uvicorn
         'uvicorn',
         'uvicorn.logging',

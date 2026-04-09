@@ -21,8 +21,9 @@ RESPONDER_NO_TOOLS_RULE = """CRITICAL RULES:
    - You MUST acknowledge the success naturally (e.g., "Done!", "Playing now", "Event created")
    - NEVER say "I need to use a tool" or "Let me help you differently" - the tool ALREADY RAN
    - NEVER say "I can't do that" if tool output shows success
+   - If tool_outputs is present and non-empty, you MUST reference the tool result in your response. "I need to use a tool" is NEVER acceptable when tool_outputs exists.
 3. If NO tool results are provided and user asks for an action you can't do, just chat naturally.
-4. TRUST the tool results - if it says "success" or "created", IT HAPPENED."""
+4. TRUST the tool results - if it says "success" or "created", IT HAPPENED. """
 
 
 # V13: Pre-compiled validation patterns (avoid recompiling on every response)
@@ -288,8 +289,16 @@ class ResponseGenerator:
         """Build message list for LLM invocation."""
         messages = []
         
+        # V18.2: Import missing guardrails from config
+        from ...config import RESPONDER_GUARDRAIL_PROMPT, TOOL_BEHAVIOR_RULES
+        
         # 1. Build system prompt with all context blocks
-        system_parts = [self.personality, RESPONDER_NO_TOOLS_RULE]
+        system_parts = [
+            self.personality, 
+            TOOL_BEHAVIOR_RULES,
+            RESPONDER_NO_TOOLS_RULE,
+            RESPONDER_GUARDRAIL_PROMPT
+        ]
         
         # V10.5: inject Session Summary (Short-term memory)
         if context.session_summary:

@@ -6,7 +6,8 @@
 ## 🎯 Overview
 **Sakura** is a production-grade personal AI assistant optimized for cost, performance, and CPU-only deployment.
 **V17.5 "Precise Soul":** Featuring **Model-Specific Token Counting**, **SSE Tool Streaming**, V17.4 **Observability Fix**, plus all prior architecture (Stable Soul, Dependency Injection, Search Cascade).
-**V18.0 \"Ironclad Reliability\":** 12-point surgical fix eliminating silent failures via Strict Configured Budget Limits, Search Cascade Parity, Ephemeral RAG Data Overrides, and Deterministic Results Fidelity Verification.
+**V18.1 "Ironclad Reliability":** 8-point surgical fix sprint eliminating production bugs: Fixed Token Tracking (BUG-04), Tool Result Propagation (BUG-05), Memory Recall Routing (BUG-08), Personal Fact Persistence (BUG-03), Tool Hint Alignment (BUG-01), Weather Hallucination Guard (BUG-02), Cleaner Arg Extraction (BUG-06), and Executor Success Guard (BUG-07).
+**V18.0 "Ironclad Reliability":** 12-point surgical fix eliminating silent failures via Strict Configured Budget Limits, Search Cascade Parity, Ephemeral RAG Data Overrides, and Deterministic Results Fidelity Verification.
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
 
@@ -87,6 +88,7 @@
 | **Ephemeral Data Reasoning** | **V18.0** | Detects virtual handles; forces `data_reasoning=True` upon Responder generation |
 | **Negative Search Specificity** | **V18.0** | Regex exclusions prevent generic `search` from swallowing specialized intents |
 | **AI Vision (Lllama-4-Scout)** | **V18.0** | Dedicated Groq-hosted vision layer for screenshot/image analysis with fallback |
+| **V18.1 Reliability Sprint** | **V18.1** | 8-part reliability patch fixing token tracking, tool hints, and memory recall |
 
 ---
 
@@ -125,7 +127,7 @@ V17 introduces a hardened execution pipeline that eliminates "split-brain" bugs 
 
 ---
 
-## 🛡️ V18 Ironclad Reliability (Surgical Diagnostics)
+## 🌸 Sakura V18.1 — Ironclad Reliability (Surgical Diagnostics)
 
 V18 focused exclusively on closing structural loopholes that historically caused silent data ingestion ignorance, hallucinated responses, or execution infinite loops.
 

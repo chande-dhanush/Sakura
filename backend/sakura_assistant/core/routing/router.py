@@ -22,46 +22,8 @@ _URGENT_PATTERNS = re.compile(
 )
 
 
-# Router prompt for V10 classification with Few-Shot Examples
-# V15.2: Temporal grounding added dynamically in IntentRouter.route()
-ROUTER_SYSTEM_PROMPT_TEMPLATE = """You are a query classifier for a personal AI assistant.
+from ...config import ROUTER_SYSTEM_PROMPT
 
-CURRENT DATE/TIME: {current_datetime}
-
-Classify the user's query into ONE of these categories:
-
-DIRECT - Single, obvious tool action that can be executed immediately.
-PLAN - Requires multiple steps, research, reasoning chains, or complex comparison.
-       CRITICAL: Chained commands (e.g., "Do A and B", "Do A then B") MUST be PLAN.
-
-=== FEW-SHOT EXAMPLES ===
-
-User: "Play Numb by Linkin Park"
-{{"classification": "DIRECT", "tool_hint": "spotify_control", "reason": "Single media action"}}
-
-User: "hi sakura"
-{{"classification": "CHAT", "tool_hint": null, "reason": "Greeting"}}
-
-User: "What is the weather in Tokyo?"
-{{"classification": "DIRECT", "tool_hint": "get_weather", "reason": "Single lookup"}}
-
-User: "Research quantum computing and summarize the key concepts"
-{{"classification": "PLAN", "tool_hint": null, "reason": "Multi-step: Research -> Summarize"}}
-
-=== END EXAMPLES ===
-
-CRITICAL RULES:
-1. Greetings ("hi", "hello", "hey") are ALWAYS CHAT.
-2. If mode is DIRECT, you MUST provide a specific tool hint.
-3. If mode is PLAN but you can't identify tools, use CHAT instead.
-4. Factual questions (who, what, when, where, how, weather, define, news, 
-   time, date, price, score) are ALWAYS DIRECT or PLAN — NEVER CHAT.
-5. If uncertain between CHAT and DIRECT/PLAN, always choose DIRECT/PLAN. 
-   A redundant tool call is always less harmful than a hallucinated answer.
-
-Return JSON only:
-{{"classification": "DIRECT|PLAN|CHAT", "tool_hint": "tool_name or null"}}
-"""
 
 
 class RouteResult:
@@ -129,17 +91,31 @@ class IntentRouter:
         try:
             # V15.2: Inject current datetime for temporal grounding
             current_dt = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
-            prompt = ROUTER_SYSTEM_PROMPT_TEMPLATE.format(current_datetime=current_dt)
+            prompt = ROUTER_SYSTEM_PROMPT.format(current_datetime=current_dt)
             
+            # V18.4 BUG-03: Slice history to last 3 turns
+            recent_history = ""
+            if history:
+                sliced = history[-3:]
+                recent_history = "\n".join([f"{m.get('role', 'user').upper()}: {m.get('content', '')[:100]}" for m in sliced])
+                
             messages = [
                 SystemMessage(content=prompt),
-                HumanMessage(content=f"Context: {context}\n\nQuery: {query}")
+                HumanMessage(content=f"History:\n{recent_history}\n\nContext: {context}\n\nQuery: {query}")
             ]
             
             # Use async invoke
             response = await self.llm.ainvoke(messages)
             classification, tool_hint = self._parse_response(response.content)
             
+            # VERIFICATION-05: Music Force PLAN for references
+            music_tools = ["spotify_control", "play_youtube", "youtube_control"]
+            if classification == "DIRECT" and tool_hint in music_tools:
+                triggers = ["my ", "it", "that", "the one", "favourite", "fav ", "last ", "same "]
+                if any(t in query.lower() for t in triggers):
+                    print(f"🔄 [Router] Reference detected in music query, forcing PLAN")
+                    classification = "PLAN"
+
             # V17.2: Apply safety checks to prevent Tavily Trap
             route_result = RouteResult(classification, tool_hint, urgency)
             return self._apply_safety_checks(query, route_result)
@@ -176,15 +152,28 @@ class IntentRouter:
             current_dt = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
             prompt = ROUTER_SYSTEM_PROMPT_TEMPLATE.format(current_datetime=current_dt)
             
+            # V18.4 BUG-03: Slice history to last 3 turns
+            recent_history = ""
+            if history:
+                sliced = history[-3:]
+                recent_history = "\n".join([f"{m.get('role', 'user').upper()}: {m.get('content', '')[:100]}" for m in sliced])
+
             messages = [
                 SystemMessage(content=prompt),
-                HumanMessage(content=f"Context: {context}\n\nQuery: {query}")
+                HumanMessage(content=f"History:\n{recent_history}\n\nContext: {context}\n\nQuery: {query}")
             ]
             
+            # LLM classification
             response = self.llm.invoke(messages)
             classification, tool_hint = self._parse_response(response.content)
             
-            # V17.2: Apply safety checks to prevent Tavily Trap
+            # VERIFICATION-05: Music Force PLAN for references
+            music_tools = ["spotify_control", "play_youtube", "youtube_control"]
+            if classification == "DIRECT" and tool_hint in music_tools:
+                triggers = ["my ", "it", "that", "the one", "favourite", "fav ", "last ", "same "]
+                if any(t in query.lower() for t in triggers):
+                    classification = "PLAN"
+                    
             route_result = RouteResult(classification, tool_hint, urgency)
             return self._apply_safety_checks(query, route_result)
             
@@ -206,6 +195,12 @@ class IntentRouter:
         # V17.1 Fix: Relax comma check to catch "cmd1, cmd2" (count=1)
         is_complex = " and " in text or " then " in text or "," in text
         if is_complex:
+            return False
+            
+        # V18.4 Fix: Don't shortcut queries with reference pronouns/possessives
+        # These MUST go to LLM -> PLAN for memory resolution
+        triggers = [" it", " that", " the one", "favourite", "fav ", "last ", "my "]
+        if any(t in text for t in triggers) or text.endswith(" it") or text.endswith(" that"):
             return False
         
         # Action verbs that ALWAYS need tools

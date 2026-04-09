@@ -63,6 +63,7 @@ class SmartResearcher:
         # --- SMART CACHING START ---
         collection = None
         query_emb = None
+        is_degraded = False # FIX-6
         
         try:
             # Import using absolute path for robustness
@@ -83,10 +84,11 @@ class SmartResearcher:
                      raise ImportError("Model failed to load")
             except Exception as e:
                 # Fallback for Test Environment
-                print(f"⚠️ Embedder Import Failed: {e}. Using Mock.")
+                print(f"⚠️ [Research] Embedder Load Failed: {e}. Using Mock.")
                 import random
                 rng = random.Random(query) 
                 query_emb = [rng.random() for _ in range(384)]
+                is_degraded = True # FIX-6
 
             # Query Cache
             results = collection.query(
@@ -104,7 +106,9 @@ class SmartResearcher:
                     broadcast("cache_hit", {"query": query, "distance": distance})
                     if emitter:
                         emitter.tool_success("research_topic", f"⚡ Cache hit! Using cached result")
-                    return f" **[Cached Result - {timestamp}]:**\n{cached_summary}"
+                    
+                    prefix = " [⚠️ Degraded Mode]" if is_degraded else ""
+                    return f"{prefix} **[Cached Result - {timestamp}]:**\n{cached_summary}"
         except Exception as e:
             print(f"⚠️ Cache check failed: {e}")
             # Do NOT crash, proceed to live search
@@ -206,9 +210,15 @@ class SmartResearcher:
                     )
                     print(" Saved result to SmartCache")
                 except Exception as e:
-                    print(f"⚠️ Cache save failed: {e}")
+                    from sakura_assistant.utils.logging import get_logger
+                    get_logger("Research").warning(f"[Research] Search failed: {e}")
+                    return f" Error: {e}"
             else:
                  print("⚠️ Cache save skipped (collection/embedding missing)")
+            
+            # FIX-6: Global prefixing for non-cached results
+            if is_degraded:
+                final_output = f"[⚠️ Degraded Mode] {final_output}"
             
             if emitter:
                 emitter.tool_success("research_topic", f"✅ Research complete ({len(results)} sources)")

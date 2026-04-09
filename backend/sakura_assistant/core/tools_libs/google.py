@@ -6,6 +6,8 @@ from langchain_core.tools import tool
 from .common import get_google_creds, retry_with_auth, USER_TIMEZONE
 from googleapiclient.discovery import build
 import base64
+import logging
+logger = logging.getLogger("Google")
 from email.mime.text import MIMEText
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, List, Dict, Any
@@ -224,8 +226,8 @@ def calendar_get_events(
                         continue
                     start = b['start'].get('date')
                     out.append(f" {start} - {summary}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[Google] Suppressed birthday fetch error: {e}")
             
         if not out: return " No upcoming events matching filters."
         

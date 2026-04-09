@@ -71,8 +71,8 @@ def write_memory_atomic(path: Path, obj: Any):
         for old_backup in backups[:-5]:
             try:
                 old_backup.unlink()
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"[Store] Suppressed backup pruning error: {e}")
 
         # 4. Checksum
         checksum = hashlib.sha256(data_bytes).hexdigest()

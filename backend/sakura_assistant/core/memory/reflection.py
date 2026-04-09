@@ -105,6 +105,8 @@ class ReflectionEngine:
         
         conversation_str = ""
         for msg in delta:
+            if msg.get('role') != 'user':
+                continue
             role = msg.get('role', 'unknown').upper()
             content = msg.get('content', '')
             conversation_str += f"{role}: {content}\n"
