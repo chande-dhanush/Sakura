@@ -28,11 +28,18 @@ from ...config import ROUTER_SYSTEM_PROMPT
 
 class RouteResult:
     """Result of intent routing."""
+    __slots__ = ["classification", "tool_hint", "urgency"]
     
     def __init__(self, classification: str, tool_hint: Optional[str] = None, urgency: str = "NORMAL"):
-        self.classification = classification  # DIRECT, PLAN, or CHAT
+        # Validate classification
+        valid_modes = {"DIRECT", "PLAN", "CHAT", "RESEARCH"}
+        if classification not in valid_modes:
+            # V19 Contract Hardening: Default to PLAN if malformed string provided
+            classification = "PLAN"
+            
+        self.classification = classification  # DIRECT, PLAN, CHAT, or RESEARCH
         self.tool_hint = tool_hint
-        self.urgency = urgency  # V13: URGENT or NORMAL
+        self.urgency = urgency if urgency in ("URGENT", "NORMAL") else "NORMAL"
     
     @property
     def needs_tools(self) -> bool:
@@ -150,7 +157,7 @@ class IntentRouter:
         try:
             # V15.2: Inject current datetime for temporal grounding
             current_dt = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
-            prompt = ROUTER_SYSTEM_PROMPT_TEMPLATE.format(current_datetime=current_dt)
+            prompt = ROUTER_SYSTEM_PROMPT.format(current_datetime=current_dt)
             
             # V18.4 BUG-03: Slice history to last 3 turns
             recent_history = ""

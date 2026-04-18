@@ -1,4 +1,4 @@
-# Sakura V10 Backend Dependencies
+# Sakura V19.0 Backend Dependencies
 # ================================
 
 # --- Core Framework ---
@@ -7,7 +7,6 @@ uvicorn[standard]
 python-multipart
 pydantic>=2.0.0
 python-dotenv
-aiofiles
 nest-asyncio       # V18: Sync/Async bridge for tools
 
 # --- LangChain & LLMs ---
@@ -47,7 +46,6 @@ psutil
 pycaw; sys_platform == 'win32'
 pyperclip
 AppOpener; sys_platform == 'win32'
-plyer              # Notifications
 pytesseract        # OCR
 Pillow             # Image processing
 mss                # Screenshot
@@ -55,11 +53,8 @@ pytz               # Timezone
 
 # --- Observability & Testing ---
 structlog          # Structured logging
-prometheus_client  # Metrics
 pytest             # Testing framework
 pytest-asyncio     # V18: Async testing
-pytest-cov         # Coverage reports (optional)
-bandit             # Security linter (optional)
 
 # --- Utilities & Security ---
 numpy

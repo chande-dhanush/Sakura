@@ -666,7 +666,7 @@ async def precompute_initiations() -> int:
     print(" [Sleep Cycle] Pre-computing tomorrow's icebreakers...")
     
     from ..graph.world_graph import get_world_graph
-    from .cognitive.proactive import get_proactive_scheduler
+    from ..cognitive.proactive import get_proactive_scheduler  # V19-FIX-03: Fixed path
     from ...config import get_project_root
     
     wg = get_world_graph()
@@ -754,11 +754,16 @@ def run_hourly_desire_tick():
     """
     V15: Hourly tick for DesireSystem.
     Updates loneliness, social battery decay.
+    V19-FIX-03: Fixed import path (.cognitive -> ..cognitive).
     """
     try:
-        from .cognitive.desire import get_desire_system
+        from ..cognitive.desire import get_desire_system
         desire = get_desire_system()
         desire.on_hourly_tick()
+        print(f"✅ [DesireSystem] Hourly tick completed: battery={desire.state.social_battery:.2f}, loneliness={desire.state.loneliness:.2f}")
+    except ImportError as e:
+        # V19-FIX-03: NEVER silently swallow import failures
+        print(f"❌ [DesireSystem] IMPORT FAILED (cognitive module unreachable): {e}")
     except Exception as e:
         print(f"⚠️ [DesireSystem] Hourly tick failed: {e}")
 
@@ -766,11 +771,16 @@ def run_hourly_desire_tick():
 async def run_hourly_proactive_check():
     """
     V15: Hourly check for proactive initiation.
+    V19-FIX-03: Fixed import path (.cognitive -> ..cognitive).
     """
     try:
-        from .cognitive.proactive import get_proactive_scheduler
+        from ..cognitive.proactive import get_proactive_scheduler
         scheduler = get_proactive_scheduler()
-        await scheduler.check_and_initiate()
+        result = await scheduler.check_and_initiate()
+        print(f"✅ [ProactiveScheduler] Hourly check completed (initiated={result})")
+    except ImportError as e:
+        # V19-FIX-03: NEVER silently swallow import failures
+        print(f"❌ [ProactiveScheduler] IMPORT FAILED (cognitive module unreachable): {e}")
     except Exception as e:
         print(f"⚠️ [ProactiveScheduler] Hourly check failed: {e}")
 
@@ -812,6 +822,15 @@ def schedule_cognitive_tasks():
     
     print(" [Cognitive] Scheduled hourly desire tick")
     print(" [Cognitive] Scheduled hourly proactive check")
+    
+    # V19-FIX-03: Verify cognitive imports are valid at schedule time
+    try:
+        from ..cognitive.desire import get_desire_system
+        from ..cognitive.proactive import get_proactive_scheduler
+        print("✅ [Cognitive] Import verification passed: desire + proactive modules reachable")
+    except ImportError as e:
+        print(f"❌ [Cognitive] CRITICAL: Cognitive imports FAILED at schedule time: {e}")
+        print(f"   Desire ticks and proactive checks will NOT work until this is fixed.")
 
 
 async def run_full_sleep_cycle():

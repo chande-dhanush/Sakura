@@ -1,0 +1,9 @@
+{
+  "user_name": "User",
+  "user_location": "Unknown",
+  "user_bio": "Default user profile.",
+  "age": null,
+  "birthday": "",
+  "interests": [],
+  "not_claims": ["NOT the actor Dhanush", "NOT a public figure"]
+}

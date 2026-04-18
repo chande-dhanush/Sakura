@@ -104,26 +104,49 @@ class ContextManager:
             
         return "\n".join(identity)
 
-    def _build_episodic_block(self, user_input: str, signals: ContextSignals, force: bool = False) -> str:
+    def _build_episodic_block(self, user_input: str, signals: ContextSignals, state: "RequestState", force: bool = False) -> str:
         """
-        V17: Search and format relevant memories using MemoryCoordinator.
-        
-        Uses unified search across FAISS, episodic, and WorldGraph.
+        V19: Tiered Memory Read-Path.
+        Gates semantic recall structurally instead of unconditionally.
         """
-        # V17: Use MemoryCoordinator's smarter recall detection
         from ...memory.memory_coordinator import get_memory_coordinator
         coordinator = get_memory_coordinator()
         
-        is_recall = coordinator.is_recall_query(user_input)
+        # Detect Tier 1 (Explicit Recall)
+        is_explicit = coordinator.is_recall_query(user_input) or signals.episodes or force
         
-        if not (signals.episodes or force or is_recall):
+        mode = state.classification if state else "UNKNOWN"
+        has_reference = bool(state and state.reference_context)
+        study_mode = bool(state and state.study_mode)
+        
+        # Gating Logic
+        should_recall = False
+        max_chars = 1500
+        
+        if is_explicit:
+            # Tier 1: Full recall path allowed
+            should_recall = True
+            max_chars = 2000
+        elif mode == "PLAN" or study_mode:
+            # Tier 2: PLAN / complex reasoning or study - light semantic recall
+            should_recall = True
+            max_chars = 800
+        elif mode == "DIRECT" and has_reference:
+            # Tier 3: DIRECT with references (e.g. "play that")
+            should_recall = True
+            max_chars = 500
+        else:
+            # Tier 4: CHAT / simple turns - no recall by default
+            should_recall = False
+            
+        if not should_recall:
             return ""
         
-        # V17: Unified memory search
+        # V17/V19: Unified memory search with capped bounds
         result = coordinator.recall(user_input)
         
         if result.has_results():
-            return result.to_context_string(max_chars=1500)
+            return result.to_context_string(max_chars=max_chars)
         
         # Fallback to recent episodes if explicit memory request but no hits
         if signals.episodes:
@@ -147,15 +170,19 @@ class ContextManager:
             
         return "=== RECENT ACTIONS ===\n" + "\n".join(action_strs)
 
-    def get_context_for_llm(self, user_input: str, mode: str = "CHAT", history: List[Dict] = None) -> Dict[str, str]:
+    def get_context_for_llm(self, user_input: str, state: "RequestState" = None, mode: str = "CHAT", history: List[Dict] = None) -> Dict[str, str]:
         """
         Main entry point for llm.py. Returns segmented context strings.
         
         Args:
             user_input: Current user message
-            mode: DIRECT, PLAN, or CHAT
+            state: V19 RequestState representation
+            mode: Fallback if state is missing
             history: Optional conversation list
         """
+        if state:
+            mode = state.classification
+            
         signals = self._detect_signals(user_input)
         
         # 1. Assemble Planner Context (Deterministic Pruning)
@@ -167,8 +194,8 @@ class ContextManager:
             # Full context for planning or identity-focused direct queries
             parts = [self._build_identity_block(is_compact=False)]
             
-            # Add episodic if relevant to plan or asked
-            mem = self._build_episodic_block(user_input, signals, force=(mode == "CHAT"))
+            # Add episodic if relevant to plan or asked (V19 tiered)
+            mem = self._build_episodic_block(user_input, signals, state, force=(mode == "CHAT"))
             if mem: parts.append(mem)
             
             # V17.1: Always include recent actions (removed PLAN-only gating)
@@ -206,7 +233,7 @@ def get_smart_context(user_input: str, history: List[Dict], mode: str = "CHAT") 
     """Shim for backward compatibility."""
     # V15.4: dynamic_user_context renamed to planner_context in modern API
     # but kept here if llm.py expects old names (llm.py was updated though)
-    ctx = context_manager.get_context_for_llm(user_input, mode, history)
+    ctx = context_manager.get_context_for_llm(user_input, mode=mode, history=history)
     return {
         "dynamic_user_context": ctx["planner_context"],
         "graph_context": ctx["responder_context"],

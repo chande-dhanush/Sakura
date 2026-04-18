@@ -615,11 +615,18 @@ class ReActLoop:
             available_tools = available_tools or []
             
             # FIX-7: Populate graph_context from context snapshot
+            graph_context_parts = []
+            
+            if ctx.reference_context:
+                graph_context_parts.append(ctx.reference_context)
+                
             if ctx.snapshot:
                 actions = ctx.snapshot.recent_actions
                 action_lines = [f"  - {a['tool']}({a['args']}) -> {a['summary']}" for a in actions]
-                graph_context = f"[SYSTEM CONTEXT]\nRecent Actions:\n" + "\n".join(action_lines)
-                graph_context += f"\n\nUser Strategy: Focus on {ctx.snapshot.user_identity.get('name', 'User')}"
+                graph_context_parts.append(f"[SYSTEM CONTEXT]\nRecent Actions:\n" + "\n".join(action_lines))
+                graph_context_parts.append(f"User Strategy: Focus on {ctx.snapshot.user_identity.get('name', 'User')}")
+                
+            graph_context = "\n\n".join(graph_context_parts)
         
         all_tool_messages = []
         all_outputs = []

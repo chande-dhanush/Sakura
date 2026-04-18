@@ -8,7 +8,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import unittest
-from sakura_assistant.core.context_manager import ContextManager, get_smart_context, ContextSignals
+from sakura_assistant.core.context import ContextManager, get_smart_context
+from sakura_assistant.core.context.manager import ContextSignals
 
 
 class TestDeterministicRouting(unittest.TestCase):

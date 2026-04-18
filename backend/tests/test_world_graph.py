@@ -1,5 +1,5 @@
 """
-Tests for Sakura V7: World Graph
+Tests for Sakura V19: World Graph
 
 These tests verify the core invariants of the World Graph:
 1. User identity is immutable to tools
@@ -26,18 +26,45 @@ from sakura_assistant.core.graph.world_graph import (
 class TestIdentityProtection:
     """Invariant 1: User identity is immutable to tools."""
     
-    def test_user_identity_exists(self):
+    @pytest.fixture
+    def mock_identity(self, tmp_path):
+        """Creates a temporary identity manager for tests."""
+        from sakura_assistant.core.graph.identity import IdentityManager
+        import json
+        
+        # Create a temp settings file
+        settings_path = tmp_path / "user_settings.json"
+        data = {
+            "user_name": "TestUser",
+            "not_claims": ["NOT the actor Dhanush", "NOT a robot"]
+        }
+        settings_path.write_text(json.dumps(data))
+        
+        # Patch IdentityManager to use this path
+        # Note: IdentityManager is a singleton, so we need to be careful.
+        # For simplicity in this test, we'll just manually set the fields on a NEW instance.
+        mgr = IdentityManager.__new__(IdentityManager)
+        mgr._initialized = True
+        mgr._identity = {
+            "name": "TestUser",
+            "not_claims": ["NOT the actor Dhanush", "NOT a robot"],
+            "location": "Mumbai",
+            "interests": []
+        }
+        return mgr
+
+    def test_user_identity_exists(self, mock_identity):
         """user:self always exists."""
-        graph = WorldGraph()
+        graph = WorldGraph(identity_manager=mock_identity)
         user = graph.get_user_identity()
         
         assert user is not None
         assert user.id == "user:self"
-        assert user.name == "Dhanush"
+        assert user.name == "TestUser"
     
-    def test_user_immutable_to_tools(self):
+    def test_user_immutable_to_tools(self, mock_identity):
         """Tools cannot update user identity."""
-        graph = WorldGraph()
+        graph = WorldGraph(identity_manager=mock_identity)
         
         result = graph.update_entity(
             "user:self",
@@ -46,24 +73,24 @@ class TestIdentityProtection:
         )
         
         assert result is False
-        assert graph.get_user_identity().attributes["age"] == 22
+        assert graph.get_user_identity().name == "TestUser"
     
-    def test_user_mutable_by_user(self):
+    def test_user_mutable_by_user(self, mock_identity):
         """User can update their own identity."""
-        graph = WorldGraph()
+        graph = WorldGraph(identity_manager=mock_identity)
         
         result = graph.update_entity(
             "user:self",
-            {"location": "Mumbai"},
+            {"location": "Pune"},
             EntitySource.USER_STATED
         )
         
         assert result is True
-        assert graph.get_user_identity().attributes["location"] == "Mumbai"
+        assert graph.get_user_identity().attributes["location"] == "Pune"
     
-    def test_llm_cannot_update_user(self):
+    def test_llm_cannot_update_user(self, mock_identity):
         """LLM inferences cannot update user identity."""
-        graph = WorldGraph()
+        graph = WorldGraph(identity_manager=mock_identity)
         
         result = graph.update_entity(
             "user:self",
@@ -73,9 +100,9 @@ class TestIdentityProtection:
         
         assert result is False
     
-    def test_negative_constraints_exist(self):
+    def test_negative_constraints_exist(self, mock_identity):
         """User has negative constraints (NOT claims)."""
-        graph = WorldGraph()
+        graph = WorldGraph(identity_manager=mock_identity)
         user = graph.get_user_identity()
         
         assert len(user.not_claims) > 0
@@ -262,7 +289,8 @@ class TestUserReferenceDetection:
         """User's name with 'about' is likely user reference."""
         graph = WorldGraph()
         
-        is_user, conf = graph.is_user_reference("tell me about Dhanush")
+        # Just use 'user' because Dhanush is no longer hardcoded
+        is_user, conf = graph.is_user_reference("tell me about User")
         
         assert is_user is True
         assert conf >= 0.7
@@ -286,7 +314,7 @@ class TestPlanValidation:
         
         plan = {
             "plan": [
-                {"tool": "web_search", "args": {"query": "who is Dhanush"}}
+                {"tool": "web_search", "args": {"query": "who is User"}}
             ]
         }
         
@@ -403,30 +431,7 @@ class TestCompression:
 
 class TestContextGeneration:
     """Test context generation for planner/responder."""
-    
-    def test_context_for_planner_includes_user(self):
-        """Planner context always includes user identity."""
-        graph = WorldGraph()
-        
-        context = graph.get_context_for_planner("test query")
-        
-        assert "Dhanush" in context
-    
-    def test_context_for_planner_includes_recent_action(self):
-        """Planner context includes recent actions."""
-        graph = WorldGraph()
-        
-        graph.record_action(
-            tool="web_search",
-            args={"query": "test"},
-            result="results",
-            success=True
-        )
-        
-        context = graph.get_context_for_planner("another query")
-        
-        assert "web_search" in context or "RECENT" in context
-
+    # Planner context methods were removed as part of Phase 2 reference resolution unification
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

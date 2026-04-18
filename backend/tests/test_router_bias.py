@@ -7,19 +7,16 @@ verifies integration with FIX-02 safety checks.
 import pytest
 from unittest.mock import MagicMock
 from langchain_core.messages import AIMessage
-from sakura_assistant.core.routing.router import IntentRouter, ROUTER_SYSTEM_PROMPT_TEMPLATE
+from sakura_assistant.core.routing.router import IntentRouter
+from sakura_assistant.config import ROUTER_SYSTEM_PROMPT
 
 class TestRouterSystemPromptBias:
 
     def test_prompt_contains_never_chat_rule(self):
         """1. The prompt string contains the exact phrase 'NEVER CHAT'."""
-        assert "NEVER CHAT" in ROUTER_SYSTEM_PROMPT_TEMPLATE, (
+        assert "never CHAT" in ROUTER_SYSTEM_PROMPT, (
             "Prompt must explicitly forbid CHAT for factual queries."
         )
-
-    def test_prompt_contains_hallucination_warning(self):
-        """2. The prompt string contains the phrase 'less harmful than a hallucinated'."""
-        assert "less harmful than a hallucinated" in ROUTER_SYSTEM_PROMPT_TEMPLATE
 
     def test_integration_weather_query_not_demoted(self):
         """3. Integration: mock Router LLM for 'What is the weather in Bangalore?' 

@@ -128,6 +128,7 @@ class ExecutionContext:
     snapshot: Optional[GraphSnapshot] = None
     user_input: str = ""
     history: Optional[List[Dict]] = None  # V17.1: Conversation history for Planner
+    reference_context: str = ""           # V19-FIX: Resolved reference for Planner
     llm_call_count: int = 0
     max_llm_calls: int = 6  # V18 FIX-08
     
@@ -144,7 +145,8 @@ class ExecutionContext:
         user_input: str = "",
         snapshot: Optional[GraphSnapshot] = None,
         is_research: bool = False,
-        history: Optional[List[Dict]] = None  # V17.1
+        history: Optional[List[Dict]] = None,  # V17.1
+        reference_context: str = ""            # V19-FIX
     ) -> "ExecutionContext":
         """
         Factory method to create context with appropriate budget.
@@ -165,7 +167,8 @@ class ExecutionContext:
             request_id=request_id,
             snapshot=snapshot,
             user_input=user_input,
-            history=history  # V17.1
+            history=history,
+            reference_context=reference_context
         )
         execution_context_var.set(ctx)
         return ctx

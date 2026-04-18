@@ -1,4 +1,4 @@
-# Sakura V10 Backend Dependencies (Docker/Linux)
+# Sakura V19.0 Backend Dependencies (Docker/Linux)
 # ===============================================
 
 # --- Core Framework ---
@@ -7,7 +7,6 @@ uvicorn[standard]
 python-multipart
 pydantic>=2.0.0
 python-dotenv
-aiofiles
 httpx
 
 # --- LangChain & LLMs ---
@@ -49,8 +48,7 @@ psutil
 # pyperclip removed (Headless issues, but kept for logic)
 pyperclip
 # AppOpener removed (Desktop only)
-# plyer kept (might work)
-plyer
+# plyer removed
 pytesseract
 Pillow
 mss
@@ -58,7 +56,6 @@ pytz
 
 # --- Observability ---
 structlog
-prometheus_client
 
 # --- Utils ---
 numpy

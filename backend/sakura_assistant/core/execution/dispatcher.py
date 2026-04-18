@@ -84,7 +84,8 @@ class Executor:
         classification: str,
         tool_hint: Optional[str] = None,
         request_id: Optional[str] = None,
-        history: Optional[List[Dict]] = None  # V17.1: Conversation history
+        history: Optional[List[Dict]] = None,  # V17.1: Conversation history
+        reference_context: str = ""            # V19-FIX: Threaded reference context
     ) -> ExecutionResult:
         """
         Main dispatch entry point.
@@ -95,6 +96,7 @@ class Executor:
             tool_hint: Optional tool hint from router
             request_id: Optional request ID for tracing
             history: V17.1 - Conversation history for Planner reference resolution
+            reference_context: V19 - Structured reference resolution string
         
         Returns:
             ExecutionResult
@@ -121,7 +123,8 @@ class Executor:
             user_input=user_input,
             snapshot=snapshot,
             is_research=is_research,
-            history=history  # V17.1
+            history=history,
+            reference_context=reference_context
         )
         
         logger.info(

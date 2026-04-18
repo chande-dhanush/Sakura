@@ -1,5 +1,5 @@
 """
-Sakura V10 Backend Server
+Sakura V19.0 Backend Server
 
 FastAPI wrapper around SmartAssistant with SSE streaming.
 Designed to run as a Tauri sidecar.
@@ -20,6 +20,8 @@ from contextlib import asynccontextmanager
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from sakura_assistant.version import __version__, get_version_string
 
 from sakura_assistant.core.memory.reflection import get_reflection_engine  # V14: Unified
 
@@ -209,7 +211,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Sakura Backend",
-    version="18.0",
+    version=__version__,
     lifespan=lifespan
 )
 
@@ -592,7 +594,7 @@ async def health_check():
         
     return {
         "status": status,
-        "system": "Sakura V18.0",
+        "system": get_version_string(),
         "ready": assistant is not None,
         "error": INIT_ERROR
     }

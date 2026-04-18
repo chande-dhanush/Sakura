@@ -48,6 +48,8 @@ _ACTION_CLAIM_PATTERNS = [
 @dataclass
 class ResponseContext:
     """Context for generating a response."""
+    __slots__ = ["user_input", "tool_outputs", "history", "graph_context", "intent_adjustment", "current_mood", "study_mode", "data_reasoning", "session_summary"]
+    
     user_input: str
     tool_outputs: str = ""
     history: List[Dict] = None
@@ -61,6 +63,15 @@ class ResponseContext:
     def __post_init__(self):
         if self.history is None:
             self.history = []
+        
+        # Type validation
+        if not isinstance(self.user_input, str):
+            raise ValueError(f"ResponseContext.user_input must be str, got {type(self.user_input)}")
+        if not isinstance(self.history, list):
+            raise ValueError(f"ResponseContext.history must be list, got {type(self.history)}")
+        if not isinstance(self.tool_outputs, str):
+            # Coerce if possible, or fail fast
+            self.tool_outputs = str(self.tool_outputs) if self.tool_outputs is not None else ""
 
 
 class ResponseGenerator:

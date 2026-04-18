@@ -112,7 +112,7 @@ class TestIntentRouter(unittest.TestCase):
         
         # Invalid format
         classification, hint = router._parse_response("random text")
-        self.assertEqual(classification, "CHAT")  # Default
+        self.assertEqual(classification, "PLAN")  # Default
 
 
 class TestRouterIntegration(unittest.TestCase):

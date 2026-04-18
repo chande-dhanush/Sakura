@@ -800,45 +800,7 @@ class WorldGraph:
         """Get N most recent actions."""
         return self.actions[-count:] if self.actions else []
     
-    def get_context_for_planner(self, query: str, budget: int = 500) -> str:
-        """
-        Generate compact context for planner injection.
-        
-        Includes:
-        - Resolved references
-        - Recent actions (last 3)
-        - Relevant promoted entities
-        
-        INVARIANT: Always respects token budget.
-        """
-        parts = []
-        
-        # 1. Check for resolved reference
-        resolution = self.resolve_reference(query)
-        if resolution.resolved and resolution.confidence > 0.5:
-            if isinstance(resolution.resolved, EntityNode):
-                parts.append(f"[RESOLVED] Entity: {resolution.resolved.name} ({resolution.resolved.summary})")
-            elif isinstance(resolution.resolved, ActionNode):
-                parts.append(f"[RESOLVED] Last action: {resolution.resolved.tool} - {resolution.resolved.summary}")
-        
-        # 2. Recent actions (summaries)
-        recent = self.get_recent_actions(3)
-        if recent:
-            summaries = [f"T{a.turn}: {a.summary}" for a in recent if a.summary]
-            if summaries:
-                parts.append(f"[RECENT] {'; '.join(summaries)}")
-        
-        # 3. Identity reminder (always include)
-        user = self.get_user_identity()
-        parts.append(f"[USER] {user.summary}")
-        
-        # Build and truncate
-        context = "\n".join(parts)
-        if len(context) > budget:
-            context = context[:budget-3] + "..."
-        
-        return context
-    
+
     def get_context_for_responder(self) -> str:
         """
         V14: Generate context for responder injection.

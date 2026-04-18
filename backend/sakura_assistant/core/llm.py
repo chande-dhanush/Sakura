@@ -13,6 +13,7 @@ from .models import ReliableLLM
 from .routing import IntentRouter
 from .execution import ToolExecutor
 from .models import ResponseGenerator, ResponseContext
+from .models.request import RequestState
 from .tools import get_all_tools
 
 # V17: Execution architecture
@@ -41,7 +42,7 @@ from .memory.judger import MemoryJudger
 
 class SmartAssistant:
     """
-    Sakura V18.0 Facade
+    Sakura V19.0 Facade
     =================
     Orchestrates the V17 execution architecture:
     Router -> Executor -> Responder
@@ -190,6 +191,14 @@ class SmartAssistant:
         request_id = f"req_{int(time.time()*1000)}"
         emitter = self.emitter_factory.create(request_id)
         
+        # V19-FIX: Initialize RequestState container
+        req_state = RequestState(
+            query=user_input,
+            history=history if history else [],
+            image_data=image_data,
+            request_id=request_id
+        )
+        
         # 1. Vision Short-Circuit
         if image_data:
             # We can use the sync handle_vision for now, or make an async one. 
@@ -233,20 +242,57 @@ class SmartAssistant:
             self.responder.personality = f"{base_personality}\n\n{style_constraint}"
             
             # 2. Graph & Context (Keep sync for now as it's pure logic + in-memory mostly)
-            study_mode_active = detect_study_mode(user_input)
+            req_state.study_mode = detect_study_mode(user_input)
             
-            # Update Graph with User Intent
-            self.world_graph.resolve_reference(user_input)
+            # V19-FIX-01: Capture reference resolution result
+            resolution = self.world_graph.resolve_reference(user_input)
             self.world_graph.infer_user_intent(user_input, history)
+            
+            # V19-FIX-02: Format resolved reference for downstream context injection
+            reference_context = ""
+            if resolution.resolved and resolution.confidence > 0.4:
+                from .graph.world_graph import EntityNode, ActionNode
+                if isinstance(resolution.resolved, EntityNode):
+                    reference_context = (
+                        f"[REFERENCE RESOLVED] \"{user_input}\" refers to: "
+                        f"{resolution.resolved.name} — {resolution.resolved.summary or 'No description'} "
+                        f"(confidence: {resolution.confidence:.0%})"
+                    )
+                elif isinstance(resolution.resolved, ActionNode):
+                    reference_context = (
+                        f"[REFERENCE RESOLVED] \"{user_input}\" refers to previous action: "
+                        f"{resolution.resolved.tool or 'chat'} — {resolution.resolved.summary or 'No description'} "
+                        f"(confidence: {resolution.confidence:.0%})"
+                    )
+                if resolution.ban_external_search:
+                    reference_context += " [DO NOT search externally for this — use graph data]"
+                if resolution.action:
+                    reference_context += f" [Suggested action: {resolution.action}]"
+                
+                req_state.reference_context = reference_context
+                recorder.log("ReferenceResolution", f"Resolved: {reference_context[:80]}")
+            else:
+                recorder.log("ReferenceResolution", f"No match (confidence={resolution.confidence:.2f})")
             
             # V14: Constraint detection moved to background ReflectionEngine
             # (happens after response, not in hot path)
             
             # 3. Routing (Async)
+            # V19-FIX-01: Use keyword arguments to prevent positional mismatch.
+            # Previous bug: aroute(user_input, history, study_mode_active) passed
+            # history as 'context' (str) and study_mode_active (bool) as 'history' (List),
+            # causing TypeError crash when router tried history[-3:] on a boolean.
             state.record_llm_call("routing")
             with span("Router"):
-                route_result = await self.router.aroute(user_input, history, study_mode_active)
-            recorder.log("Router", f"Decision: {route_result.classification} (hint: {route_result.tool_hint})")
+                route_result = await self.router.aroute(
+                    query=user_input,
+                    history=history
+                )
+            
+            req_state.classification = route_result.classification
+            req_state.tool_hint = route_result.tool_hint
+            
+            recorder.log("Router", f"Decision: {route_result.classification} (hint: {route_result.tool_hint}), study_mode={req_state.study_mode}")
             print(f" Async Router Decision: {route_result.classification}")
             
             state.current_intent = route_result.classification
@@ -266,7 +312,8 @@ class SmartAssistant:
                         classification=route_result.classification,
                         tool_hint=route_result.tool_hint,
                         request_id=request_id,
-                        history=history  # V17.1: Planner reference resolution
+                        history=history,
+                        reference_context=req_state.reference_context
                     )
                 
                 # V17: Use ExecutionStatus instead of bool
@@ -321,16 +368,20 @@ class SmartAssistant:
             print(f" Async Response Phase")
             
             # V15.4: Get unified context from ContextManager
+            # V19-FIX: Thread RequestState through ContextManager
             resp_ctx = self.context_manager.get_context_for_llm(
                 user_input,
-                mode=route_result.classification,
-                history=history
+                state=req_state
             )
             
             # V15: Inject mood from DesireSystem
             mood_prompt = self.desire_system.get_mood_prompt()
-            # Hygiene: Use descriptive variable name for responder-specific context
-            responder_context = f"{mood_prompt}\n\n{resp_ctx['responder_context']}"
+            # V19-FIX-02: Inject reference resolution into responder context
+            # This ensures the LLM actually sees what "that"/"it" refers to
+            responder_parts = [mood_prompt, resp_ctx['responder_context']]
+            if reference_context:
+                responder_parts.insert(1, reference_context)
+            responder_context = "\n\n".join(filter(None, responder_parts))
             
             # V18 FIX-12: Detect ephemeral handle in tool outputs
             has_ephemeral = (
@@ -340,14 +391,15 @@ class SmartAssistant:
             
             resp_context = ResponseContext(
                 user_input=user_input,
-                tool_outputs=tool_outputs,
+                assistant_name=sakura_name,
+                system_prompt=self.responder.personality,
+                mood_prompt=mood_prompt,
+                graph_context=resp_ctx.get("responder_context", ""),
+                summary_context=resp_ctx.get("summary_context", ""),
+                tool_output=tool_outputs,
                 history=history,
-                graph_context=responder_context,
-                intent_adjustment=resp_ctx["intent_adjustment"],
-                current_mood=resp_ctx["current_mood"],
-                study_mode=study_mode_active,
-                data_reasoning=has_ephemeral,
-                session_summary=resp_ctx["summary_context"]
+                study_mode=req_state.study_mode,
+                tool_used=tool_used
             )
             
             with span("Responder"):
