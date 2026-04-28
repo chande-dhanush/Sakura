@@ -28,6 +28,7 @@ _MODEL_PATTERNS = {
     "llama": ["llama", "mistral", "mixtral", "codellama"],
     "gemini": ["gemini", "palm", "bison"],
     "claude": ["claude", "anthropic"],
+    "deepseek": ["deepseek"],
 }
 
 # Calibrated chars-per-token ratios (based on public benchmarks)
@@ -36,6 +37,7 @@ _CHARS_PER_TOKEN = {
     "llama": 3.5,    # Llama 3 is slightly more efficient
     "gemini": 3.8,   # Between GPT and Llama
     "claude": 3.7,   # Similar to Llama
+    "deepseek": 3.8, # OpenAI-compatible heuristic
     "default": 4.0,  # Fallback
 }
 
@@ -95,6 +97,8 @@ def count_tokens(text: Union[str, List[Dict]], model: str = "unknown") -> int:
         # Claude models - calibrated estimation
         if _is_model_family(model_lower, "claude"):
             return _count_anthropic_tokens(text, model_lower)
+        if _is_model_family(model_lower, "deepseek"):
+            return _estimate_tokens(text, "deepseek")
         
         # Unknown model - use default estimation
         return _estimate_tokens(text, "default")

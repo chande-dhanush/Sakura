@@ -41,6 +41,8 @@ MODEL_COSTS = {
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
     "claude-3-5-sonnet": {"input": 3.00, "output": 15.00},
     "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
+    "deepseek-chat": {"input": 0.27, "output": 1.10},
+    "deepseek-reasoner": {"input": 0.55, "output": 2.19},
     # Default fallback
     "default": {"input": 0.50, "output": 1.00},
 }

@@ -12,7 +12,10 @@
         GROQ_API_KEY: "",
         TAVILY_API_KEY: "",
         OPENROUTER_API_KEY: "",
+        OPENAI_API_KEY: "",
         GOOGLE_API_KEY: "",
+        DEEPSEEK_API_KEY: "",
+        DEEPSEEK_BASE_URL: "https://api.deepseek.com",
         SPOTIFY_CLIENT_ID: "",
         SPOTIFY_CLIENT_SECRET: "",
         SPOTIFY_DEVICE_NAME: "",
@@ -27,6 +30,15 @@
         SAKURA_NAME: "Sakura",
         RESPONSE_STYLE: "balanced",
         SYSTEM_PROMPT_OVERRIDE: ""
+        ,
+        ROUTER_PROVIDER: "auto",
+        PLANNER_PROVIDER: "auto",
+        RESPONDER_PROVIDER: "auto",
+        VERIFIER_PROVIDER: "auto",
+        ROUTER_MODEL: "llama-3.1-8b-instant",
+        PLANNER_MODEL: "",
+        RESPONDER_MODEL: "openai/gpt-oss-20b",
+        VERIFIER_MODEL: "llama-3.1-8b-instant"
     };
 
     // UI Props
@@ -69,7 +81,10 @@
                         GROQ_API_KEY: data.GROQ_API_KEY || "",
                         TAVILY_API_KEY: data.TAVILY_API_KEY || "",
                         OPENROUTER_API_KEY: data.OPENROUTER_API_KEY || "",
+                        OPENAI_API_KEY: data.OPENAI_API_KEY || "",
                         GOOGLE_API_KEY: data.GOOGLE_API_KEY || "",
+                        DEEPSEEK_API_KEY: data.DEEPSEEK_API_KEY || "",
+                        DEEPSEEK_BASE_URL: data.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
                         SPOTIFY_CLIENT_ID: data.SPOTIFY_CLIENT_ID || "",
                         SPOTIFY_CLIENT_SECRET: "", 
                         SPOTIFY_DEVICE_NAME: data.SPOTIFY_DEVICE_NAME || "",
@@ -82,7 +97,15 @@
                         // FIX-C: New Personalization Fields
                         SAKURA_NAME: data.SAKURA_NAME || "Sakura",
                         RESPONSE_STYLE: data.RESPONSE_STYLE || "balanced",
-                        SYSTEM_PROMPT_OVERRIDE: data.SYSTEM_PROMPT_OVERRIDE || ""
+                        SYSTEM_PROMPT_OVERRIDE: data.SYSTEM_PROMPT_OVERRIDE || "",
+                        ROUTER_PROVIDER: data.ROUTER_PROVIDER || "auto",
+                        PLANNER_PROVIDER: data.PLANNER_PROVIDER || "auto",
+                        RESPONDER_PROVIDER: data.RESPONDER_PROVIDER || "auto",
+                        VERIFIER_PROVIDER: data.VERIFIER_PROVIDER || "auto",
+                        ROUTER_MODEL: data.ROUTER_MODEL || "llama-3.1-8b-instant",
+                        PLANNER_MODEL: data.PLANNER_MODEL || "",
+                        RESPONDER_MODEL: data.RESPONDER_MODEL || "openai/gpt-oss-20b",
+                        VERIFIER_MODEL: data.VERIFIER_MODEL || "llama-3.1-8b-instant"
                     };
                     
                     // Clone for comparison
@@ -312,12 +335,61 @@
                                     <label for="openrouter">OpenRouter Key</label>
                                     <input id="openrouter" type="password" value={config.OPENROUTER_API_KEY} on:input={(e) => handleInput('OPENROUTER_API_KEY', e.target.value)} placeholder="sk-or-••••" />
                                 </div>
+                                <div class="form-group">
+                                    <label for="openai">OpenAI Key</label>
+                                    <input id="openai" type="password" value={config.OPENAI_API_KEY} on:input={(e) => handleInput('OPENAI_API_KEY', e.target.value)} placeholder="sk-••••" />
+                                </div>
+                                <div class="form-group">
+                                    <label for="deepseek">DeepSeek API Key</label>
+                                    <input id="deepseek" type="password" value={config.DEEPSEEK_API_KEY} on:input={(e) => handleInput('DEEPSEEK_API_KEY', e.target.value)} placeholder="sk-••••" />
+                                </div>
+                                <div class="form-group">
+                                    <label for="deepseek-base-url">DeepSeek Base URL</label>
+                                    <input id="deepseek-base-url" type="text" value={config.DEEPSEEK_BASE_URL} on:input={(e) => handleInput('DEEPSEEK_BASE_URL', e.target.value)} placeholder="https://api.deepseek.com" />
+                                </div>
                             </div>
                             
                             <div class="tool-section">
                                 <h3>Spotify Device</h3>
                                 <div class="form-group">
                                     <input type="text" value={config.SPOTIFY_DEVICE_NAME} on:input={(e) => handleInput('SPOTIFY_DEVICE_NAME', e.target.value)} placeholder="e.g. My PC" />
+                                </div>
+                            </div>
+                            <div class="tool-section">
+                                <h3>Model Stage Configuration</h3>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>Router Provider</label>
+                                        <input type="text" value={config.ROUTER_PROVIDER} on:input={(e) => handleInput('ROUTER_PROVIDER', e.target.value)} placeholder="auto|groq|google|openrouter|openai|deepseek" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Router Model</label>
+                                        <input type="text" value={config.ROUTER_MODEL} on:input={(e) => handleInput('ROUTER_MODEL', e.target.value)} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Planner Provider</label>
+                                        <input type="text" value={config.PLANNER_PROVIDER} on:input={(e) => handleInput('PLANNER_PROVIDER', e.target.value)} placeholder="Use deepseek explicitly here" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Planner Model (required if DeepSeek planner)</label>
+                                        <input type="text" value={config.PLANNER_MODEL} on:input={(e) => handleInput('PLANNER_MODEL', e.target.value)} placeholder="Set exact DeepSeek planner model id" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Responder Provider</label>
+                                        <input type="text" value={config.RESPONDER_PROVIDER} on:input={(e) => handleInput('RESPONDER_PROVIDER', e.target.value)} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Responder Model</label>
+                                        <input type="text" value={config.RESPONDER_MODEL} on:input={(e) => handleInput('RESPONDER_MODEL', e.target.value)} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Verifier Provider</label>
+                                        <input type="text" value={config.VERIFIER_PROVIDER} on:input={(e) => handleInput('VERIFIER_PROVIDER', e.target.value)} />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Verifier Model</label>
+                                        <input type="text" value={config.VERIFIER_MODEL} on:input={(e) => handleInput('VERIFIER_MODEL', e.target.value)} />
+                                    </div>
                                 </div>
                             </div>
                         </section>

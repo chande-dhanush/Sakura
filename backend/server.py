@@ -279,8 +279,12 @@ async def save_setup(request: Request):
     try:
         data = await request.json()
         
-        # 1. Validate keys (Groq required only for first-time setup)
+        # 1. Validate keys (at least one provider key required)
         groq_key = data.get("GROQ_API_KEY", "").strip()
+        openrouter_key = data.get("OPENROUTER_API_KEY", "").strip()
+        openai_key = data.get("OPENAI_API_KEY", "").strip()
+        google_key = data.get("GOOGLE_API_KEY", "").strip()
+        deepseek_key = data.get("DEEPSEEK_API_KEY", "").strip()
         
         # 2. Load existing .env to MERGE (not overwrite)
         from sakura_assistant.utils.pathing import get_project_root
@@ -305,8 +309,11 @@ async def save_setup(request: Request):
         merged = {
             "GROQ_API_KEY": merge_key("GROQ_API_KEY", groq_key),
             "TAVILY_API_KEY": merge_key("TAVILY_API_KEY", data.get("TAVILY_API_KEY", "").strip()),
-            "OPENROUTER_API_KEY": merge_key("OPENROUTER_API_KEY", data.get("OPENROUTER_API_KEY", "").strip()),
-            "GOOGLE_API_KEY": merge_key("GOOGLE_API_KEY", data.get("GOOGLE_API_KEY", "").strip()),
+            "OPENROUTER_API_KEY": merge_key("OPENROUTER_API_KEY", openrouter_key),
+            "OPENAI_API_KEY": merge_key("OPENAI_API_KEY", openai_key),
+            "GOOGLE_API_KEY": merge_key("GOOGLE_API_KEY", google_key),
+            "DEEPSEEK_API_KEY": merge_key("DEEPSEEK_API_KEY", deepseek_key),
+            "DEEPSEEK_BASE_URL": merge_key("DEEPSEEK_BASE_URL", data.get("DEEPSEEK_BASE_URL", "").strip()),
             "SPOTIFY_CLIENT_ID": merge_key("SPOTIFY_CLIENT_ID", data.get("SPOTIFY_CLIENT_ID", "").strip()),
             "SPOTIFY_CLIENT_SECRET": merge_key("SPOTIFY_CLIENT_SECRET", data.get("SPOTIFY_CLIENT_SECRET", "").strip()),
             "SPOTIFY_DEVICE_NAME": merge_key("SPOTIFY_DEVICE_NAME", data.get("SPOTIFY_DEVICE_NAME", "").strip()),
@@ -314,9 +321,18 @@ async def save_setup(request: Request):
             "SAKURA_ENABLE_VOICE": "true",
         }
         
-        # Validate: Groq key must exist (either new or existing)
-        if not merged["GROQ_API_KEY"]:
-            return JSONResponse({"success": False, "message": "Groq API Key is required"}, status_code=400)
+        # Validate: At least one provider key must exist
+        if not any([
+            merged.get("GROQ_API_KEY"),
+            merged.get("OPENROUTER_API_KEY"),
+            merged.get("OPENAI_API_KEY"),
+            merged.get("GOOGLE_API_KEY"),
+            merged.get("DEEPSEEK_API_KEY"),
+        ]):
+            return JSONResponse(
+                {"success": False, "message": "At least one provider API key is required (Groq/OpenRouter/OpenAI/Google/DeepSeek)."},
+                status_code=400,
+            )
         
         # 4. Write merged .env
         env_lines = ["# Sakura V10 User Configuration"]
@@ -429,6 +445,17 @@ async def get_settings():
         "TAVILY_API_KEY": mask_key("TAVILY_API_KEY"),
         "GOOGLE_API_KEY": mask_key("GOOGLE_API_KEY"),
         "OPENROUTER_API_KEY": mask_key("OPENROUTER_API_KEY"),
+        "OPENAI_API_KEY": mask_key("OPENAI_API_KEY"),
+        "DEEPSEEK_API_KEY": mask_key("DEEPSEEK_API_KEY"),
+        "DEEPSEEK_BASE_URL": os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        "ROUTER_PROVIDER": os.getenv("ROUTER_PROVIDER", "auto"),
+        "PLANNER_PROVIDER": os.getenv("PLANNER_PROVIDER", "auto"),
+        "RESPONDER_PROVIDER": os.getenv("RESPONDER_PROVIDER", "auto"),
+        "VERIFIER_PROVIDER": os.getenv("VERIFIER_PROVIDER", "auto"),
+        "ROUTER_MODEL": os.getenv("ROUTER_MODEL", "llama-3.1-8b-instant"),
+        "PLANNER_MODEL": os.getenv("PLANNER_MODEL", "llama-3.3-70b-versatile"),
+        "RESPONDER_MODEL": os.getenv("RESPONDER_MODEL", "openai/gpt-oss-20b"),
+        "VERIFIER_MODEL": os.getenv("VERIFIER_MODEL", "llama-3.1-8b-instant"),
         "SPOTIFY_CLIENT_ID": mask_key("SPOTIFY_CLIENT_ID"),
         # Spotify device (not masked - it's just a name, not secret)
         "SPOTIFY_DEVICE_NAME": os.getenv("SPOTIFY_DEVICE_NAME", ""),
@@ -443,6 +470,9 @@ async def get_settings():
         # Flags
         "has_groq": bool(os.getenv("GROQ_API_KEY")),
         "has_google": bool(os.getenv("GOOGLE_API_KEY")),
+        "has_openrouter": bool(os.getenv("OPENROUTER_API_KEY")),
+        "has_openai": bool(os.getenv("OPENAI_API_KEY")),
+        "has_deepseek": bool(os.getenv("DEEPSEEK_API_KEY")),
     }
 
 
@@ -452,6 +482,7 @@ async def update_settings(request: Request):
     Update specific settings (V13: Fix for frontend PATCH calls).
     Only updates provided fields - doesn't overwrite all settings.
     """
+    global assistant
     from sakura_assistant.utils.pathing import get_project_root
     
     try:
@@ -472,14 +503,21 @@ async def update_settings(request: Request):
                     env_lines.append(line)
         
         # 2. Update only provided API keys and device settings
-        api_key_fields = {"GROQ_API_KEY", "TAVILY_API_KEY", "OPENROUTER_API_KEY", 
-                          "GOOGLE_API_KEY", "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET",
-                          "SPOTIFY_DEVICE_NAME"}
+        api_key_fields = {"GROQ_API_KEY", "TAVILY_API_KEY", "OPENROUTER_API_KEY",
+                          "OPENAI_API_KEY", "GOOGLE_API_KEY", "DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL",
+                          "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "SPOTIFY_DEVICE_NAME"}
+        stage_config_fields = {
+            "ROUTER_PROVIDER", "PLANNER_PROVIDER", "RESPONDER_PROVIDER", "VERIFIER_PROVIDER",
+            "ROUTER_MODEL", "PLANNER_MODEL", "RESPONDER_MODEL", "VERIFIER_MODEL",
+            "MAX_LLM_CALLS", "MAX_PLANNER_ITERATIONS", "PLANNER_STEP_TIMEOUT_MS",
+            "LLM_TIMEOUT_SECONDS", "EXEC_BUDGET_CHAT_MS", "EXEC_BUDGET_ONE_SHOT_MS",
+            "EXEC_BUDGET_ITERATIVE_MS", "EXEC_BUDGET_RESEARCH_MS",
+        }
         
         updated_keys = []
-        for key in api_key_fields:
-            if key in data and data[key].strip():
-                env_dict[key] = data[key].strip()
+        for key in api_key_fields.union(stage_config_fields):
+            if key in data and str(data[key]).strip():
+                env_dict[key] = str(data[key]).strip()
                 updated_keys.append(key)
         
         # 3. Write back .env if API keys changed
@@ -491,6 +529,11 @@ async def update_settings(request: Request):
             # Reload env
             from dotenv import load_dotenv
             load_dotenv(env_path, override=True)
+            # Rebuild container/assistant so provider/model changes are live
+            from sakura_assistant.core.infrastructure.container import reset_container
+            from sakura_assistant.core.llm import SmartAssistant
+            reset_container()
+            assistant = SmartAssistant()
         
         # 4. Update user settings
         user_fields = {
@@ -857,6 +900,10 @@ async def chat(request: Request):
     global current_task, generation_cancelled
     generation_cancelled = False
     
+    # V19: Clear cancellation signal for new request
+    from sakura_assistant.core.execution.context import clear_cancellation
+    clear_cancellation()
+    
     try:
         data = await request.json()
     except Exception as e:
@@ -865,6 +912,21 @@ async def chat(request: Request):
     
     query = data.get("query", "").strip()
     image_data = data.get("image_data")
+    try:
+        if assistant and hasattr(assistant, "container"):
+            cfg = assistant.container.config
+            log.info(
+                "request_stage_config",
+                extra={
+                    "router": {"provider": cfg.router_provider, "model": cfg.router_model},
+                    "planner": {"provider": cfg.planner_provider, "model": cfg.planner_model},
+                    "responder": {"provider": cfg.responder_provider, "model": cfg.responder_model},
+                    "verifier": {"provider": cfg.verifier_provider, "model": cfg.verifier_model},
+                    "deepseek_base_url": cfg.deepseek_base_url,
+                },
+            )
+    except Exception as obs_err:
+        log.warning(f"failed to emit request stage config log: {obs_err}")
     
     if not query:
         return JSONResponse({"error": "No query provided"}, status_code=400)
@@ -1056,6 +1118,12 @@ async def stop():
     """Interrupt current generation."""
     global generation_cancelled
     generation_cancelled = True
+    
+    # V19: Signal the execution loop to stop
+    from sakura_assistant.core.execution.context import request_cancellation
+    request_cancellation()
+    print("🛑 [Server] Stop requested — cancellation signal sent to executor")
+    
     return {"status": "stopped"}
 
 

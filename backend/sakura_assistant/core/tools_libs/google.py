@@ -204,7 +204,7 @@ def calendar_get_events(
             try:
                 start_dt = datetime.fromisoformat(start)
                 start_str = start_dt.strftime("%I:%M %p, %b %d")
-            except:
+            except Exception:
                 start_str = start
             out.append(f"️ {start_str} - {summary}")
         

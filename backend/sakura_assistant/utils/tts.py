@@ -280,7 +280,7 @@ def kokoro_tts(text, voice='af_heart'):
         _is_speaking = False
         if temp_file.exists():
             try: os.remove(temp_file)
-            except: pass
+            except Exception as e: print(f"[TTS] Could not cleanup temp file: {e}", file=sys.stderr)
         return False
 
 
@@ -357,7 +357,7 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
         traceback.print_exc(file=sys.stderr)
         if temp_file.exists():
             try: os.remove(temp_file)
-            except: pass
+            except Exception as e: print(f"[TTS] Could not cleanup temp file: {e}", file=sys.stderr)
         return None
 
 

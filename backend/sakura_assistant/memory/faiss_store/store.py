@@ -600,13 +600,13 @@ class VectorMemoryStore:
         # Delete FAISS index file
         if FAISS_INDEX_PATH.exists():
             try: FAISS_INDEX_PATH.unlink()
-            except: pass
+            except Exception as e: logger.warning(f"[Store] Could not delete FAISS index: {e}")
         if MEMORY_METADATA_FILE.exists():
             try: MEMORY_METADATA_FILE.unlink()
-            except: pass
+            except Exception as e: logger.warning(f"[Store] Could not delete metadata file: {e}")
         if MEMORY_IMPORTANCE_PATH.exists():
             try: MEMORY_IMPORTANCE_PATH.unlink()
-            except: pass
+            except Exception as e: logger.warning(f"[Store] Could not delete importance file: {e}")
         
         # Recreate empty index
         self._create_new_index()

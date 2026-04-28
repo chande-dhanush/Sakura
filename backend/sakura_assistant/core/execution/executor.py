@@ -26,8 +26,21 @@ from langchain_core.messages import ToolMessage
 from ...config import PLANNER_RETRY_PROMPT
 
 # V17: Import ExecutionResult from execution_context (uses ExecutionStatus)
-from .context import ExecutionResult, ExecutionStatus
+from .context import ExecutionResult, ExecutionStatus, is_cancelled
 from ...utils.flight_recorder import get_recorder
+
+
+def _get_int_env(name: str, default: int, min_value: int, max_value: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    if value < min_value or value > max_value:
+        return default
+    return value
 
 if TYPE_CHECKING:
     from .context import ExecutionContext
@@ -505,7 +518,7 @@ class ReActLoop:
         self.tool_runner = tool_runner
         self.output_handler = output_handler
         self.policy = policy
-        self.max_iterations = max_iterations
+        self.max_iterations = _get_int_env("MAX_PLANNER_ITERATIONS", max_iterations, 1, 8)
     
     def run(
         self,
@@ -638,6 +651,14 @@ class ReActLoop:
         print(f" [ReActLoop] Starting async for: {user_input[:50]}...")
         
         for iteration in range(self.max_iterations):
+            # V19: CHECK CANCELLATION before each iteration
+            if is_cancelled():
+                print(f"🛑 [ReActLoop] Generation cancelled by user at iteration {iteration + 1}")
+                return ExecutionResult.cancelled(
+                    outputs="\n".join(all_outputs) if all_outputs else "",
+                    tool_messages=all_tool_messages
+                )
+            
             # V17: CHECK BUDGET BEFORE EACH ITERATION
             if ctx and ctx.is_expired():
                 print(f"⏱️ [ReActLoop] Budget exceeded ({ctx.elapsed_ms():.0f}ms / {ctx.budget_ms}ms)")
@@ -653,7 +674,8 @@ class ReActLoop:
             try:
                 if ctx and ctx.remaining_budget_ms() > 0:
                     # Use asyncio.wait_for with remaining budget
-                    timeout_secs = min(ctx.remaining_budget_ms() / 1000, 10.0)  # Max 10s per iteration
+                    step_timeout_ms = _get_int_env("PLANNER_STEP_TIMEOUT_MS", 10000, 1000, 60000)
+                    timeout_secs = min(ctx.remaining_budget_ms() / 1000, step_timeout_ms / 1000.0)
                     plan_result = await asyncio.wait_for(
                         self.planner.aplan(
                             user_input=user_input,

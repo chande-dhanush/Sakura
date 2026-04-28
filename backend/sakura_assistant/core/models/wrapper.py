@@ -13,11 +13,25 @@ import time
 import re
 import json
 import uuid
+import os
 from typing import Optional, List, Any, Dict
 from langchain_core.messages import AIMessage
 
 # Timeout in seconds
-LLM_TIMEOUT = 60
+def _get_int_env(name: str, default: int, min_value: int, max_value: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    if value < min_value or value > max_value:
+        return default
+    return value
+
+
+LLM_TIMEOUT = _get_int_env("LLM_TIMEOUT_SECONDS", 60, 5, 180)
 
 
 def _extract_tokens(result: Any, messages: Any = None, model: str = "unknown") -> Dict[str, int]:
@@ -219,7 +233,7 @@ class ReliableLLM:
             bucket.tokens -= 1
             bucket.total_requests += 1
         
-        print(f" [{self.name}] Invoking LLM...")
+        print(f" [{self.name}] Invoking LLM... path=sync model={model_name}")
         start_time = time.time()
         try:
             result = invoke_with_timeout(self.primary, messages, timeout=timeout, **kwargs)
@@ -262,7 +276,7 @@ class ReliableLLM:
                     print(f" Recovery failed: {parse_err}")
 
             if self.backup:
-                print(f"⚠️ {self.name} Primary failed: {e}. Switching to Backup (Gemini)...")
+                print(f"⚠️ {self.name} Primary failed: {e}. fallback_activated=true path=sync")
                 try:
                     backup_start = time.time()
                     backup_model = getattr(self.backup, 'model_name', None) or \
@@ -367,7 +381,7 @@ class ReliableLLM:
         if wait_time > 0:
             print(f"⏳ [{self.name}] Rate limited: waited {wait_time:.2f}s")
         
-        print(f" [{self.name}] Async invoking LLM...")
+        print(f" [{self.name}] Async invoking LLM... path=async model={model_name}")
         start_time = time.time()
         
         try:
@@ -419,7 +433,7 @@ class ReliableLLM:
             
             # Try backup
             if self.backup:
-                print(f"⚠️ {self.name} Primary async failed: {e}. Switching to Backup...")
+                print(f"⚠️ {self.name} Primary async failed: {e}. fallback_activated=true path=async")
                 try:
                     backup_start = time.time()
                     backup_model = getattr(self.backup, 'model_name', None) or \

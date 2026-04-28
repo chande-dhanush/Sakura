@@ -2,8 +2,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from langchain_core.messages import SystemMessage, HumanMessage
-from ...config import VERIFIER_SYSTEM_PROMPT, GROQ_API_KEY
-from langchain_groq import ChatGroq
+from ...config import VERIFIER_SYSTEM_PROMPT
 
 logger = logging.getLogger("Verifier")
 
@@ -14,21 +13,9 @@ class PlanVerifier:
     Uses a lightweight model (llama-3.1-8b-instant) for fast verification.
     """
     
-    def __init__(self, model_input: Any = "llama-3.1-8b-instant"):
-        # V18.4 FIX: Handle ReliableLLM object or raw string
-        if isinstance(model_input, str):
-            model_name = model_input
-        else:
-            # Try to extract model_name from ReliableLLM or LangChain model
-            primary = getattr(model_input, 'primary', model_input)
-            model_name = getattr(primary, 'model_name', None) or \
-                         getattr(primary, 'model', 'llama-3.1-8b-instant')
-            
-        self.llm = ChatGroq(
-            temperature=0,
-            model_name=model_name,
-            groq_api_key=GROQ_API_KEY
-        )
+    def __init__(self, llm: Any):
+        # Provider-agnostic: use injected llm from container/runtime.
+        self.llm = llm
 
     async def averify(
         self, 

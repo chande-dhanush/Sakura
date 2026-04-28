@@ -27,8 +27,7 @@ jobs:
       - name: Run tests
         working-directory: backend
         run: |
-          pytest sakura_assistant/tests/ \
-            --ignore=sakura_assistant/tests/memory \
+          pytest tests/ \
             --cov=sakura_assistant \
             --cov-report=xml \
             --cov-report=term-missing \

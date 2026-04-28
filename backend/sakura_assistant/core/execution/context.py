@@ -7,6 +7,8 @@ v2.1: Mode must be explicit everywhere - no implicit inference.
 """
 
 import time
+import threading
+import os
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
@@ -17,6 +19,34 @@ class LLMBudgetExceededError(Exception):
     pass
 
 execution_context_var = contextvars.ContextVar("execution_context", default=None)
+
+
+def _get_int_env(name: str, default: int, min_value: int, max_value: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    if value < min_value or value > max_value:
+        return default
+    return value
+
+# V19: Shared cancellation signal — set by server /stop, checked by ReActLoop
+_cancellation_event = threading.Event()
+
+def request_cancellation():
+    """Signal all running execution loops to stop."""
+    _cancellation_event.set()
+
+def clear_cancellation():
+    """Reset the cancellation signal (called at start of new request)."""
+    _cancellation_event.clear()
+
+def is_cancelled() -> bool:
+    """Check if cancellation has been requested."""
+    return _cancellation_event.is_set()
 
 if TYPE_CHECKING:
     from ..graph.world_graph import WorldGraph
@@ -133,10 +163,10 @@ class ExecutionContext:
     max_llm_calls: int = 6  # V18 FIX-08
     
     # Budgets by mode (class constants)
-    BUDGET_CHAT_MS: int = 1000
-    BUDGET_ONE_SHOT_MS: int = 2000
-    BUDGET_ITERATIVE_MS: int = 8000
-    BUDGET_RESEARCH_MS: int = 20000
+    BUDGET_CHAT_MS: int = _get_int_env("EXEC_BUDGET_CHAT_MS", 1000, 500, 10000)
+    BUDGET_ONE_SHOT_MS: int = _get_int_env("EXEC_BUDGET_ONE_SHOT_MS", 2000, 500, 15000)
+    BUDGET_ITERATIVE_MS: int = _get_int_env("EXEC_BUDGET_ITERATIVE_MS", 8000, 1000, 60000)
+    BUDGET_RESEARCH_MS: int = _get_int_env("EXEC_BUDGET_RESEARCH_MS", 20000, 2000, 120000)
     
     @staticmethod
     def create(
@@ -170,6 +200,7 @@ class ExecutionContext:
             history=history,
             reference_context=reference_context
         )
+        ctx.max_llm_calls = _get_int_env("MAX_LLM_CALLS", ctx.max_llm_calls, 3, 20)
         execution_context_var.set(ctx)
         return ctx
     
@@ -262,4 +293,15 @@ class ExecutionResult:
             tool_used="None",
             last_result=None,
             status=ExecutionStatus.FAILED
+        )
+
+    @staticmethod
+    def cancelled(outputs: str = "", tool_messages: list = None) -> "ExecutionResult":
+        """Create result for user-cancelled execution."""
+        return ExecutionResult(
+            outputs=outputs + "\n[Generation cancelled by user]" if outputs else "[Generation cancelled by user]",
+            tool_messages=tool_messages or [],
+            tool_used="None",
+            last_result=None,
+            status=ExecutionStatus.PARTIAL
         )

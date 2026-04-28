@@ -195,6 +195,13 @@ class GlobalRateLimiter:
         "openai/gpt-oss-20b": RateLimitConfig(
             rpm=30, burst=5, tpm=8000, context_window=8192, name="OR-GPT"
         ),
+        # DeepSeek (OpenAI-compatible direct API)
+        "deepseek-chat": RateLimitConfig(
+            rpm=30, burst=5, tpm=60000, context_window=64000, name="DeepSeek-Chat"
+        ),
+        "deepseek-reasoner": RateLimitConfig(
+            rpm=20, burst=3, tpm=30000, context_window=64000, name="DeepSeek-Reasoner"
+        ),
     }
     
     # Default for unknown models (conservative)

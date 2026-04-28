@@ -63,16 +63,18 @@ class SmartAssistant:
         router_llm = self.container.get_router_llm()
         planner_llm = self.container.get_planner_llm()
         responder_llm = self.container.get_responder_llm()
+        verifier_llm = self.container.get_verifier_llm()
         
         # Validate LLMs are available (prevents NoneType errors later)
-        if router_llm is None or planner_llm is None or responder_llm is None:
+        if router_llm is None or planner_llm is None or responder_llm is None or verifier_llm is None:
             missing = []
             if router_llm is None: missing.append("Router")
             if planner_llm is None: missing.append("Planner")
             if responder_llm is None: missing.append("Responder")
+            if verifier_llm is None: missing.append("Verifier")
             raise RuntimeError(
                 f" No LLM configured for: {', '.join(missing)}. "
-                f"Please set GROQ_API_KEY or OPENROUTER_API_KEY in your .env file."
+                f"Please set a valid provider key (GROQ/GOOGLE/OPENROUTER/OPENAI/DEEPSEEK) and stage model config."
             )
         
         # Initialize Components via Container
@@ -138,7 +140,7 @@ class SmartAssistant:
         self.emitter_factory = EmitterFactory()
         
         # V18 FIX-05: Plan Verifier
-        self.plan_verifier = PlanVerifier(router_llm)
+        self.plan_verifier = PlanVerifier(verifier_llm)
         
         # Store last response for async reflection (picked up by server.py BackgroundTask)
         self._last_turn_data = {"user_msg": "", "assistant_response": ""}
