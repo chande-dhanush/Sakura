@@ -13,10 +13,20 @@ Endpoints:
 """
 import os
 import sys
+import io
 import json
 import asyncio
 from typing import Optional
 from contextlib import asynccontextmanager
+
+# V18.3: Force UTF-8 for stdout/stderr to prevent UnicodeEncodeError on Windows sidecars
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except (AttributeError, io.UnsupportedOperation):
+        # Fallback for older python or restricted environments
+        pass
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

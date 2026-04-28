@@ -1,9 +1,9 @@
-# 🌸 Sakura V18.1 — Ironclad Reliability
+# 🌸 Sakura V19.0 — DeepSeek Integration & Model Abstraction
 
 **Production-ready Personal AI Assistant.**
 *Tauri + Svelte (Frontend) | FastAPI + LangChain (Backend)*
 
-![Version](https://img.shields.io/badge/version-18.1-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-19.0-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)
@@ -35,6 +35,10 @@ Sakura is a **desktop AI assistant** that can:
 - 🔄 **Unified Context API** — single source of truth for LLM data (V15.4)
 - 🛡️ **Ironclad Reliability** — LLM Core Budgets (6 calls), Fidelity checks, Search Cascade Parity (V18)
 - 👁️ **AI Vision (Llama 4 Scout)** — High-performance screenshot & image analysis (V18)
+- 🧠 **DeepSeek Integration** — First-class support for DeepSeek V3/V4 (V19)
+- 🎭 **Model Abstraction** — Dynamic per-stage model assignment (Router/Planner/Responder/Verifier) (V19)
+- 🧬 **Request Overrides** — Hot-swap models per query for specialized tasks (V19)
+- 🛡️ **Budget Sync** — Request-scoped LLM call limits enforced across full lifecycle (V19)
 
 **Free to run** — Uses Groq (Llama 3.3 70B) and Google Gemini free tiers.
 
@@ -108,8 +112,9 @@ npm run tauri dev
 Create a `.env` file in the project root:
 
 ```env
-# REQUIRED (Free)
+# REQUIRED (Free/Cheap)
 GROQ_API_KEY=gsk_your_key_here        # https://console.groq.com
+DEEPSEEK_API_KEY=sk-your_key_here     # https://platform.deepseek.com
 
 # OPTIONAL (Enhances features)
 OPENROUTER_API_KEY=sk-or-your_key     # Vision - https://openrouter.ai
@@ -120,9 +125,10 @@ SPOTIFY_CLIENT_ID=your_id
 SPOTIFY_CLIENT_SECRET=your_secret
 ```
 
-| Service | Free Tier | What It Enables |
-|---------|-----------|-----------------|
+| Service | Free/Paid Tier | What It Enables |
+|---------|----------------|-----------------|
 | Groq | 30 RPM | Core LLM (Llama 3.3 70B) |
+| DeepSeek | Paid (Cheap) | Reasoning & Planning (V4 Flash) |
 | Tavily | 1000/mo | Web search tool |
 | OpenRouter | $5 free | Vision analysis |
 | Spotify | Unlimited | Music control |
@@ -207,15 +213,15 @@ npm run tauri build
 | **Reactive Themes** | UI colors shift based on mood (5 palettes) |
 | **Port 3210** | Optimized port to avoid conflicts |
 
-## 🆕 What's New in V18.0
-
 | Feature | Description |
 |---------|-------------|
-| **AI Vision Layer** | Dedicated Llama 4 Scout 17B (primary) + Llama 3.2 90B (fallback) for screen analysis |
-| **LLM Core Budgets** | Hard limit of 6 LLM calls per turn via `contextvars` (no more infinite loops) |
-| **High Fidelity Results** | Deterministic regex verification forces Responder regeneration if tool data is ignored |
-| **Hallucination Gateways** | Intercepts malformed tool inputs and Wh-question CHAT hallucinations |
-| **Search Cascade Parity** | Multi-tier fallback (Wikipedia > Web) now supported in both Sync and Async paths |
+| **DeepSeek Integration** | First-class provider with strict validation (Model ID required) |
+| **Model Abstraction** | Independent model selection for Router, Planner, Responder, and Verifier |
+| **Request Overrides** | Pass `llm_overrides` in `/chat` to hot-swap models per turn |
+| **Unified Budgeting** | `max_llm_calls` enforced across router + planner + verifier + responder |
+| **UI Validation** | Provider gating in Setup (disabled if key missing) + DeepSeek ID warning |
+
+## 🆕 What's New in V18.0
 
 ### Previous Versions
 

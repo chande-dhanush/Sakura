@@ -123,3 +123,31 @@ Sakura V19.0 is now structurally honest, contract-hardened, and deployment-ready
 1. **Confidence Gating:** Implement true threshold-based routing in `dispatcher.py` (Currently heuristic only).
 2. **Behavioral Impact:** Wire Desire system state deeper into tool selection and timing.
 3. **Multi-monitor mapping:** Fix monitor index mapping in `read_screen` tool.
+
+## Phase 4: Responder Pipeline & Context Synchronization
+**Date:** 2026-04-28
+**Operator:** Antigravity (Principal Engineer Mode)
+
+### Phase Goal
+Resolve `ResponseContext` dataclass instantiation crashes during the response generation phase caused by schema drift from recent refactoring.
+
+---
+
+### Issues Fixed
+
+#### 1. ResponseContext Signature Drift (CRITICAL CRASH)
+- **Root Cause:** `ResponseContext` was refactored in `models/responder.py` to remove `assistant_name`, `system_prompt`, and `tool_used`, while renaming fields like `mood_prompt` to `intent_adjustment`. The calling site in `llm.py:410` was never updated to match this new signature.
+- **Failure Mode:** Any execution reaching the Responder phase triggered `TypeError: ResponseContext.__init__() got an unexpected keyword argument 'assistant_name'`, halting final response synthesis.
+- **Fix Applied:** Updated the `ResponseContext(...)` instantiation in `llm.py` to perfectly map to the new dataclass fields.
+
+#### 2. Ephemeral RAG "data_reasoning" Dropped (SILENT FAILURE)
+- **Root Cause:** The `has_ephemeral` flag, triggered when massive text output falls into Ephemeral RAG, was correctly calculated in `llm.py` but never passed into the `ResponseContext` constructor.
+- **Failure Mode:** `data_reasoning` remained False incorrectly. The LLM would ignore the "data reasoning" prompt instructions, causing it to hallucinate or summarize poorly on massive data queries instead of applying analytical judgment.
+- **Fix Applied:** Mapped `data_reasoning=has_ephemeral` directly into the `ResponseContext` instantiation.
+
+#### 3. Identity Disconnection
+- **Root Cause:** With `assistant_name` stripped from the ResponseContext constructor, any custom renamed identity (e.g., `sakura_name="Bob"`) loaded from user settings was silently discarded before reaching the responder system prompt.
+- **Fix Applied:** Injected the `sakura_name` dynamically into `base_personality` directly inside `llm.py` prior to assigning it to the `ResponseGenerator`, preserving user-defined assistant identity logic structurally without cluttering the context dataclasses.
+
+### Outcome
+The Responder phase is fully synchronized with V19 dataclass schemas.

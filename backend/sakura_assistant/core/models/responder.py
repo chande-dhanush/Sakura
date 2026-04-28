@@ -48,7 +48,6 @@ _ACTION_CLAIM_PATTERNS = [
 @dataclass
 class ResponseContext:
     """Context for generating a response."""
-    __slots__ = ["user_input", "tool_outputs", "history", "graph_context", "intent_adjustment", "current_mood", "study_mode", "data_reasoning", "session_summary"]
     
     user_input: str
     tool_outputs: str = ""

@@ -1,5 +1,5 @@
-# Sakura V18.0 — Technical Documentation
-*System Certified: March 31, 2026*
+# Sakura V19.0 — Model Abstraction & DeepSeek
+*System Certified: April 28, 2026*
 
 ---
 
@@ -7,7 +7,7 @@
 **Sakura** is a production-grade personal AI assistant optimized for cost, performance, and CPU-only deployment.
 **V17.5 "Precise Soul":** Featuring **Model-Specific Token Counting**, **SSE Tool Streaming**, V17.4 **Observability Fix**, plus all prior architecture (Stable Soul, Dependency Injection, Search Cascade).
 **V18.1 "Ironclad Reliability":** 8-point surgical fix sprint eliminating production bugs: Fixed Token Tracking (BUG-04), Tool Result Propagation (BUG-05), Memory Recall Routing (BUG-08), Personal Fact Persistence (BUG-03), Tool Hint Alignment (BUG-01), Weather Hallucination Guard (BUG-02), Cleaner Arg Extraction (BUG-06), and Executor Success Guard (BUG-07).
-**V18.0 "Ironclad Reliability":** 12-point surgical fix eliminating silent failures via Strict Configured Budget Limits, Search Cascade Parity, Ephemeral RAG Data Overrides, and Deterministic Results Fidelity Verification.
+**V19.0 "DeepSeek Integration":** Added DeepSeek as a first-class provider. Implemented request-time LLM overrides for stage-specific model hot-swapping. Enforced request-scoped safety rails (MAX_LLM_CALLS) across the full request lifecycle (Router -> Planner -> Verifier -> Responder).
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
 
@@ -89,6 +89,11 @@
 | **Negative Search Specificity** | **V18.0** | Regex exclusions prevent generic `search` from swallowing specialized intents |
 | **AI Vision (Lllama-4-Scout)** | **V18.0** | Dedicated Groq-hosted vision layer for screenshot/image analysis with fallback |
 | **V18.1 Reliability Sprint** | **V18.1** | 8-part reliability patch fixing token tracking, tool hints, and memory recall |
+| **DeepSeek Provider** | **V19.0** | First-class integration for DeepSeek V3/V4 (OpenAI-compatible direct API) |
+| **Model Abstraction** | **V19.0** | Independent model/provider configuration for every stage (Router, Planner, Responder, Verifier) |
+| **Request Overrides** | **V19.0** | `llm_overrides` support in `/chat` allows dynamic model selection per request |
+| **Unified Budgeting** | **V19.0** | `max_llm_calls` budget synced between `AgentState` and `ExecutionContext` for full-lifecycle protection |
+| **UI Configuration Gating**| **V19.0** | Setup UI disables providers with missing API keys and validates DeepSeek model requirements |
 
 ---
 
@@ -127,6 +132,44 @@ V17 introduces a hardened execution pipeline that eliminates "split-brain" bugs 
 
 ---
 
+## 🎭 Sakura V19.0 — Model Abstraction & Request Overrides
+
+V19 introduces a flexible, decoupled LLM abstraction layer that allows for granular control over which model handles which stage of the cognitive process.
+
+### 1. Granular Stage Assignment
+Users can now configure independent providers and models for:
+*   **Router**: (Groq/Gemini recommended for speed)
+*   **Planner**: (DeepSeek V4 Flash recommended for complex reasoning)
+*   **Responder**: (GPT-4o or DeepSeek V3 for personality)
+*   **Verifier**: (Groq for fast fact-checking)
+
+### 2. Request-Time Overrides
+The `/chat` endpoint now accepts an optional `llm_overrides` object, allowing the frontend (or API users) to hot-swap models for a single turn:
+```json
+{
+  "query": "Solve this complex math problem",
+  "llm_overrides": {
+    "planner": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-flash"
+    }
+  }
+}
+```
+
+### 3. DeepSeek as a First-Class Provider
+DeepSeek is integrated via a direct OpenAI-compatible driver. Unlike "auto" providers that might guess a model ID, DeepSeek requires **explicit model configuration** (e.g., `deepseek-v4-flash`) to ensure compatibility and performance.
+
+### 4. Lifecycle Budget Enforcement
+The `MAX_LLM_CALLS` limit (default: 6) is now enforced across the **entire request**. 
+*   **Router**: Counts as 1 call.
+*   **Planner**: Counts toward the loop limit.
+*   **Verifier**: Counts as 1 call.
+*   **Responder**: Counts as 1 call.
+If the combined count exceeds the limit, the system gracefully terminates with an `LLMBudgetExceededError` to prevent runaway costs.
+
+---
+
 ## 🌸 Sakura V18.1 — Ironclad Reliability (Surgical Diagnostics)
 
 V18 focused exclusively on closing structural loopholes that historically caused silent data ingestion ignorance, hallucinated responses, or execution infinite loops.
@@ -148,6 +191,10 @@ V18 focused exclusively on closing structural loopholes that historically caused
 * **Universal Context Valve Handles**: The Context Valve creates virtual IDs (`Ephemeral Store ID: eph_XXX`) when a tool generates huge text. We injected `query_ephemeral` into `UNIVERSAL_TOOLS` permanently, eliminating instances where the context handle became permanently disconnected across mode switches.
 * **data_reasoning Overrides**: When an ephemeral handle exists in context, `llm.py` parses it and toggles `data_reasoning=True` on `ResponseContext` forcefully, guiding the final LLM synthesis step correctly rather than treating the handle token string as plain text.
 * **Error Escalation**: Sub-loop Planner exceptions explicitly throw `ExecutionResult.error()` strings backwards to the UI, guaranteeing identical visibility.
+
+### 5. Responder Context Synchronization
+* **The Vulnerability:** `ResponseContext` instantiation crashed `SmartAssistant.arun()` because legacy parameters (`assistant_name`, `system_prompt`, `tool_used`) were retained post-refactor, causing unexpected keyword arguments.
+* **The Fix:** Hard-aligned the instantiation call in `llm.py` to match the exact `ResponseContext` dataclass signature. Furthermore, we implemented dynamic injection for custom assistant identities (`sakura_name`) directly into the responder's base personality prompt to ensure custom user settings are not discarded prior to reaching the responder module.
 
 ---
 

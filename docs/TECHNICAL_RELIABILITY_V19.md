@@ -21,7 +21,7 @@ The system now implements a hardware-style "Kill Switch" for background generati
 - **Enforcement**: The `ReActLoop` checks `is_cancelled()` at the start of every iteration. If set, it returns a partial `ExecutionResult` immediately, preventing further LLM/Tool costs.
 
 ### **Context Hardening**
-V19.2 uses `__slots__` and `__post_init__` validation for core data structures (`RequestState`, `ResponseContext`, `RouteResult`) to prevent silent attribute drift and malformed requests from crashing the hot-path.
+V19.2 uses `__post_init__` validation for core data structures (`RequestState`, `ResponseContext`, `RouteResult`) to prevent silent attribute drift and malformed requests from crashing the hot-path. (Note: `__slots__` was removed from dataclasses to resolve default value conflicts).
 
 ## 3. Tool Infrastructure
 

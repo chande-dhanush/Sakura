@@ -54,7 +54,7 @@ class SmartAssistant:
     """
 
     def __init__(self):
-        print("️ Initializing SmartAssistant Facade (V17)...")
+        print("Initializing SmartAssistant Facade (V17)...")
         self.container = get_container()
         self.tools = get_all_tools()
         self.tool_map = {t.name: t for t in self.tools}
@@ -236,6 +236,10 @@ class SmartAssistant:
             custom_prompt = user_settings.get("system_prompt_override", "")
             base_personality = custom_prompt if custom_prompt else SYSTEM_PERSONALITY
             
+            # Inject sakura_name so the responder knows its identity
+            if sakura_name and sakura_name != "Sakura":
+                base_personality = f"Your name is {sakura_name}. Respond as {sakura_name}.\n\n{base_personality}"
+            
             # 3. Response Style Enforcement
             style = user_settings.get("response_style", "balanced").lower()
             style_blocks = {
@@ -409,15 +413,14 @@ class SmartAssistant:
             
             resp_context = ResponseContext(
                 user_input=user_input,
-                assistant_name=sakura_name,
-                system_prompt=self.responder.personality,
-                mood_prompt=mood_prompt,
-                graph_context=resp_ctx.get("responder_context", ""),
-                summary_context=resp_ctx.get("summary_context", ""),
-                tool_output=tool_outputs,
+                tool_outputs=tool_outputs,
                 history=history,
+                graph_context=resp_ctx.get("responder_context", ""),
+                intent_adjustment=mood_prompt,
+                current_mood=resp_ctx.get("current_mood", "Neutral"),
                 study_mode=req_state.study_mode,
-                tool_used=tool_used
+                data_reasoning=has_ephemeral,
+                session_summary=resp_ctx.get("summary_context", "")
             )
             
             with span("Responder"):

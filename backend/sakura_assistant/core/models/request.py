@@ -10,7 +10,6 @@ from typing import List, Dict, Optional
 
 @dataclass
 class RequestState:
-    __slots__ = ["query", "history", "image_data", "study_mode", "reference_context", "classification", "tool_hint", "request_id"]
     
     # Essential Input
     query: str

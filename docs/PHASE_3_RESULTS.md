@@ -14,8 +14,8 @@
 
 | Structure | Current Role | Hardening Applied | Invariant Enforced | Risk Removed |
 | :--- | :--- | :--- | :--- | :--- |
-| `RequestState` | Hot-path state | `__slots__`, `__post_init__` validation | Type checking for query/history, valid classifications only | Silent attribute drift, malformed requests passing through |
-| `ResponseContext` | Response metadata | `__slots__`, `__post_init__` validation | Type checking for input/history/outputs | Responder crashing on non-string tool outputs or list of wrong types |
+| `RequestState` | Hot-path state | `__post_init__` validation | Type checking for query/history, valid classifications only | Silent attribute drift, malformed requests passing through |
+| `ResponseContext` | Response metadata | `__post_init__` validation | Type checking for input/history/outputs | Responder crashing on non-string tool outputs or list of wrong types |
 | `RouteResult` | Router output | `__slots__`, Enum-like validation | Validates classification string, defaults to PLAN if invalid | System deadlock or "UNKNOWN" mode propagation |
 
 ## Fixture Truth Report

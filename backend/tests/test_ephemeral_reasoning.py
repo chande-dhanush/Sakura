@@ -12,6 +12,7 @@ import sys
 # Mock modules that spawn background threads on import to prevent pytest hangs
 sys.modules['pygame'] = MagicMock()
 sys.modules['sakura_assistant.utils.stability_logger'] = MagicMock()
+sys.modules['AppOpener'] = MagicMock()
 
 try:
     from sakura_assistant.core.llm import SmartAssistant

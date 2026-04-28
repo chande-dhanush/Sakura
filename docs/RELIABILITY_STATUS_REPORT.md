@@ -27,7 +27,7 @@ We performed an exhaustive reliability audit to find "Ghost Components" and sile
 
 ### **Reliability Hardening**
 - **[FIXED] Bare Excepts**: 6 bare `except` blocks in `store.py`, `google.py`, `tts.py`, and `ephemeral.py` were replaced with typed exceptions + `logger.warning`.
-- **[FIXED] Type Safety**: Hardened `RequestState`, `ResponseContext`, and `RouteResult` with `__slots__` and data validation.
+- **[FIXED] Type Safety**: Hardened `RequestState`, `ResponseContext`, and `RouteResult` with robust `__post_init__` data validation.
 
 ---
 
