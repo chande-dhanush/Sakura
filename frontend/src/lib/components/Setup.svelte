@@ -57,6 +57,23 @@
     
     // Tab State
     let currentTab = 'general';
+    
+    // V19: Provider gating
+    $: isProviderDisabled = (provider) => {
+        if (!provider || provider === 'auto') return false;
+        if (provider === 'groq' && !config.GROQ_API_KEY) return true;
+        if (provider === 'google' && !config.GOOGLE_API_KEY) return true;
+        if (provider === 'openai' && !config.OPENAI_API_KEY) return true;
+        if (provider === 'openrouter' && !config.OPENROUTER_API_KEY) return true;
+        if (provider === 'deepseek' && !config.DEEPSEEK_API_KEY) return true;
+        return false;
+    };
+
+    $: deepseekWarning = config.PLANNER_PROVIDER === 'deepseek' && !config.PLANNER_MODEL;
+    $: providerKeyWarning = (stage) => {
+        const p = config[`${stage}_PROVIDER`];
+        return p !== 'auto' && isProviderDisabled(p);
+    };
     const tabs = [
         { id: 'general', label: 'General', icon: '⚙️' },
         { id: 'personalization', label: 'Personalization', icon: '🌸' },
@@ -360,23 +377,58 @@
                                 <div class="form-grid">
                                     <div class="form-group">
                                         <label>Router Provider</label>
-                                        <input type="text" value={config.ROUTER_PROVIDER} on:input={(e) => handleInput('ROUTER_PROVIDER', e.target.value)} placeholder="auto|groq|google|openrouter|openai|deepseek" />
+                                        <select value={config.ROUTER_PROVIDER} on:change={(e) => handleInput('ROUTER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('ROUTER')}>
+                                            <option value="auto">Auto (Smart)</option>
+                                            <option value="groq" disabled={isProviderDisabled('groq')}>Groq {!config.GROQ_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="google" disabled={isProviderDisabled('google')}>Google Gemini {!config.GOOGLE_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="openai" disabled={isProviderDisabled('openai')}>OpenAI {!config.OPENAI_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="openrouter" disabled={isProviderDisabled('openrouter')}>OpenRouter {!config.OPENROUTER_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="deepseek" disabled={isProviderDisabled('deepseek')}>DeepSeek {!config.DEEPSEEK_API_KEY ? '(No Key)' : ''}</option>
+                                        </select>
+                                        {#if providerKeyWarning('ROUTER')}
+                                            <small class="error-text">API key missing for selected provider!</small>
+                                        {/if}
                                     </div>
                                     <div class="form-group">
                                         <label>Router Model</label>
-                                        <input type="text" value={config.ROUTER_MODEL} on:input={(e) => handleInput('ROUTER_MODEL', e.target.value)} />
+                                        <input type="text" value={config.ROUTER_MODEL} on:input={(e) => handleInput('ROUTER_MODEL', e.target.value)} placeholder="e.g. llama-3.1-8b-instant" />
                                     </div>
                                     <div class="form-group">
                                         <label>Planner Provider</label>
-                                        <input type="text" value={config.PLANNER_PROVIDER} on:input={(e) => handleInput('PLANNER_PROVIDER', e.target.value)} placeholder="Use deepseek explicitly here" />
+                                        <select value={config.PLANNER_PROVIDER} on:change={(e) => handleInput('PLANNER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('PLANNER')}>
+                                            <option value="auto">Auto (Smart)</option>
+                                            <option value="deepseek" disabled={isProviderDisabled('deepseek')}>DeepSeek (Recommended) {!config.DEEPSEEK_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="openai" disabled={isProviderDisabled('openai')}>OpenAI {!config.OPENAI_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="google" disabled={isProviderDisabled('google')}>Google Gemini {!config.GOOGLE_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="groq" disabled={isProviderDisabled('groq')}>Groq {!config.GROQ_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="openrouter" disabled={isProviderDisabled('openrouter')}>OpenRouter {!config.OPENROUTER_API_KEY ? '(No Key)' : ''}</option>
+                                        </select>
+                                        {#if providerKeyWarning('PLANNER')}
+                                            <small class="error-text">API key missing for selected provider!</small>
+                                        {/if}
                                     </div>
                                     <div class="form-group">
-                                        <label>Planner Model (required if DeepSeek planner)</label>
-                                        <input type="text" value={config.PLANNER_MODEL} on:input={(e) => handleInput('PLANNER_MODEL', e.target.value)} placeholder="Set exact DeepSeek planner model id" />
+                                        <label>Planner Model</label>
+                                        <input type="text" value={config.PLANNER_MODEL} on:input={(e) => handleInput('PLANNER_MODEL', e.target.value)} placeholder="Required for DeepSeek (e.g. deepseek-v4-flash)" class:error={deepseekWarning} />
+                                        {#if deepseekWarning}
+                                            <small class="error-text">DeepSeek requires an explicit Model ID!</small>
+                                        {:else}
+                                            <small class="hint">DeepSeek V4 Flash is recommended for PLAN. Ensure exact model ID.</small>
+                                        {/if}
                                     </div>
                                     <div class="form-group">
                                         <label>Responder Provider</label>
-                                        <input type="text" value={config.RESPONDER_PROVIDER} on:input={(e) => handleInput('RESPONDER_PROVIDER', e.target.value)} />
+                                        <select value={config.RESPONDER_PROVIDER} on:change={(e) => handleInput('RESPONDER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('RESPONDER')}>
+                                            <option value="auto">Auto (Smart)</option>
+                                            <option value="openai" disabled={isProviderDisabled('openai')}>OpenAI {!config.OPENAI_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="google" disabled={isProviderDisabled('google')}>Google Gemini {!config.GOOGLE_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="groq" disabled={isProviderDisabled('groq')}>Groq {!config.GROQ_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="deepseek" disabled={isProviderDisabled('deepseek')}>DeepSeek {!config.DEEPSEEK_API_KEY ? '(No Key)' : ''}</option>
+                                            <option value="openrouter" disabled={isProviderDisabled('openrouter')}>OpenRouter {!config.OPENROUTER_API_KEY ? '(No Key)' : ''}</option>
+                                        </select>
+                                        {#if providerKeyWarning('RESPONDER')}
+                                            <small class="error-text">API key missing for selected provider!</small>
+                                        {/if}
                                     </div>
                                     <div class="form-group">
                                         <label>Responder Model</label>
@@ -384,7 +436,13 @@
                                     </div>
                                     <div class="form-group">
                                         <label>Verifier Provider</label>
-                                        <input type="text" value={config.VERIFIER_PROVIDER} on:input={(e) => handleInput('VERIFIER_PROVIDER', e.target.value)} />
+                                        <select value={config.VERIFIER_PROVIDER} on:change={(e) => handleInput('VERIFIER_PROVIDER', e.target.value)}>
+                                            <option value="auto">Auto (Smart)</option>
+                                            <option value="groq">Groq</option>
+                                            <option value="google">Google Gemini</option>
+                                            <option value="openai">OpenAI</option>
+                                            <option value="deepseek">DeepSeek</option>
+                                        </select>
                                     </div>
                                     <div class="form-group">
                                         <label>Verifier Model</label>
@@ -600,6 +658,28 @@
         color: #ffb6c1;
     }
     .style-option input { display: none; }
+
+    select {
+        background: #1a1a1a;
+        border: 1px solid #333;
+        padding: 12px 16px;
+        border-radius: 12px;
+        color: #fff;
+        outline: none;
+        cursor: pointer;
+        transition: border 0.2s;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        background-size: 1em;
+    }
+    select:focus { border-color: #ffb6c1; }
+
+    .hint { font-size: 11px; color: #666; margin-top: -4px; }
+    .warning { border-color: #f1c40f !important; }
+    .error { border-color: #ff6b6b !important; }
+    .error-text { color: #ff6b6b; font-size: 11px; margin-top: -4px; }
 
     .danger-zone { margin-top: 50px; padding-top: 20px; border-top: 1px solid #222; }
     .reset-btn { background: none; border: none; color: #666; font-size: 13px; cursor: pointer; }

@@ -94,18 +94,21 @@ class ResponseGenerator:
         self.llm = llm
         self.personality = personality
     
-    async def agenerate(self, context: ResponseContext) -> str:
+    async def agenerate(self, context: ResponseContext, llm_override: Any = None) -> str:
         """Async version of generate."""
         messages = self._build_messages(context)
+        
+        # Use provided override or default
+        active_llm = llm_override or self.llm
         
         try:
             print(f" Synthesizing (Async)... ({len(messages)} messages)")
             
             # Invoke with tool_choice=none if supported
             try:
-                response = await self.llm.ainvoke(messages, tool_choice="none")
+                response = await active_llm.ainvoke(messages, tool_choice="none")
             except TypeError:
-                response = await self.llm.ainvoke(messages)
+                response = await active_llm.ainvoke(messages)
             
             raw_response = response.content
             
@@ -163,9 +166,9 @@ class ResponseGenerator:
                         print(f"⚠️ [Fidelity] Response references none of {key_points}. Regenerating.")
                         retry_messages = self._build_messages(context, fidelity_override=True)
                         try:
-                            retry_resp = await self.llm.ainvoke(retry_messages, tool_choice="none")
+                            retry_resp = await active_llm.ainvoke(retry_messages, tool_choice="none")
                         except TypeError:
-                            retry_resp = await self.llm.ainvoke(retry_messages)
+                            retry_resp = await active_llm.ainvoke(retry_messages)
                         final_response, _ = self.validate_output(retry_resp.content)
                         final_response = self._identity_self_check(final_response)
             

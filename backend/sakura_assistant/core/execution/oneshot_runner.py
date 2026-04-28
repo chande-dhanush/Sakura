@@ -126,7 +126,8 @@ class OneShotRunner:
     async def aexecute(
         self,
         tool_name: str,
-        ctx: "ExecutionContext"
+        ctx: "ExecutionContext",
+        llm_overrides: Optional[Dict[str, Any]] = None
     ) -> "ExecutionResult":
         """
         Async execution path.

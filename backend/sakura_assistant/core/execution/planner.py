@@ -247,10 +247,13 @@ class Planner:
         history: Optional[List[Dict]] = None,
         hindsight: Optional[str] = None,
         executed_tools: Optional[List[str]] = None,
-        tool_hint: Optional[str] = None
+        tool_hint: Optional[str] = None,
+        llm_override: Any = None
     ) -> Dict[str, Any]:
         """Async version of planning."""
         try:
+            # Use provided override or default
+            active_llm = llm_override or self.llm
             # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
             filtered_tools = available_tools
             if tool_hint and available_tools:
@@ -271,9 +274,9 @@ class Planner:
             
             # Use async invoke
             if filtered_tools:
-                llm_with_tools = self.llm.bind_tools(filtered_tools)
+                llm_with_tools = active_llm.bind_tools(filtered_tools)
             else:
-                llm_with_tools = self.llm
+                llm_with_tools = active_llm
             
             response = await llm_with_tools.ainvoke(messages)
             

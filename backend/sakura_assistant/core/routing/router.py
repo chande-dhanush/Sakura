@@ -81,8 +81,10 @@ class IntentRouter:
         """
         self.llm = llm
     
-    async def aroute(self, query: str, context: str = "", history: List[Dict] = None) -> RouteResult:
+    async def aroute(self, query: str, context: str = "", history: List[Dict] = None, llm_override: Any = None) -> RouteResult:
         """Async version of route using native ainvoke."""
+        # Use provided override or default
+        active_llm = llm_override or self.llm
         # V13: Detect urgency first (fast, no LLM)
         urgency = get_urgency(query)
         if urgency == "URGENT":
@@ -112,7 +114,7 @@ class IntentRouter:
             ]
             
             # Use async invoke
-            response = await self.llm.ainvoke(messages)
+            response = await active_llm.ainvoke(messages)
             classification, tool_hint = self._parse_response(response.content)
             
             # VERIFICATION-05: Music Force PLAN for references

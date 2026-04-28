@@ -21,7 +21,8 @@ class PlanVerifier:
         self, 
         user_query: str, 
         plan: List[Dict[str, Any]], 
-        tool_results: str
+        tool_results: str,
+        llm_override: Any = None
     ) -> Dict[str, Any]:
         """
         Verify the execution of a plan against the user query.
@@ -30,10 +31,13 @@ class PlanVerifier:
             user_query: The original user request.
             plan: The list of steps the planner generated.
             tool_results: The consolidated output of all tools executed.
+            llm_override: Optional LLM instance for verification.
             
         Returns:
             {"verdict": "PASS" | "FAIL", "reason": "summary"}
         """
+        # Use provided override or default
+        active_llm = llm_override or self.llm
         try:
             # Format plan for the prompt
             plan_str = "\n".join([f"- {s.get('tool')}({s.get('args')})" for s in plan])
@@ -53,7 +57,7 @@ TOOL OUTPUTS:
                 HumanMessage(content=prompt_input)
             ]
             
-            response = await self.llm.ainvoke(messages)
+            response = await active_llm.ainvoke(messages)
             content = response.content.strip()
             
             # Clean possible markdown wrap

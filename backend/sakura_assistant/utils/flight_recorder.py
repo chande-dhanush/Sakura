@@ -43,6 +43,8 @@ MODEL_COSTS = {
     "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
     "deepseek-chat": {"input": 0.27, "output": 1.10},
     "deepseek-reasoner": {"input": 0.55, "output": 2.19},
+    "deepseek-v4-flash": {"input": 0.15, "output": 0.60},
+    "deepseek-v4-pro": {"input": 0.27, "output": 1.10},
     # Default fallback
     "default": {"input": 0.50, "output": 1.00},
 }

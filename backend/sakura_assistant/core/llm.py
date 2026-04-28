@@ -60,22 +60,27 @@ class SmartAssistant:
         self.tool_map = {t.name: t for t in self.tools}
         
         # Get LLMs from container
-        router_llm = self.container.get_router_llm()
-        planner_llm = self.container.get_planner_llm()
-        responder_llm = self.container.get_responder_llm()
-        verifier_llm = self.container.get_verifier_llm()
-        
-        # Validate LLMs are available (prevents NoneType errors later)
-        if router_llm is None or planner_llm is None or responder_llm is None or verifier_llm is None:
-            missing = []
-            if router_llm is None: missing.append("Router")
-            if planner_llm is None: missing.append("Planner")
-            if responder_llm is None: missing.append("Responder")
-            if verifier_llm is None: missing.append("Verifier")
-            raise RuntimeError(
-                f" No LLM configured for: {', '.join(missing)}. "
-                f"Please set a valid provider key (GROQ/GOOGLE/OPENROUTER/OPENAI/DEEPSEEK) and stage model config."
-            )
+        try:
+            router_llm = self.container.get_router_llm()
+            planner_llm = self.container.get_planner_llm()
+            responder_llm = self.container.get_responder_llm()
+            verifier_llm = self.container.get_verifier_llm()
+            
+            # Validate LLMs are available (prevents NoneType errors later)
+            if router_llm is None or planner_llm is None or responder_llm is None or verifier_llm is None:
+                missing = []
+                if router_llm is None: missing.append("Router")
+                if planner_llm is None: missing.append("Planner")
+                if responder_llm is None: missing.append("Responder")
+                if verifier_llm is None: missing.append("Verifier")
+                raise RuntimeError(
+                    f"No LLM configured for: {', '.join(missing)}. "
+                    f"Please check your provider keys and stage-specific model settings."
+                )
+        except RuntimeError as config_err:
+             print(f"❌ [CRITICAL] SmartAssistant configuration failed: {config_err}")
+             # We re-raise to prevent starting in a broken state
+             raise
         
         # Initialize Components via Container
         self.router = IntentRouter(router_llm)
@@ -169,7 +174,7 @@ class SmartAssistant:
             raise
 
 
-    async def arun(self, user_input: str, history: List[Dict], image_data: Optional[str] = None) -> Dict[str, Any]:
+    async def arun(self, user_input: str, history: List[Dict], image_data: Optional[str] = None, llm_overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Async Pipeline (V17):
         1. Vision Check
@@ -182,8 +187,11 @@ class SmartAssistant:
         - Executor replaces ToolExecutor calls
         - ResponseEmitter guarantees exactly one message
         - ExecutionContext threads mode/budget through pipeline
+        - V19: Support optional request-time llm_overrides
         """
         print(f" [LLM] SmartAssistant.arun() STARTED (V17 Async)")
+        if llm_overrides:
+            print(f" [LLM] Applying request-time overrides: {llm_overrides}")
         start_time = time.time()
         state = AgentState()
         recorder = get_recorder()
@@ -286,9 +294,12 @@ class SmartAssistant:
             # causing TypeError crash when router tried history[-3:] on a boolean.
             state.record_llm_call("routing")
             with span("Router"):
+                # Use override LLM if provided
+                r_llm = self.container.get_router_llm(overrides=llm_overrides) if llm_overrides else self.router.llm
                 route_result = await self.router.aroute(
                     query=user_input,
-                    history=history
+                    history=history,
+                    llm_override=r_llm if llm_overrides else None
                 )
             
             req_state.classification = route_result.classification
@@ -309,13 +320,15 @@ class SmartAssistant:
                 state.record_llm_call("execution")
                 
                 with span("Executor"):
+                    # Pass overrides to dispatch
                     exec_result = await self.executor_layer.dispatch(
                         user_input=user_input,
                         classification=route_result.classification,
                         tool_hint=route_result.tool_hint,
                         request_id=request_id,
                         history=history,
-                        reference_context=req_state.reference_context
+                        reference_context=req_state.reference_context,
+                        llm_overrides=llm_overrides
                     )
                 
                 # V17: Use ExecutionStatus instead of bool
@@ -351,10 +364,13 @@ class SmartAssistant:
                     with span("Verifier"):
                         # Convert steps (List[Dict]) to a readable summary for the Verifier
                         plan_steps = exec_result.last_result.get("steps", []) if exec_result.last_result else []
+                        # V19: Resolve verifier LLM with overrides
+                        v_llm = self.container.get_verifier_llm(overrides=llm_overrides) if llm_overrides else self.plan_verifier.llm
                         verification = await self.plan_verifier.averify(
                             user_query=user_input,
                             plan=plan_steps,
-                            tool_results=tool_outputs
+                            tool_results=tool_outputs,
+                            llm_override=v_llm if llm_overrides else None
                         )
                         recorder.log(
                             "Verifier", 
@@ -405,7 +421,9 @@ class SmartAssistant:
             )
             
             with span("Responder"):
-                response_text = await self.responder.agenerate(resp_context)
+                # Use override LLM if provided
+                res_llm = self.container.get_responder_llm(overrides=llm_overrides) if llm_overrides else self.responder.llm
+                response_text = await self.responder.agenerate(resp_context, llm_override=res_llm if llm_overrides else None)
             recorder.log("Responder", f"Generated {len(response_text)} chars")
             
             # V15: Update desire state on messages

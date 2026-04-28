@@ -912,6 +912,7 @@ async def chat(request: Request):
     
     query = data.get("query", "").strip()
     image_data = data.get("image_data")
+    llm_overrides = data.get("llm_overrides") # V19: Support request-time overrides
     try:
         if assistant and hasattr(assistant, "container"):
             cfg = assistant.container.config
@@ -962,7 +963,7 @@ async def chat(request: Request):
                 current_history = store.conversation_history
                 
                 # Execute True Async Pipeline
-                result = await assistant.arun(query, current_history, image_data=image_data)
+                result = await assistant.arun(query, current_history, image_data=image_data, llm_overrides=llm_overrides)
                 
                 # Push success result
                 q.put_nowait({"type": "pipeline_result", "data": result})

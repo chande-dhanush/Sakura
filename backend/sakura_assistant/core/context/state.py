@@ -19,6 +19,7 @@ Non-Core Calls (must be explicitly logged):
 """
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict
+import os
 
 
 class RateLimitExceeded(Exception):
@@ -93,25 +94,34 @@ class AgentState:
         """
         Record an LLM call. Raises RateLimitExceeded if hard limit hit.
         
-        MUST be called BEFORE making the actual LLM call.
-        
-        Args:
-            phase: Pipeline phase (routing/planning/verifying/retrying/responding)
-            essential: If True, allowed up to hard_limit. If False, blocked at soft_limit.
-        
-        Raises:
-            RateLimitExceeded: Hard limit exceeded (8 calls)
-            SoftLimitWarning: Soft limit exceeded for non-essential call
+        V19: Syncs with ExecutionContext for request-scoped budget enforcement.
         """
+        # 1. Sync with ExecutionContext if active
+        try:
+            from ..execution.context import execution_context_var
+            ctx = execution_context_var.get()
+            if ctx:
+                # Sync our local count with context count if it's higher
+                if ctx.llm_call_count > self.llm_call_count:
+                    self.llm_call_count = ctx.llm_call_count
+                
+                # Use context's limit if it's lower than our hard_limit
+                effective_limit = min(self.hard_limit, ctx.max_llm_calls)
+            else:
+                effective_limit = self.hard_limit
+        except (ImportError, LookupError):
+            effective_limit = self.hard_limit
+
+        # 2. Validate phase is known
         # Validate phase is known
         all_phases = CORE_PHASES | NON_CORE_PHASES | {"idle"}
         if phase not in all_phases:
             print(f"⚠️ [AgentState] Unknown phase '{phase}' - treating as core")
         
-        # Check hard limit
-        if self.llm_call_count >= self.hard_limit:
+        # 3. Check hard limit
+        if self.llm_call_count >= effective_limit:
             raise RateLimitExceeded(
-                f" HARD LIMIT ({self.hard_limit}) exceeded at phase '{phase}'. "
+                f" HARD LIMIT ({effective_limit}) exceeded at phase '{phase}'. "
                 f"Call log: {[c['phase'] for c in self.call_log]}"
             )
         

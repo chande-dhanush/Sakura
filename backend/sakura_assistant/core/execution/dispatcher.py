@@ -85,7 +85,8 @@ class Executor:
         tool_hint: Optional[str] = None,
         request_id: Optional[str] = None,
         history: Optional[List[Dict]] = None,  # V17.1: Conversation history
-        reference_context: str = ""            # V19-FIX: Threaded reference context
+        reference_context: str = "",           # V19-FIX: Threaded reference context
+        llm_overrides: Optional[Dict[str, Any]] = None  # V19: request-time overrides
     ) -> ExecutionResult:
         """
         Main dispatch entry point.
@@ -140,7 +141,7 @@ class Executor:
                 result = ExecutionResult.empty()
             
             elif mode == ExecutionMode.ONE_SHOT:
-                result = await self._dispatch_one_shot(tool_hint, ctx)
+                result = await self._dispatch_one_shot(tool_hint, ctx, llm_overrides=llm_overrides)
             
             elif mode == ExecutionMode.ITERATIVE:
                 # V17.3 PRODUCTION GUARD: Disable sharding for complex queries
@@ -156,7 +157,7 @@ class Executor:
                     available_tools = micro_tools if micro_tools else self.tools
                     logger.info(f" [Executor] Sharded {len(available_tools)} tools for intent: {intent}")
                 
-                result = await self._dispatch_iterative(ctx, available_tools, tool_hint=tool_hint)
+                result = await self._dispatch_iterative(ctx, available_tools, tool_hint=tool_hint, llm_overrides=llm_overrides)
             
             else:
                 result = ExecutionResult.error(f"Unknown mode: {mode}")
@@ -177,7 +178,8 @@ class Executor:
     async def _dispatch_one_shot(
         self, 
         tool_name: str, 
-        ctx: ExecutionContext
+        ctx: ExecutionContext,
+        llm_overrides: Optional[Dict[str, Any]] = None
     ) -> ExecutionResult:
         """
         Dispatch to ONE_SHOT runner.
@@ -185,7 +187,7 @@ class Executor:
         If ONE_SHOT fails (args incomplete), falls back to ITERATIVE.
         """
         try:
-            return await self.one_shot_runner.aexecute(tool_name, ctx)
+            return await self.one_shot_runner.aexecute(tool_name, ctx, llm_overrides=llm_overrides)
         
         except OneShotArgsIncomplete as e:
             logger.warning(
@@ -200,14 +202,15 @@ class Executor:
                 snapshot=ctx.snapshot,
                 is_research=False
             )
-            return await self._dispatch_iterative(new_ctx)
+            return await self._dispatch_iterative(new_ctx, llm_overrides=llm_overrides)
     
-    async def _dispatch_iterative(self, ctx: ExecutionContext, available_tools: Optional[List] = None, tool_hint: Optional[str] = None) -> ExecutionResult:
+    async def _dispatch_iterative(self, ctx: ExecutionContext, available_tools: Optional[List] = None, tool_hint: Optional[str] = None, llm_overrides: Optional[Dict[str, Any]] = None) -> ExecutionResult:
         """Dispatch to ReAct loop."""
         return await self.react_loop.arun(
             ctx=ctx,
             available_tools=available_tools or self.tools,
-            tool_hint=tool_hint
+            tool_hint=tool_hint,
+            llm_overrides=llm_overrides
         )
     
     def _determine_mode(

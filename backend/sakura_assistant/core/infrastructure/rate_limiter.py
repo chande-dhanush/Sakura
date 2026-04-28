@@ -197,10 +197,16 @@ class GlobalRateLimiter:
         ),
         # DeepSeek (OpenAI-compatible direct API)
         "deepseek-chat": RateLimitConfig(
-            rpm=30, burst=5, tpm=60000, context_window=64000, name="DeepSeek-Chat"
+            rpm=1000, burst=10, tpm=1000000, context_window=64000, name="DeepSeek-Chat"
         ),
         "deepseek-reasoner": RateLimitConfig(
-            rpm=20, burst=3, tpm=30000, context_window=64000, name="DeepSeek-Reasoner"
+            rpm=50, burst=5, tpm=100000, context_window=64000, name="DeepSeek-Reasoner"
+        ),
+        "deepseek-v4-flash": RateLimitConfig(
+            rpm=2000, burst=20, tpm=2000000, context_window=64000, name="DeepSeek-V4-Flash"
+        ),
+        "deepseek-v4-pro": RateLimitConfig(
+            rpm=1000, burst=10, tpm=1000000, context_window=64000, name="DeepSeek-V4-Pro"
         ),
     }
     

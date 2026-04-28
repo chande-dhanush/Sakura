@@ -609,12 +609,13 @@ class ReActLoop:
     
     async def arun(
         self,
-        ctx: "ExecutionContext" = None,  # V17: NEW - ExecutionContext with budget
-        user_input: str = None,  # Legacy fallback
-        graph_context: str = None,  # Legacy fallback
+        ctx: "ExecutionContext" = None,
+        user_input: str = None,
+        graph_context: str = None,
         available_tools: List = None,
         state=None,
-        tool_hint: Optional[str] = None # VERIFICATION-03
+        tool_hint: Optional[str] = None,
+        llm_overrides: Optional[Dict[str, Any]] = None
     ) -> ExecutionResult:
         """
         Run the ReAct loop asynchronously.
@@ -659,19 +660,40 @@ class ReActLoop:
                     tool_messages=all_tool_messages
                 )
             
-            # V17: CHECK BUDGET BEFORE EACH ITERATION
-            if ctx and ctx.is_expired():
-                print(f"⏱️ [ReActLoop] Budget exceeded ({ctx.elapsed_ms():.0f}ms / {ctx.budget_ms}ms)")
-                # Return partial results
-                return ExecutionResult.timeout(
-                    outputs="\n".join(all_outputs) if all_outputs else "",
-                    tool_messages=all_tool_messages
-                )
+            # V17: CHECK BUDGET & LLM CALL LIMIT BEFORE EACH ITERATION
+            if ctx:
+                if ctx.is_expired():
+                    print(f"⏱️ [ReActLoop] Budget exceeded ({ctx.elapsed_ms():.0f}ms / {ctx.budget_ms}ms)")
+                    return ExecutionResult.timeout(
+                        outputs="\n".join(all_outputs) if all_outputs else "",
+                        tool_messages=all_tool_messages
+                    )
+                
+                # V18 FIX-08: Check LLM call limit (Plan + optional Verify)
+                # We check BEFORE we make the next planner call
+                if ctx.llm_call_count >= ctx.max_llm_calls:
+                    print(f"🛑 [ReActLoop] LLM call limit ({ctx.max_llm_calls}) reached at iteration {iteration + 1}")
+                    return ExecutionResult.timeout(
+                        outputs="\n".join(all_outputs) if all_outputs else "",
+                        tool_messages=all_tool_messages
+                    )
             
             print(f" [ReActLoop] Async iteration {iteration + 1}/{self.max_iterations}")
             
             # 1. PLAN (with timeout if we have budget)
             try:
+                # V18: Record planner call in context and check limit
+                if ctx and not ctx.record_and_check_llm_call():
+                    print(f"🛑 [ReActLoop] LLM call limit ({ctx.max_llm_calls}) reached during iteration {iteration + 1}")
+                    return ExecutionResult.timeout(
+                        outputs="\n".join(all_outputs) if all_outputs else "",
+                        tool_messages=all_tool_messages
+                    )
+                
+                # V19: Resolve planner LLM with overrides
+                from ..infrastructure import get_container
+                planner_llm = get_container().get_planner_llm(overrides=llm_overrides) if llm_overrides else self.planner.llm
+
                 if ctx and ctx.remaining_budget_ms() > 0:
                     # Use asyncio.wait_for with remaining budget
                     step_timeout_ms = _get_int_env("PLANNER_STEP_TIMEOUT_MS", 10000, 1000, 60000)
@@ -685,7 +707,8 @@ class ReActLoop:
                             history=ctx.history, # V17.1
                             hindsight=prev_hindsight,  # FIX-4
                             executed_tools=executed_tools, # BUG-02
-                            tool_hint=tool_hint # VERIFICATION-03
+                            tool_hint=tool_hint, # VERIFICATION-03
+                            llm_override=planner_llm if llm_overrides else None
                         ),
                         timeout=timeout_secs
                     )
@@ -699,7 +722,8 @@ class ReActLoop:
                         history=ctx.history if ctx else None, # V17.1
                         hindsight=prev_hindsight,  # FIX-4
                         executed_tools=executed_tools, # BUG-02
-                        tool_hint=tool_hint # VERIFICATION-03
+                        tool_hint=tool_hint, # VERIFICATION-03
+                        llm_override=planner_llm if llm_overrides else None
                     )
             
             except asyncio.TimeoutError:

@@ -114,49 +114,97 @@ class Container:
     def has_deepseek(self) -> bool:
         return bool(self.deepseek_api_key)
     
-    def get_router_llm(self):
+    def get_router_llm(self, overrides: Optional[Dict[str, Any]] = None):
         """Get or create router LLM (lazy-loaded)."""
-        if "router" not in self._llms:
-            self._llms["router"] = self._create_reliable_llm(
+        key = "router"
+        if overrides:
+            # V19: Support nested request-time overrides or flat settings overrides
+            stage_overrides = overrides.get("router", {}) if isinstance(overrides.get("router"), dict) else {}
+            return self._create_reliable_llm(
+                stage="router",
+                model=stage_overrides.get("model") or overrides.get("router_model", self.config.router_model),
+                temperature=0.0,
+                name="Router-Override",
+                provider_override=stage_overrides.get("provider") or overrides.get("router_provider")
+            )
+            
+        if key not in self._llms:
+            self._llms[key] = self._create_reliable_llm(
                 stage="router",
                 model=self.config.router_model,
                 temperature=self.config.router_temp,
                 name="Router",
             )
-        return self._llms["router"]
+        return self._llms[key]
     
-    def get_planner_llm(self):
+    def get_planner_llm(self, overrides: Optional[Dict[str, Any]] = None):
         """Get or create planner LLM (lazy-loaded)."""
-        if "planner" not in self._llms:
-            self._llms["planner"] = self._create_reliable_llm(
+        key = "planner"
+        if overrides:
+            # V19: Support nested request-time overrides or flat settings overrides
+            stage_overrides = overrides.get("planner", {}) if isinstance(overrides.get("planner"), dict) else {}
+            return self._create_reliable_llm(
+                stage="planner",
+                model=stage_overrides.get("model") or overrides.get("planner_model", self.config.planner_model),
+                temperature=stage_overrides.get("temperature") or overrides.get("planner_temp", self.config.planner_temp),
+                name="Planner-Override",
+                provider_override=stage_overrides.get("provider") or overrides.get("planner_provider")
+            )
+            
+        if key not in self._llms:
+            self._llms[key] = self._create_reliable_llm(
                 stage="planner",
                 model=self.config.planner_model,
                 temperature=self.config.planner_temp,
                 name="Planner",
             )
-        return self._llms["planner"]
+        return self._llms[key]
     
-    def get_responder_llm(self):
+    def get_responder_llm(self, overrides: Optional[Dict[str, Any]] = None):
         """Get or create responder LLM (lazy-loaded)."""
-        if "responder" not in self._llms:
-            self._llms["responder"] = self._create_reliable_llm(
+        key = "responder"
+        if overrides:
+            # V19: Support nested request-time overrides or flat settings overrides
+            stage_overrides = overrides.get("responder", {}) if isinstance(overrides.get("responder"), dict) else {}
+            return self._create_reliable_llm(
+                stage="responder",
+                model=stage_overrides.get("model") or overrides.get("responder_model", self.config.responder_model),
+                temperature=stage_overrides.get("temperature") or overrides.get("responder_temp", self.config.responder_temp),
+                name="Responder-Override",
+                provider_override=stage_overrides.get("provider") or overrides.get("responder_provider")
+            )
+            
+        if key not in self._llms:
+            self._llms[key] = self._create_reliable_llm(
                 stage="responder",
                 model=self.config.responder_model,
                 temperature=self.config.responder_temp,
                 name="Responder",
             )
-        return self._llms["responder"]
+        return self._llms[key]
 
-    def get_verifier_llm(self):
+    def get_verifier_llm(self, overrides: Optional[Dict[str, Any]] = None):
         """Get or create verifier LLM (lazy-loaded)."""
-        if "verifier" not in self._llms:
-            self._llms["verifier"] = self._create_reliable_llm(
+        key = "verifier"
+        if overrides:
+            # V19: Support nested request-time overrides or flat settings overrides
+            stage_overrides = overrides.get("verifier", {}) if isinstance(overrides.get("verifier"), dict) else {}
+            return self._create_reliable_llm(
+                stage="verifier",
+                model=stage_overrides.get("model") or overrides.get("verifier_model", self.config.verifier_model),
+                temperature=0.0,
+                name="Verifier-Override",
+                provider_override=stage_overrides.get("provider") or overrides.get("verifier_provider")
+            )
+            
+        if key not in self._llms:
+            self._llms[key] = self._create_reliable_llm(
                 stage="verifier",
                 model=self.config.verifier_model,
                 temperature=0.0,
                 name="Verifier",
             )
-        return self._llms["verifier"]
+        return self._llms[key]
     
     def get_backup_llm(self):
         """Get backup LLM for vision/failover."""
@@ -164,16 +212,26 @@ class Container:
             self._llms["backup"] = self._create_backup_llm()
         return self._llms["backup"]
     
-    def _create_reliable_llm(self, stage: str, model: str, temperature: float, name: str):
+    def _create_reliable_llm(self, stage: str, model: str, temperature: float, name: str, provider_override: Optional[str] = None):
         """Create a ReliableLLM with stage-aware provider selection + backup."""
         from ..models.wrapper import ReliableLLM
 
-        provider = self._resolve_stage_provider(stage)
+        provider = provider_override or self._resolve_stage_provider(stage)
         primary = self._build_provider_llm(provider=provider, model=model, temperature=temperature, stage=stage)
+        
         if primary is None:
+            # If explicit provider was requested but failed (e.g. no key), log clearly and FAIL FAST
+            if provider != "auto":
+                log.error(f"Critical resolution failure: Stage '{stage}' requested provider '{provider}' but it is unavailable or misconfigured.")
+                raise RuntimeError(
+                    f"FATAL: Selected provider '{provider}' for stage '{stage}' is unavailable (missing API key or dependency). "
+                    f"Please check your settings or use 'auto' for automatic fallback."
+                )
+                
             log.warning(f"{name}: provider={provider} unavailable, trying backup provider chain")
             primary = self._create_backup_llm()
             if primary is None:
+                log.error(f"Fatal: Stage '{stage}' could not resolve any valid LLM provider.")
                 return None
             return ReliableLLM(primary, None, name)
 
@@ -285,11 +343,17 @@ class Container:
             )
         if provider == "deepseek":
             if not self.deepseek_api_key:
+                log.error(f"DeepSeek provider requested for stage '{stage}' but DEEPSEEK_API_KEY is missing.")
                 return None
-            if stage == "planner" and not model:
+            
+            # STALKER-G: Require explicit model for DeepSeek (v3 parity)
+            if not model or model.strip() == "":
+                log.error(f"DeepSeek provider requested for stage '{stage}' but no Model ID was provided.")
                 raise RuntimeError(
-                    "PLANNER_PROVIDER=deepseek requires PLANNER_MODEL to be explicitly configured."
+                    f"Configuration Error: {stage.upper()}_PROVIDER=deepseek requires {stage.upper()}_MODEL to be explicitly configured. "
+                    "DeepSeek does not support a default 'guess' model ID in this architecture."
                 )
+                
             from langchain_openai import ChatOpenAI
             return ChatOpenAI(
                 model=model,
