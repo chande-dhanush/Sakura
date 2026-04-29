@@ -1,4 +1,4 @@
-# Sakura V10 Docker Ignore
+# Sakura V19.5 Docker Ignore
 # ========================
 
 # Virtual environments
@@ -44,6 +44,11 @@ data/chroma_store/
 data/faiss_store/
 data/world_graph.json
 data/wake_templates/
+data/flight_recorder.jsonl
+data/*.bak
+temp_audio/
+sakura_assistant/scratch/
+scratch/
 
 # System
 Thumbs.db

@@ -1,4 +1,4 @@
-# Sakura V10 Backend Dockerfile
+# Sakura V19.5 Backend Dockerfile
 FROM python:3.11-slim
 
 # Set environment

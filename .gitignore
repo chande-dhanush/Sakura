@@ -19,6 +19,11 @@ env/
 # ============ Data & Logs ============
 data/chroma_store/
 data/faiss_store/
+backend/data/flight_recorder.jsonl
+backend/data/conversation_history.json
+backend/data/*.bak
+backend/data/*.log
+backend/temp_audio/
 /logs/
 *.log
 *.db
@@ -53,6 +58,12 @@ target/
 Heart Manim Scripts/
 Memory Manim Scripts/
 Notes/
+
+# ============ Scratch & Tests ============
+backend/sakura_assistant/scratch/
+backend/scratch/
+backend/tests/__pycache__/
+.pytest_cache/
 
 # ============ Tauri ============
 frontend/src-tauri/target/
