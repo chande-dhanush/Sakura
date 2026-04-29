@@ -1,4 +1,4 @@
-# Sakura V19.0 — Model Abstraction & DeepSeek
+# Sakura V19.2 — Execution Stability & Hardening
 *System Certified: April 28, 2026*
 
 ---
@@ -8,6 +8,8 @@
 **V17.5 "Precise Soul":** Featuring **Model-Specific Token Counting**, **SSE Tool Streaming**, V17.4 **Observability Fix**, plus all prior architecture (Stable Soul, Dependency Injection, Search Cascade).
 **V18.1 "Ironclad Reliability":** 8-point surgical fix sprint eliminating production bugs: Fixed Token Tracking (BUG-04), Tool Result Propagation (BUG-05), Memory Recall Routing (BUG-08), Personal Fact Persistence (BUG-03), Tool Hint Alignment (BUG-01), Weather Hallucination Guard (BUG-02), Cleaner Arg Extraction (BUG-06), and Executor Success Guard (BUG-07).
 **V19.0 "DeepSeek Integration":** Added DeepSeek as a first-class provider. Implemented request-time LLM overrides for stage-specific model hot-swapping. Enforced request-scoped safety rails (MAX_LLM_CALLS) across the full request lifecycle (Router -> Planner -> Verifier -> Responder).
+**V19.2 "Execution Stability & Hardening":** Resolved critical regressions in clipboard routing and planning loops. Implemented tool alias normalization and terminal action enforcement for system-level tasks. Hardened metadata preservation during budget failures to eliminate `mode="unknown"` issues.
+
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
 
@@ -94,6 +96,10 @@
 | **Request Overrides** | **V19.0** | `llm_overrides` support in `/chat` allows dynamic model selection per request |
 | **Unified Budgeting** | **V19.0** | `max_llm_calls` budget synced between `AgentState` and `ExecutionContext` for full-lifecycle protection |
 | **UI Configuration Gating**| **V19.0** | Setup UI disables providers with missing API keys and validates DeepSeek model requirements |
+| **Terminal Enforcement** | **V19.2** | System actions (clipboard, screen) terminate planning loops instantly to save budget |
+| **Tool Alias Resilience** | **V19.2** | Support for common hallucinated names (e.g., `read_clipboard` → `clipboard_read`) |
+| **Metadata Hardening** | **V19.2** | Guarantees consistent `mode` and `tool_used` metadata in all error/budget paths |
+
 
 ---
 
@@ -167,6 +173,29 @@ The `MAX_LLM_CALLS` limit (default: 6) is now enforced across the **entire reque
 *   **Verifier**: Counts as 1 call.
 *   **Responder**: Counts as 1 call.
 If the combined count exceeds the limit, the system gracefully terminates with an `LLMBudgetExceededError` to prevent runaway costs.
+
+---
+
+## 🌸 Sakura V19.2 — Execution Stability & Hardening
+
+V19.2 addresses operational "ghosting" bugs where tools were successfully executed but the pipeline failed to terminate or report the status correctly.
+
+### 1. Terminal Action Enforcement
+* **The Vulnerability:** Certain system tools (like `clipboard_read`) were not marked as terminal, causing the Planner to repeatedly generate "Next Step: read clipboard" in a loop until the budget was exhausted.
+* **The Fix:** Added a `TERMINAL_ACTIONS` registry in `ExecutionPolicy`. Once a tool in this registry succeeds, the `ReActLoop` breaks immediately, saving up to 66% of the LLM budget for simple tasks.
+
+### 2. Tool Alias Normalization
+* **The Vulnerability:** LLMs frequently hallucinate `read_clipboard` or `write_clipboard` despite the registry using `clipboard_read`. This led to unnecessary "Tool not found" errors and planning retries.
+* **The Fix:** Implemented a tool alias layer in `tools.py`. Hallucinated names are now first-class mappings to the underlying tool implementations.
+
+### 3. Direct Path Intent Exceptions
+* **The Vulnerability:** Aggressive reference resolution triggers ("my ", "that ") forced queries like "read my clipboard" into the Planner (PLAN), adding 3+ LLM calls of latency for a static system task.
+* **The Fix:** Updated `router.py` with intent-specific exceptions. System nouns like "clipboard", "screen", and "volume" now bypass the PLAN trigger even when possessives are used, forcing a high-speed `DIRECT` route.
+
+### 4. Mode & Metadata Persistence
+* **The Vulnerability:** Exceptions (Budget/Timeout) occasionally returned `mode="unknown"` and empty tool lists in metadata, breaking auditability.
+* **The Fix:** Hardened the pipeline's error response contract to always preserve the `RouteResult` classification and accurately reflect any tools that were executed prior to the failure.
+
 
 ---
 
