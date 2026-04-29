@@ -31,5 +31,7 @@ A system for managing temporary, extremely large tool outputs (e.g., scraping 10
 - **Management**: `EphemeralManager` handles auto-cleanup and mass-purge (`clear_all()`). 
 - **Tool**: `clear_all_ephemeral_memory` allows manual cache clearing.
 
-### **Tool Filtering (Token Optimization)**
-The `Planner` now uses semantic tool filtering at the prompt level. Based on the Router's `tool_hint`, only relevant tool categories (e.g., "music", "search") are injected into the prompt, reducing token usage by up to 80% for simple tasks.
+### **Tool Filtering & Terminal Enforcement (V19.2)**
+*   **Semantic Gating**: The `Planner` now uses semantic tool filtering at the prompt level. Based on the Router's `tool_hint`, only relevant tool categories (e.g., "music", "search") are injected into the prompt, reducing token usage by up to 80% for simple tasks.
+*   **Terminal Actions**: To prevent planning loops, system actions (clipboard, screen, volume) are now marked as **Terminal**. Once these tools succeed, the `ReActLoop` terminates immediately without re-consulting the Planner.
+*   **Alias Normalization**: The system now supports naming aliases (e.g., `read_clipboard` → `clipboard_read`) to ensure the pipeline is resilient to LLM naming hallucinations.

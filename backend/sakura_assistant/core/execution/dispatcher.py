@@ -29,7 +29,7 @@ from .context import (
     GraphSnapshot
 )
 from .oneshot_runner import OneShotRunner, OneShotArgsIncomplete
-from ..routing.micro_toolsets import get_micro_toolset, detect_semantic_intent
+from ..routing.micro_toolsets import get_micro_toolset, detect_semantic_intent, resolve_tool_hint
 
 logger = get_logger(__name__)
 
@@ -111,6 +111,9 @@ class Executor:
         # 1. Take graph snapshot at entry
         snapshot = GraphSnapshot.from_graph(self.world_graph)
         
+        # Resolve tool hint alias before anything else
+        tool_hint = resolve_tool_hint(tool_hint)
+        
         # 2. Determine execution mode (deterministic)
         mode = self._determine_mode(classification, tool_hint, user_input)
         
@@ -161,10 +164,12 @@ class Executor:
             
             else:
                 result = ExecutionResult.error(f"Unknown mode: {mode}")
+                result.last_result = {"mode": mode.value}
         
         except Exception as e:
             logger.error(f" [Executor] Execution failed: {e}")
             result = ExecutionResult.error(str(e))
+            result.last_result = {"mode": mode.value if 'mode' in locals() else "unknown"}
         
         # 6. Log completion
         elapsed_ms = (time.time() - start_time) * 1000
@@ -235,8 +240,8 @@ class Executor:
         
         # Rule 2: DIRECT with valid, extractable tool → ONE_SHOT
         if classification == "DIRECT" and tool_hint:
-            # V17.3: Resolve hint before checking existence (e.g., youtube_control -> play_youtube)
-            actual_tool = OneShotRunner.HINT_MAPPING.get(tool_hint, tool_hint)
+            # Tool hint already resolved at top of dispatch
+            actual_tool = tool_hint
             
             # Check 1: Tool exists
             if actual_tool not in self.tool_names:

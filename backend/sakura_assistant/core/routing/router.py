@@ -210,7 +210,11 @@ class IntentRouter:
         # These MUST go to LLM -> PLAN for memory resolution
         triggers = [" it", " that", " the one", "favourite", "fav ", "last ", "my "]
         if any(t in text for t in triggers) or text.endswith(" it") or text.endswith(" that"):
-            return False
+            # V19: Exception for common system nouns that don't need memory resolution
+            if "clipboard" in text or "screen" in text or "volume" in text:
+                pass
+            else:
+                return False
         
         # Action verbs that ALWAYS need tools
         action_verbs = [
@@ -222,6 +226,7 @@ class IntentRouter:
             "create", "add", "make", "delete", "remove",         # CRUD
             "download", "upload", "save", "export",              # Files
             "turn on", "turn off", "enable", "disable",          # System
+            "read", "write", "clipboard"                         # Clipboard
         ]
         
         words = text.split()
@@ -286,6 +291,13 @@ class IntentRouter:
             elif any(v in text for v in ["create", "make", "new", "write"]):
                 return "note_create"
             return "note_read"
+        
+        if "wikipedia" in text: return "search_wikipedia"
+        if "arxiv" in text: return "search_arxiv"
+        if "clipboard" in text: return "read_clipboard"
+        
+        # System control guessing
+        if any(w in text for w in ["volume", "brightness", "mute"]): return "system_control"
         
         return None
     

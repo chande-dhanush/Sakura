@@ -39,6 +39,8 @@ from ..utils.note_tools import (
     note_create, note_append, note_overwrite, note_read,
     note_list, note_delete, note_search, note_open
 )
+read_clipboard = clipboard_read
+write_clipboard = clipboard_write
 
 # Ephemeral RAG tools (re-export for Planner)
 # Assuming they are aliases or wrappers around memory tools
@@ -184,6 +186,7 @@ def get_all_tools():
         # System
         get_system_info, read_screen, open_app, 
         clipboard_read, clipboard_write, 
+        read_clipboard, write_clipboard, # Aliases
         file_read, file_write, file_open,
         set_timer, volume_control, get_location, set_reminder,
         

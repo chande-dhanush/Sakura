@@ -98,6 +98,7 @@ class ExecutionPolicy:
     TERMINAL_ACTIONS = {
         "play_youtube", "spotify_control", "open_app", "open_site",
         "file_open", "gmail_send_email", "calendar_create_event",
+        "clipboard_read", "clipboard_write", "read_clipboard", "write_clipboard",
         "tasks_create", "note_create", "set_timer", "set_reminder"
     }
     
@@ -557,12 +558,18 @@ class ReActLoop:
                 if iteration == 0:
                     status_msg = "Planning failed: No tools selected for action request"
                     print(f"❌ [ReActLoop] {status_msg}")
-                    return ExecutionResult.error(status_msg)
+                    res = ExecutionResult.error(status_msg)
+                    if 'ctx' in locals() and ctx:
+                        res.last_result = {"mode": ctx.mode.value}
+                    return res
                 
                 error = plan_result.get("error")
                 if error:
                     print(f"❌ [ReActLoop] Planner error: {error}")
-                    return ExecutionResult.error(f"Planning failed: {error}")
+                    res = ExecutionResult.error(f"Planning failed: {error}")
+                    if 'ctx' in locals() and ctx:
+                        res.last_result = {"mode": ctx.mode.value}
+                    return res
                 print("⏹️ [ReActLoop] No more steps - complete")
                 break
             
@@ -740,12 +747,16 @@ class ReActLoop:
                 if iteration == 0:
                     status_msg = "Planning failed: No tools selected for action request (async)"
                     print(f"❌ [ReActLoop] {status_msg}")
-                    return ExecutionResult.error(status_msg)
+                    res = ExecutionResult.error(status_msg)
+                    if ctx: res.last_result = {"mode": ctx.mode.value}
+                    return res
 
                 error = plan_result.get("error")
                 if error:
                     print(f"❌ [ReActLoop] Planner error: {error}")
-                    return ExecutionResult.error(f"Planning failed: {error}")
+                    res = ExecutionResult.error(f"Planning failed: {error}")
+                    if ctx: res.last_result = {"mode": ctx.mode.value}
+                    return res
                 print("⏹️ [ReActLoop] No more steps - complete")
                 break
             
@@ -793,12 +804,26 @@ class ReActLoop:
                 print(f" [ReActLoop] Async terminal action '{final_tool_used}' completed")
                 break  # V17.1: RESTORED terminal break
         
+        # V19: Determine final status from tool execution
+        # If any tool in any iteration succeeded, we consider it at least PARTIAL
+        any_success = any(msg.get('status') == 'success' for msg in all_tool_messages if isinstance(msg, dict))
+        if not any_success:
+            # Check for LangChain ToolMessage objects too
+            any_success = any(getattr(msg, 'status', None) == 'success' for msg in all_tool_messages)
+
+        if 'exec_result' in locals() and exec_result:
+            final_status = exec_result.status
+        elif iteration == 0 and not steps:
+            final_status = ExecutionStatus.FAILED
+        else:
+            final_status = ExecutionStatus.SUCCESS if any_success else ExecutionStatus.FAILED
+            
         return ExecutionResult(
             outputs="\n".join(all_outputs),
             tool_messages=all_tool_messages,
             tool_used=final_tool_used,
             last_result=final_last_result,
-            status=ExecutionStatus.SUCCESS
+            status=final_status
         )
     
     def _execute_steps(

@@ -223,7 +223,6 @@ class ReliableLLM:
             # Can't await in sync context, just proceed
         except RuntimeError:
             # No event loop, do blocking check
-            import time
             while bucket.tokens < 1:
                 bucket._refill()
                 if bucket.tokens < 1:

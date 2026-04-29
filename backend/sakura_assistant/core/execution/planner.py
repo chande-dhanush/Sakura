@@ -106,6 +106,44 @@ class Planner:
         
         return messages
     
+    def _filter_tools(self, available_tools: List, tool_hint: str) -> List:
+        """
+        Filter tools based on hint while ensuring core capabilities are present
+        only if the filtered set is empty or invalid.
+        """
+        from ..routing.micro_toolsets import MICRO_TOOLSETS, UNIVERSAL_TOOLS, SEARCH_TOOLS, resolve_tool_hint
+        
+        target_names = set()
+        
+        # 1. Exact match on resolved hint
+        resolved_hint = resolve_tool_hint(tool_hint)
+        if resolved_hint:
+            target_names.add(resolved_hint)
+        
+        # 2. Category match
+        if tool_hint in MICRO_TOOLSETS:
+            target_names.update(MICRO_TOOLSETS[tool_hint]["primary"])
+            
+        filtered = [t for t in available_tools if t.name in target_names]
+        
+        # 3. Fallback to baseline if filtered set is empty
+        if not filtered:
+            print(f"⚠️ [Planner] Filtered toolset for hint '{tool_hint}' is empty. Falling back to baseline.")
+            baseline_categories = ["music", "search", "system"]
+            baseline_tools = set(UNIVERSAL_TOOLS)
+            for cat in baseline_categories:
+                if cat in MICRO_TOOLSETS:
+                    baseline_tools.update(MICRO_TOOLSETS[cat]["primary"])
+            baseline_tools.update(SEARCH_TOOLS)
+            
+            filtered = [t for t in available_tools if t.name in baseline_tools]
+            
+            # Absolute fallback
+            if not filtered:
+                filtered = available_tools
+                
+        return filtered
+
     def plan(
         self, 
         user_input: str, 
@@ -120,122 +158,95 @@ class Planner:
     ) -> Dict[str, Any]:
         """
         Generate a plan for the user's request.
-        
-        Args:
-            user_input: What the user wants
-            context: Optional context (graph references, etc.)
-            tool_history: Previous steps in an iterative session
-            available_tools: Tools the LLM can choose from (provided by caller)
-            
-        Returns:
-            {
-                "steps": [
-                    {"id": 1, "tool": "search_web", "args": {...}},
-                    {"id": 2, "tool": "summarize", "args": {...}}
-                ],
-                "complete": False,  # True if no more steps needed
-                "message": <AIMessage>  # Raw LLM response
-            }
         """
-        try:
-            # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
-            filtered_tools = available_tools
-            if tool_hint and available_tools:
-                filtered_tools = self._filter_tools(available_tools, tool_hint)
-                if len(filtered_tools) < len(available_tools):
-                    print(f"📉 [Planner] Filtered tools: {len(available_tools)} -> {len(filtered_tools)} (Hint: {tool_hint})")
+        # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
+        filtered_tools = available_tools
+        if tool_hint and available_tools:
+            filtered_tools = self._filter_tools(available_tools, tool_hint)
+            if len(filtered_tools) < len(available_tools):
+                print(f"📉 [Planner] Filtered tools: {len(available_tools)} -> {len(filtered_tools)} (Hint: {tool_hint})")
 
-            # Build conversation context (V17.1: include history)
-            messages = self._build_messages(
-                user_input, 
-                context, 
-                tool_history, 
-                history, 
-                hindsight, 
-                executed_tools, 
-                tool_hint
-            )
+        # Build conversation context (V17.1: include history)
+        messages = self._build_messages(
+            user_input, 
+            context, 
+            tool_history, 
+            history, 
+            hindsight, 
+            executed_tools, 
+            tool_hint
+        )
+        
+        # Bind tools if provided
+        active_llm = self.llm
+        if filtered_tools:
+            # V10.2: Enforce tool usage on initial plan
+            force_tool = not tool_history
+            tool_choice = "any" if force_tool else "auto"
             
-            # Bind tools if provided
-            if filtered_tools:
-                llm_with_tools = self.llm.bind_tools(filtered_tools)
-            else:
-                llm_with_tools = self.llm
+            try:
+                active_llm = self.llm.bind_tools(filtered_tools, tool_choice=tool_choice)
+                if force_tool:
+                    print("🛠️ [Planner] Enforcing tool usage (tool_choice='any')")
+            except TypeError:
+                print("⚠️ [Planner] Model doesn't support tool_choice, falling back to soft-prompt")
+                active_llm = self.llm.bind_tools(filtered_tools)
+        
+        print(f"🧠 [Planner] Generating plan... ({len(filtered_tools) if filtered_tools else 0} tools available)")
+        
+        # V18.3 BUG-08: Use invoke directly, self.llm handles retries implicitly
+        response = active_llm.invoke(messages)
+        
+        # Process tool calls
+        if hasattr(response, 'tool_calls') and response.tool_calls:
+            steps = []
+            for i, call in enumerate(response.tool_calls):
+                steps.append({
+                    "id": i + 1,
+                    "tool": call['name'],
+                    "args": call['args']
+                })
             
-            # Ask LLM to plan
-            response = llm_with_tools.invoke(messages)
-            
-            # Parse tool calls into clean step format
-            if response.tool_calls:
-                steps = [
-                    {
-                        "id": i + 1,
-                        "tool": call["name"],
-                        "args": call["args"],
-                        "tool_call_id": call.get("id")
-                    }
-                    for i, call in enumerate(response.tool_calls)
-                ]
-                
-                return {
-                    "steps": steps,
-                    "complete": False,
-                    "message": response
-                }
-            else:
-                # V18 FIX-03: Anti-hallucination gate
-                # If tools were bound but LLM answered from training data,
-                # retry ONCE with a strong enforcement message.
-                # Only fires when available_tools were passed (not pure CHAT).
-                if available_tools:
-                    print(f"⚠️ [Planner] No tool calls despite {len(available_tools)} tools bound. Retrying with enforcement...")
-                    tool_names = [t.name for t in available_tools[:10]]
-                    enforcement_msg = HumanMessage(
-                        content=(
-                            "SYSTEM OVERRIDE: You MUST call a tool. You answered from "
-                            "training data. Your text answer will be DISCARDED. "
-                            "Call the most relevant tool NOW. "
-                            f"Available: {tool_names}"
-                        )
-                    )
-                    retry_messages = messages + [response, enforcement_msg]
-                    retry_response = llm_with_tools.invoke(retry_messages)
-                    
-                    if retry_response.tool_calls:
-                        print(f"✅ [Planner] Enforcement succeeded: {len(retry_response.tool_calls)} tool call(s)")
-                        steps = [
-                            {
-                                "id": i + 1,
-                                "tool": call["name"],
-                                "args": call["args"],
-                                "tool_call_id": call.get("id")
-                            }
-                            for i, call in enumerate(retry_response.tool_calls)
-                        ]
-                        return {
-                            "steps": steps,
-                            "complete": False,
-                            "message": retry_response
-                        }
-                    else:
-                        print(f"⚠️ [Planner] Enforcement failed — LLM still refused tools")
-                
-                # No tool calls = either chat response or task complete
-                return {
-                    "steps": [],
-                    "complete": True,
-                    "message": response
-                }
-                
-        except Exception as e:
-            # Let errors bubble up to caller
-            # Planner doesn't handle retries - that's Executor's job
             return {
-                "steps": [],
+                "steps": steps,
                 "complete": False,
-                "error": str(e),
-                "message": None
+                "message": response
             }
+        else:
+            # V10.2 Anti-Hallucination: If tool forced but ignored
+            if filtered_tools and not tool_history:
+                print(f"⚠️ [Planner] Model ignored tool_choice='any', applying soft-retry")
+                messages.append(response)
+                
+                from langchain_core.messages import HumanMessage
+                from ...config import PLANNER_RETRY_PROMPT
+                messages.append(HumanMessage(content=PLANNER_RETRY_PROMPT))
+                
+                retry_resp = active_llm.invoke(messages)
+                
+                if hasattr(retry_resp, 'tool_calls') and retry_resp.tool_calls:
+                    print(f"✅ [Planner] Soft-retry successful")
+                    steps = []
+                    for i, call in enumerate(retry_resp.tool_calls):
+                        steps.append({
+                            "id": i + 1,
+                            "tool": call['name'],
+                            "args": call['args']
+                        })
+                    return {
+                        "steps": steps,
+                        "complete": False,
+                        "message": retry_resp
+                    }
+                else:
+                    print(f"⚠️ [Planner] Enforcement failed — LLM still refused tools")
+            
+        # No tool calls = either chat response or task complete
+        return {
+            "steps": [],
+            "complete": True,
+            "message": response
+        }
     
     async def aplan(
         self, 
@@ -251,98 +262,85 @@ class Planner:
         llm_override: Any = None
     ) -> Dict[str, Any]:
         """Async version of planning."""
-        try:
-            # Use provided override or default
-            active_llm = llm_override or self.llm
-            # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
-            filtered_tools = available_tools
-            if tool_hint and available_tools:
-                filtered_tools = self._filter_tools(available_tools, tool_hint)
-                if len(filtered_tools) < len(available_tools):
-                    print(f"📉 [Planner] Filtered tools: {len(available_tools)} -> {len(filtered_tools)} (Hint: {tool_hint})")
+        # Use provided override or default
+        active_llm = llm_override or self.llm
+        # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
+        filtered_tools = available_tools
+        if tool_hint and available_tools:
+            filtered_tools = self._filter_tools(available_tools, tool_hint)
+            if len(filtered_tools) < len(available_tools):
+                print(f"📉 [Planner] Filtered tools: {len(available_tools)} -> {len(filtered_tools)} (Hint: {tool_hint})")
 
-            # Build conversation context
-            messages = self._build_messages(
-                user_input, 
-                context, 
-                tool_history, 
-                history, 
-                hindsight, 
-                executed_tools, 
-                tool_hint
-            )
+        messages = self._build_messages(
+            user_input, 
+            context, 
+            tool_history, 
+            history, 
+            hindsight, 
+            executed_tools, 
+            tool_hint
+        )
+        
+        # Bind tools
+        if filtered_tools:
+            force_tool = not tool_history
+            tool_choice = "any" if force_tool else "auto"
+            try:
+                active_llm = active_llm.bind_tools(filtered_tools, tool_choice=tool_choice)
+                if force_tool:
+                    print("🛠️ [Planner] Enforcing tool usage (tool_choice='any', async)")
+            except TypeError:
+                print("⚠️ [Planner] Model doesn't support tool_choice, falling back to soft-prompt")
+                active_llm = active_llm.bind_tools(filtered_tools)
+        
+        print(f"🧠 [Planner] Generating plan (async)... ({len(filtered_tools) if filtered_tools else 0} tools available)")
+        
+        response = await active_llm.ainvoke(messages)
+        
+        if hasattr(response, 'tool_calls') and response.tool_calls:
+            steps = []
+            for i, call in enumerate(response.tool_calls):
+                steps.append({
+                    "id": i + 1,
+                    "tool": call['name'],
+                    "args": call['args']
+                })
             
-            # Use async invoke
-            if filtered_tools:
-                llm_with_tools = active_llm.bind_tools(filtered_tools)
-            else:
-                llm_with_tools = active_llm
-            
-            response = await llm_with_tools.ainvoke(messages)
-            
-            if response.tool_calls:
-                steps = [
-                    {
-                        "id": i + 1,
-                        "tool": call["name"],
-                        "args": call["args"],
-                        "tool_call_id": call.get("id")
-                    }
-                    for i, call in enumerate(response.tool_calls)
-                ]
-                
-                return {
-                    "steps": steps,
-                    "complete": False,
-                    "message": response
-                }
-            else:
-                # V18 FIX-03: Anti-hallucination gate (async path)
-                # If tools were bound but LLM answered from training data,
-                # retry ONCE with a strong enforcement message.
-                if available_tools:
-                    print(f"⚠️ [Planner] No tool calls despite {len(available_tools)} tools bound. Retrying with enforcement... (async)")
-                    tool_names = [t.name for t in available_tools[:10]]
-                    enforcement_msg = HumanMessage(
-                        content=(
-                            "SYSTEM OVERRIDE: You MUST call a tool. You answered from "
-                            "training data. Your text answer will be DISCARDED. "
-                            "Call the most relevant tool NOW. "
-                            f"Available: {tool_names}"
-                        )
-                    )
-                    retry_messages = messages + [response, enforcement_msg]
-                    retry_response = await llm_with_tools.ainvoke(retry_messages)
-                    
-                    if retry_response.tool_calls:
-                        print(f"✅ [Planner] Enforcement succeeded: {len(retry_response.tool_calls)} tool call(s) (async)")
-                        steps = [
-                            {
-                                "id": i + 1,
-                                "tool": call["name"],
-                                "args": call["args"],
-                                "tool_call_id": call.get("id")
-                            }
-                            for i, call in enumerate(retry_response.tool_calls)
-                        ]
-                        return {
-                            "steps": steps,
-                            "complete": False,
-                            "message": retry_response
-                        }
-                    else:
-                        print(f"⚠️ [Planner] Enforcement failed — LLM still refused tools (async)")
-                
-                return {
-                    "steps": [],
-                    "complete": True,
-                    "message": response
-                }
-                
-        except Exception as e:
             return {
-                "steps": [],
+                "steps": steps,
                 "complete": False,
-                "error": str(e),
-                "message": None
+                "message": response
             }
+        else:
+            if filtered_tools and not tool_history:
+                print(f"⚠️ [Planner] Model ignored tool_choice='any', applying soft-retry (async)")
+                messages.append(response)
+                
+                from langchain_core.messages import HumanMessage
+                from ...config import PLANNER_RETRY_PROMPT
+                messages.append(HumanMessage(content=PLANNER_RETRY_PROMPT))
+                
+                retry_resp = await active_llm.ainvoke(messages)
+                
+                if hasattr(retry_resp, 'tool_calls') and retry_resp.tool_calls:
+                    print(f"✅ [Planner] Soft-retry successful (async)")
+                    steps = []
+                    for i, call in enumerate(retry_resp.tool_calls):
+                        steps.append({
+                            "id": i + 1,
+                            "tool": call['name'],
+                            "args": call['args']
+                        })
+                    return {
+                        "steps": steps,
+                        "complete": False,
+                        "message": retry_resp
+                    }
+                else:
+                    print(f"⚠️ [Planner] Enforcement failed — LLM still refused tools (async)")
+            
+        return {
+            "steps": [],
+            "complete": True,
+            "message": response
+        }

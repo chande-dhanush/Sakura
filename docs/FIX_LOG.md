@@ -151,3 +151,47 @@ Resolve `ResponseContext` dataclass instantiation crashes during the response ge
 
 ### Outcome
 The Responder phase is fully synchronized with V19 dataclass schemas.
+
+## Phase 5: Execution Stability & Tool Hardening
+**Date:** 2026-04-29
+**Operator:** Antigravity (Principal Engineer Mode)
+
+### Phase Goal
+Resolve "ghosting" tool failures where specific actions (like clipboard reading) were misrouted or entered infinite loops, and harden structured error reporting.
+
+---
+
+### Issues Fixed
+
+#### 1. Clipboard Routing Regression
+- **Root Cause:** `router.py` misclassified "read my clipboard" as `PLAN` due to aggressive reference triggers ("my ") and a tool name mismatch (`read_clipboard` vs registry `clipboard_read`).
+- **Failure Mode:** User requests for clipboard data either went to a generic memory search (hallucinating "I found no memory of that") or failed with `ToolNotFound`.
+- **Fix Applied:** 
+    - Updated `router.py` to explicitly detect "clipboard" and "read" keywords as action verbs.
+    - Added an exception to reference triggers: "my clipboard" is now allowed to bypass the Planner and go `DIRECT`.
+    - Corrected the tool mapping to `clipboard_read`.
+- **Verified:** ✅ `test_router.py` passes. End-to-end trace confirms `DIRECT` route for "read my clipboard".
+
+#### 2. ReAct Loop Terminal Action Hallucination
+- **Root Cause:** `clipboard_read` was not marked as a terminal action in `ExecutionPolicy`.
+- **Failure Mode:** The Planner would successfully read the clipboard, but because it wasn't terminal, it would generate a "Next Step" to read it again, entering a 3-iteration loop that consumed the entire LLM budget.
+- **Fix Applied:** Added `clipboard_read` and `clipboard_write` (and their aliases) to `TERMINAL_ACTIONS` in `executor.py`.
+- **Verified:** ✅ Loop now terminates immediately after the first successful clipboard read.
+
+#### 3. Silent Budget Degradation (mode="unknown")
+- **Root Cause:** When `LLMBudgetExceededError` was raised, the exception handler in `llm.py` returned a dictionary without `tool_used` or `tools_used` metadata, and sometimes failed to resolve the `mode`.
+- **Failure Mode:** Downstream audit scripts and UI components reported `mode="unknown"`, making it impossible to diagnose why a request failed.
+- **Fix Applied:** 
+    - Hardened the exception blocks in `llm.py` to return consistent metadata (`tool_used="None"`, `tools_used=[]`, `execution_status="failed"`).
+    - Fixed `ReActLoop.arun` to return `status=FAILED` if the budget is hit before any tool succeeds.
+- **Verified:** ✅ Audit traces now show clear `failed` status with accurate mode labels during budget hits.
+
+#### 4. Tool Registry Alias Resilience
+- **Root Cause:** The Planner frequently hallucinated `read_clipboard` (snake_case) while the registry only had `clipboard_read`.
+- **Fix Applied:** Added explicit aliases `read_clipboard` and `write_clipboard` to `tools.py` as first-class tool exports.
+- **Verified:** ✅ ToolRunner now resolves both naming conventions successfully.
+
+---
+
+### Outcome
+Sakura V19.2 is now resilient to common naming hallucinations and correctly handles system-level direct actions without budget-draining loops.

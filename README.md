@@ -1,9 +1,9 @@
-# 🌸 Sakura V19.0 — DeepSeek Integration & Model Abstraction
+# 🌸 Sakura V19.2 — Execution Stability & Tool Hardening
 
 **Production-ready Personal AI Assistant.**
 *Tauri + Svelte (Frontend) | FastAPI + LangChain (Backend)*
 
-![Version](https://img.shields.io/badge/version-19.0-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-19.2-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)
@@ -39,6 +39,9 @@ Sakura is a **desktop AI assistant** that can:
 - 🎭 **Model Abstraction** — Dynamic per-stage model assignment (Router/Planner/Responder/Verifier) (V19)
 - 🧬 **Request Overrides** — Hot-swap models per query for specialized tasks (V19)
 - 🛡️ **Budget Sync** — Request-scoped LLM call limits enforced across full lifecycle (V19)
+- 📋 **Terminal Enforcement** — System actions (clipboard, screen) terminate planning loops instantly (V19.2)
+- 🧬 **Alias Normalization** — Tool naming resilience (read_clipboard vs clipboard_read) (V19.2)
+- ⚡ **Direct Path Exception** — "my clipboard" correctly bypasses planner for zero-latency execution (V19.2)
 
 **Free to run** — Uses Groq (Llama 3.3 70B) and Google Gemini free tiers.
 

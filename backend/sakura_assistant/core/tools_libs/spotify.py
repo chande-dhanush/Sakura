@@ -13,7 +13,8 @@ except ImportError:
 
 try:
     from AppOpener import open as app_open
-except ImportError:
+except Exception as e:
+    print(f"⚠️ AppOpener failed to load: {e}")
     app_open = None
 
 class ToolStateManager:

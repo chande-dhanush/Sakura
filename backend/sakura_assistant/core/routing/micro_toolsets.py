@@ -8,7 +8,7 @@ V16 Features:
 - Semantic Tool Gating to break "Tavily Trap" 
 - Tool Hierarchy: Specialized APIs > General Search
 """
-from typing import List, Set, Optional, Tuple
+from typing import List, Set, Optional, Tuple, Dict
 
 
 # V17.3: web_search removed from universal to prevent Tavily Trap
@@ -27,6 +27,28 @@ SEARCH_TOOLS: Set[str] = {
     "search_arxiv",
     "get_news"
 }
+
+
+# =============================================================================
+# TOOL ALIASES - Shared Single Source of Truth
+# =============================================================================
+
+TOOL_HINT_ALIASES: Dict[str, str] = {
+    "playyoutube": "play_youtube",
+    "youtube_control": "play_youtube",
+    "google_search": "web_search",
+    "wikipedia": "search_wikipedia",
+    "weather": "get_weather",
+    "remind": "set_reminder",
+    "timer": "set_timer",
+}
+
+def resolve_tool_hint(hint: Optional[str]) -> Optional[str]:
+    """Resolve a tool hint to its canonical name using the alias map."""
+    if not hint:
+        return hint
+    return TOOL_HINT_ALIASES.get(hint.lower(), hint)
+
 
 
 # =============================================================================

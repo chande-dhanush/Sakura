@@ -1,6 +1,7 @@
 import os
 import time
 import re
+import json
 from typing import List, Dict, Any, Optional
 
 # V17: Reorganized imports
@@ -23,6 +24,7 @@ from .execution import Executor, OneShotRunner, ResponseEmitter, EmitterFactory
 from .graph import WorldGraph
 from ..utils.study_mode import detect_study_mode
 from .context import AgentState, RateLimitExceeded
+from .execution.context import LLMBudgetExceededError
 from .execution.verifier import PlanVerifier  # FIX-5
 from ..utils.memory import cleanup_memory
 
@@ -500,14 +502,22 @@ class SmartAssistant:
                 }
             }
             
-        except RateLimitExceeded:
-            recorder.end_trace(success=False, response_preview="rate_limited")
+        except (RateLimitExceeded, LLMBudgetExceededError):
+            recorder.end_trace(success=False, response_preview="budget_exceeded")
             error_response = "I'm working too hard and hit a rate limit. Please try again in a moment."
-            await emitter.emit(error_response, {"status": "rate_limited"})
+            await emitter.emit(error_response, {"status": "budget_exceeded"})
+            mode_val = route_result.classification if 'route_result' in locals() else "unknown"
             return {
                 "content": error_response,
-                 "metadata": {"status": "rate_limited"}
-             }
+                "mode": mode_val,
+                "metadata": {
+                    "status": "error",
+                    "execution_status": "failed",
+                    "tool_used": "None",
+                    "tools_used": [],
+                    "error": "budget_exceeded"
+                }
+            }
         except Exception as e:
             recorder.end_trace(success=False, response_preview=str(e)[:50])
             print(f" Async Pipeline Error: {e}")
@@ -515,9 +525,17 @@ class SmartAssistant:
             traceback.print_exc()
             error_response = f"I encountered an error: {e}"
             await emitter.emit(error_response, {"status": "error"})
+            mode_val = route_result.classification if 'route_result' in locals() else "unknown"
             return {
                 "content": error_response,
-                 "metadata": {"status": "error"}
+                "mode": mode_val,
+                "metadata": {
+                    "status": "error",
+                    "execution_status": "failed",
+                    "tool_used": "None",
+                    "tools_used": [],
+                    "error": str(e)
+                }
             }
         finally:
             # V17: Guaranteed emission safety net
@@ -527,3 +545,7 @@ class SmartAssistant:
                     "I processed your request but encountered an issue. Please try again.",
                     {"status": "unknown"}
                 )
+            
+            # V19: Clear execution context to prevent leakage across requests in the same thread
+            from .execution.context import execution_context_var
+            execution_context_var.set(None)

@@ -18,6 +18,8 @@ import logging
 from typing import Dict, Any, Optional, Set, List, TYPE_CHECKING
 from dataclasses import dataclass
 
+from ..routing.micro_toolsets import resolve_tool_hint
+
 if TYPE_CHECKING:
     from .context import ExecutionContext, ExecutionResult, ExecutionStatus
 
@@ -76,16 +78,7 @@ class OneShotRunner:
         "volume_control",
         "screenshot",
     }
-    
-    # Mapping for router hints to actual tool names
-    HINT_MAPPING: Dict[str, str] = {
-        "youtube_control": "play_youtube",
-        "google_search": "web_search",
-        "wikipedia": "search_wikipedia",
-        "weather": "get_weather",
-        "remind": "set_reminder",
-        "timer": "set_timer",
-    }
+
     
     # Required fields per tool
     REQUIRED_FIELDS: Dict[str, List[str]] = {
@@ -120,7 +113,7 @@ class OneShotRunner:
     def can_handle(cls, tool_name: str) -> bool:
         """Check if a tool (or its hint) can be handled by ONE_SHOT."""
         # Resolve hint if necessary
-        actual_name = cls.HINT_MAPPING.get(tool_name, tool_name)
+        actual_name = resolve_tool_hint(tool_name)
         return actual_name in cls.EXTRACTABLE_TOOLS
     
     async def aexecute(
@@ -149,7 +142,7 @@ class OneShotRunner:
         user_input = ctx.user_input
         
         # Resolve tool name from hint (e.g., youtube_control -> play_youtube)
-        actual_tool = self.HINT_MAPPING.get(tool_name, tool_name)
+        actual_tool = resolve_tool_hint(tool_name)
         
         logger.info(f" [OneShotRunner] Executing {actual_tool} (via {tool_name}) for: {user_input[:50]}...")
         

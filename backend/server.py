@@ -469,6 +469,7 @@ async def get_settings():
         "SPOTIFY_CLIENT_ID": mask_key("SPOTIFY_CLIENT_ID"),
         # Spotify device (not masked - it's just a name, not secret)
         "SPOTIFY_DEVICE_NAME": os.getenv("SPOTIFY_DEVICE_NAME", ""),
+        "MICROPHONE_INDEX": os.getenv("MICROPHONE_INDEX", ""),
         # User personalization (not masked)
         "USER_NAME": user_settings.get("user_name", ""),
         "USER_LOCATION": user_settings.get("user_location", ""),
@@ -515,7 +516,7 @@ async def update_settings(request: Request):
         # 2. Update only provided API keys and device settings
         api_key_fields = {"GROQ_API_KEY", "TAVILY_API_KEY", "OPENROUTER_API_KEY",
                           "OPENAI_API_KEY", "GOOGLE_API_KEY", "DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL",
-                          "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "SPOTIFY_DEVICE_NAME"}
+                          "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "SPOTIFY_DEVICE_NAME", "MICROPHONE_INDEX"}
         stage_config_fields = {
             "ROUTER_PROVIDER", "PLANNER_PROVIDER", "RESPONDER_PROVIDER", "VERIFIER_PROVIDER",
             "ROUTER_MODEL", "PLANNER_MODEL", "RESPONDER_MODEL", "VERIFIER_MODEL",

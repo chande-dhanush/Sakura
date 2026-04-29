@@ -367,9 +367,27 @@
                             </div>
                             
                             <div class="tool-section">
-                                <h3>Spotify Device</h3>
+                                <h3>Spotify Integration</h3>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="spotify-client-id">Spotify Client ID</label>
+                                        <input id="spotify-client-id" type="password" value={config.SPOTIFY_CLIENT_ID} on:input={(e) => handleInput('SPOTIFY_CLIENT_ID', e.target.value)} placeholder="Enter Client ID" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="spotify-client-secret">Spotify Client Secret</label>
+                                        <input id="spotify-client-secret" type="password" value={config.SPOTIFY_CLIENT_SECRET} on:input={(e) => handleInput('SPOTIFY_CLIENT_SECRET', e.target.value)} placeholder="Enter Client Secret" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="spotify-device">Spotify Device Name</label>
+                                        <input id="spotify-device" type="text" value={config.SPOTIFY_DEVICE_NAME} on:input={(e) => handleInput('SPOTIFY_DEVICE_NAME', e.target.value)} placeholder="e.g. My PC" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="tool-section">
+                                <h3>Hardware Configuration</h3>
                                 <div class="form-group">
-                                    <input type="text" value={config.SPOTIFY_DEVICE_NAME} on:input={(e) => handleInput('SPOTIFY_DEVICE_NAME', e.target.value)} placeholder="e.g. My PC" />
+                                    <label for="mic-index">Microphone Index (Optional)</label>
+                                    <input id="mic-index" type="number" min="0" value={config.MICROPHONE_INDEX} on:input={(e) => handleInput('MICROPHONE_INDEX', e.target.value)} placeholder="0" />
                                 </div>
                             </div>
                             <div class="tool-section">
@@ -475,8 +493,8 @@
                                 </div>
                             </div>
                             <p class="about-text">
-                                Sakura is a state-of-the-art agentic coding and personal assistant.
-                                This build includes FIX-A (Routing) and FIX-B (Vision Stability).
+                                Sakura is a privacy-first, context-aware personal assistant.
+                                Designed for reliability, speed, and deep local integration.
                             </p>
                         </section>
                     {/if}

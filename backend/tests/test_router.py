@@ -58,6 +58,8 @@ class TestIntentRouter(unittest.TestCase):
         self.assertTrue(router._is_action_command("open chrome"))
         self.assertTrue(router._is_action_command("launch spotify"))
         self.assertTrue(router._is_action_command("start notepad"))
+        self.assertTrue(router._is_action_command("read my clipboard"))
+        self.assertTrue(router._is_action_command("write to clipboard"))
     
     def test_is_action_command_search(self):
         """Test action command detection for search."""
@@ -84,6 +86,7 @@ class TestIntentRouter(unittest.TestCase):
         self.assertEqual(router._guess_tool_hint("check the weather"), "get_weather")
         self.assertEqual(router._guess_tool_hint("set a timer for 5 min"), "set_timer")
         self.assertEqual(router._guess_tool_hint("search for news"), "web_search")
+        self.assertEqual(router._guess_tool_hint("read my clipboard"), "clipboard_read")
     
     def test_parse_response_json(self):
         """Test JSON response parsing."""

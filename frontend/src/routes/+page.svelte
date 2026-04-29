@@ -3,6 +3,7 @@
     import { invoke } from '@tauri-apps/api/core';
     import { listen } from '@tauri-apps/api/event';
     import { getCurrentWindow } from '@tauri-apps/api/window';
+    import { LogicalSize } from '@tauri-apps/api/dpi';
     import Omnibox from '$lib/components/Omnibox.svelte';
     import Timeline from '$lib/components/Timeline.svelte';
     import WorldGraphPill from '$lib/components/WorldGraphPill.svelte';
@@ -15,6 +16,48 @@
     let isQuickSearch = false; // Spotlight mode
     let showVoiceSetup = false;
     let showSettings = false; // V10: Settings Modal State
+    
+    // Reactive Window Resizing for Setup Mode
+    let isSetupMode = false;
+    $: isSetupMode = $backendStatus === 'setup_required' || showSettings;
+    
+    let previousSize = null;
+    let previousPosition = null;
+    let isWindowExpanded = false;
+
+    $: {
+        if (isSetupMode && !isWindowExpanded) {
+            expandWindow();
+        } else if (!isSetupMode && isWindowExpanded) {
+            restoreWindow();
+        }
+    }
+
+    async function expandWindow() {
+        try {
+            isWindowExpanded = true;
+            const win = getCurrentWindow();
+            previousSize = await win.innerSize();
+            previousPosition = await win.outerPosition();
+            await win.setSize(new LogicalSize(1150, 800));
+            await win.center();
+        } catch(e) {
+            console.warn("Failed to expand window", e);
+        }
+    }
+
+    async function restoreWindow() {
+        try {
+            isWindowExpanded = false;
+            const win = getCurrentWindow();
+            if (previousSize && previousPosition) {
+                await win.setSize(previousSize);
+                await win.setPosition(previousPosition);
+            }
+        } catch(e) {
+            console.warn("Failed to restore window size", e);
+        }
+    }
     
     onMount(async () => {
         console.log('[Main] Window mounted, waiting for backend...');
