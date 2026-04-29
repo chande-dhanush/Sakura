@@ -140,7 +140,7 @@ def _extract_tokens(result: Any, messages: Any = None, model: str = "unknown") -
     return tokens
 
 
-def _log_llm_tokens(stage: str, model_name: str, result: Any, messages: Any, duration_ms: float, success: bool = True):
+def _log_llm_tokens(stage: str, model_name: str, result: Any, messages: Any, duration_ms: float, success: bool = True, trace_id: Optional[str] = None):
     """
     V17.5: Log token usage to FlightRecorder with precise counting.
     
@@ -160,7 +160,8 @@ def _log_llm_tokens(stage: str, model_name: str, result: Any, messages: Any, dur
                 model=model_name,
                 tokens=tokens,
                 duration_ms=duration_ms,
-                success=success
+                success=success,
+                trace_id=trace_id # V19 FIX: Pass trace_id
             )
             cost = estimate_cost(tokens, model_name)
             print(f"📊 [{stage}] Logged {tokens['total']} tokens (${cost:.6f})")
@@ -191,7 +192,7 @@ class ReliableLLM:
         self.backup = backup
         self.name = name
     
-    def invoke(self, messages, timeout=LLM_TIMEOUT, **kwargs):
+    def invoke(self, messages, timeout=LLM_TIMEOUT, trace_id=None, **kwargs):
         """
         Synchronous LLM invocation with rate limiting.
         
@@ -240,7 +241,7 @@ class ReliableLLM:
             print(f" [{self.name}] LLM call succeeded")
             
             # V17.5: Log token usage to FlightRecorder with precise counting
-            _log_llm_tokens(self.name, model_name, result, messages, duration_ms, success=True)
+            _log_llm_tokens(self.name, model_name, result, messages, duration_ms, success=True, trace_id=trace_id)
             
             return result
         except (TimeoutError, Exception) as e:
@@ -349,7 +350,7 @@ class ReliableLLM:
             }]
         )
     
-    async def ainvoke(self, messages, timeout=LLM_TIMEOUT, **kwargs):
+    async def ainvoke(self, messages, timeout=LLM_TIMEOUT, trace_id=None, **kwargs):
         """
         True async invocation with backpressure rate limiting.
         
@@ -396,7 +397,7 @@ class ReliableLLM:
             print(f" [{self.name}] Async LLM call succeeded")
             
             # V17.5: Log token usage to FlightRecorder with precise counting
-            _log_llm_tokens(self.name, model_name, result, messages, duration_ms, success=True)
+            _log_llm_tokens(self.name, model_name, result, messages, duration_ms, success=True, trace_id=trace_id)
             
             return result
             

@@ -247,8 +247,8 @@ PLANNER_SYSTEM_PROMPT = """Tool selector. Call the right tool(s).
 CONTEXT: {context}
 
 PRIORITY ORDER:
-1. References ("it","my favourite X") → query_memory FIRST, then act
-2. Personal facts/memory → query_memory
+1. update_user_memory: Store facts about the user.
+2. web_search: Find real-time info.
 3. Encyclopedia → search_wikipedia
 4. Science → search_arxiv
 5. News/current → get_news / web_search
@@ -258,8 +258,9 @@ PRIORITY ORDER:
 9. Notes → note_create / note_list
 10. Apps → open_app
 11. Fallback → web_search
+"""
 
-RULES:
+RULES = """
 - "and/then/also" → multiple tool calls, one turn
 - Clean args only — no full sentences, no intent keywords
 - Never repeat a tool that already succeeded
@@ -358,22 +359,22 @@ ROUTER_SYSTEM_PROMPT = """Query classifier. One route only.
 CURRENT DATE/TIME: {current_datetime}
 
 DIRECT: Single tool, no context or memory lookup needed.
-PLAN:   Multi-step, OR contains reference ("it","that","my favourite X") needing memory first.
+PLAN:   Multi-step, OR contains reference ("it","that","my favourite X") needing context injection.
     Chained commands ("do A and B") → always PLAN.
 CHAT:   Pure conversation. No tool needed.
 
 === TOOL HINTS ===
 Email→gmail_read_email | Weather→get_weather | Calendar→calendar_get_events
 Timer→set_timer | Reminder→set_reminder | App→open_app | Site→open_site
-Notes→note_list/note_create | Memory→query_memory | Search→web_search
+Notes→note_list/note_create | Memory→update_user_memory | Search→web_search
 
 === EXAMPLES ===
 "play Numb by Linkin Park" → {{"classification":"DIRECT","tool_hint":"spotify_control"}}
 "hi sakura"               → {{"classification":"CHAT","tool_hint":null}}
 "weather in Tokyo"        → {{"classification":"DIRECT","tool_hint":"get_weather"}}
 "research AI and summarize" → {{"classification":"PLAN","tool_hint":"research_topic"}}
-"what's my favourite song"  → {{"classification":"PLAN","tool_hint":"query_memory"}}
-"play it on youtube"        → {{"classification":"PLAN","tool_hint":"query_memory"}}
+"what's my favourite song"  → {{"classification":"PLAN","tool_hint":null}}
+"play it on youtube"        → {{"classification":"PLAN","tool_hint":"play_youtube"}}
 "check email and open spotify" → {{"classification":"PLAN","tool_hint":null}}
 
 === RULES ===
@@ -381,7 +382,7 @@ Notes→note_list/note_create | Memory→query_memory | Search→web_search
 2. DIRECT must have a tool_hint
 3. Weather/facts → never CHAT
 4. Reference pronouns ("it","that","the one") → PLAN always
-5. "my favourite/preferred X" → PLAN + query_memory
+5. "my favourite/preferred X" → PLAN (to allow context injection)
 6. Chained commands → PLAN always
 7. Unsure → DIRECT or PLAN, never CHAT
 

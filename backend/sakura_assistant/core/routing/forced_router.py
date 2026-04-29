@@ -245,15 +245,7 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "summarize audio file",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
-    # MEMORY RECALL (V18.1 BUG-08)
-    # ═══════════════════════════════════════════════════════════════════════
-    {
-        "pattern": r"\b(?:do\s+you\s+remember|what\s+did\s+i\s+(?:say|tell)|what(?:'s|\s+is)\s+my\s+favourite|have\s+i\s+(?:told|mentioned))\b",
-        "tool": "query_memory",
-        "args_extractor": lambda m, text: {"query": text},
-        "description": "recall from memory",
-    },
+    # V19: Removed forced query_memory pattern (tool is hallucinated/redundant)
 ]
 
 # V13: Pre-compile all patterns at module load for performance

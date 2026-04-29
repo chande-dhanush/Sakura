@@ -55,7 +55,7 @@ class SummaryMemory:
         # Load existing summary
         self._load()
     
-    def add_turn(self, role: str, content: str) -> None:
+    def add_turn(self, role: str, content: str, trace_id: Optional[str] = None) -> None:
         """Add a message to the buffer."""
         self.recent_messages.append({
             "role": role,
@@ -66,9 +66,9 @@ class SummaryMemory:
         
         # Auto-compress if threshold reached
         if self.message_count_since_compress >= self.COMPRESS_THRESHOLD:
-            self.compress()
+            self.compress(trace_id=trace_id)
     
-    def compress(self) -> str:
+    def compress(self, trace_id: Optional[str] = None) -> str:
         """Compress recent messages into running summary."""
         if not self.recent_messages:
             return self.summary
@@ -85,6 +85,11 @@ class SummaryMemory:
             try:
                 from langchain_core.messages import SystemMessage, HumanMessage
                 
+                # V19 FIX: Relabel stage to 'MemoryManager' to prevent 'Planner' leakage in CHAT traces
+                original_name = getattr(self.llm, "name", "Model")
+                if hasattr(self.llm, "name"):
+                    self.llm.name = "MemoryManager"
+                
                 prompt = f"""Summarize this conversation segment in 2-3 sentences.
 Focus on: key facts, user preferences, and decisions made.
 Do NOT add information not present.
@@ -94,8 +99,13 @@ Previous context: {self.summary or 'None'}
 New messages:
 {msgs_text}"""
                 
-                response = self.llm.invoke([HumanMessage(content=prompt)])
-                new_summary = response.content.strip()
+                try:
+                    response = self.llm.invoke([HumanMessage(content=prompt)], trace_id=trace_id)
+                    new_summary = response.content.strip()
+                finally:
+                    # Restore original name to avoid side effects in other parts of the system
+                    if hasattr(self.llm, "name"):
+                        self.llm.name = original_name
                 
                 # Append to running summary (keep it bounded)
                 if self.summary:

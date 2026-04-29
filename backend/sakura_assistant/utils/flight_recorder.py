@@ -157,7 +157,8 @@ class FlightRecorder:
     def log_llm_call(self, stage: str, model: str = "unknown", 
                      tokens: Optional[Dict[str, int]] = None,
                      duration_ms: Optional[float] = None,
-                     success: bool = True):
+                     success: bool = True,
+                     trace_id: Optional[str] = None):
         """
         V13: Log an LLM API call with token usage and cost calculation.
         
@@ -192,6 +193,7 @@ class FlightRecorder:
             content=f"LLM Call: {model} ({tokens.get('total', 0)} tokens, ${call_cost:.6f})",
             status="SUCCESS" if success else "ERROR",
             duration_ms=duration_ms,
+            trace_id=trace_id,  # V19 FIX: Pass explicit trace_id
             metadata={
                 "type": "llm_call",
                 "model": model,
@@ -475,6 +477,6 @@ def span(stage: str, status: str = None, content: str = None, **kwargs):
 
 
 def log_llm_call(stage: str, model: str = "unknown", tokens: dict = None,
-                 duration_ms: float = None, success: bool = True):
+                 duration_ms: float = None, success: bool = True, trace_id: str = None):
     """V13: Log an LLM API call with token/cost tracking."""
-    return get_recorder().log_llm_call(stage, model, tokens, duration_ms, success)
+    return get_recorder().log_llm_call(stage, model, tokens, duration_ms, success, trace_id)

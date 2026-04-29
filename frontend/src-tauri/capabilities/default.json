@@ -24,6 +24,9 @@
       "allow": [
         {
           "path": "$APPDATA/SakuraV10/audio/**"
+        },
+        {
+          "path": "../../backend/temp_audio/**"
         }
       ]
     }

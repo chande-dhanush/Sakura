@@ -263,35 +263,35 @@ class ExecutionResult:
         return self.status == ExecutionStatus.FAILED
     
     @staticmethod
-    def empty() -> "ExecutionResult":
+    def empty(mode: str = "CHAT") -> "ExecutionResult":
         """Create empty result for CHAT mode (no execution)."""
         return ExecutionResult(
             outputs="",
             tool_messages=[],
             tool_used="None",
-            last_result=None,
+            last_result={"mode": mode},
             status=ExecutionStatus.SKIPPED
         )
     
     @staticmethod
-    def timeout(outputs: str, tool_messages: List[Any]) -> "ExecutionResult":
+    def timeout(outputs: str, tool_messages: List[Any], mode: str = "PLAN") -> "ExecutionResult":
         """Create partial result for timeout."""
         return ExecutionResult(
             outputs=outputs + "\n[Execution time limit reached - partial results]",
             tool_messages=tool_messages,
             tool_used=tool_messages[-1].name if tool_messages else "None",
-            last_result=None,
+            last_result={"mode": mode},
             status=ExecutionStatus.PARTIAL
         )
     
     @staticmethod
-    def error(message: str) -> "ExecutionResult":
+    def error(message: str, mode: str = "unknown") -> "ExecutionResult":
         """Create failed result for errors."""
         return ExecutionResult(
             outputs=message,
             tool_messages=[],
             tool_used="None",
-            last_result=None,
+            last_result={"mode": mode},
             status=ExecutionStatus.FAILED
         )
 

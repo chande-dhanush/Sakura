@@ -48,7 +48,7 @@ class MemoryJudger:
             # 2. Call LLM (Cheap model)
             # max_tokens=128 is enough for "yes [N] - reason"
             # We use ainvoke for non-blocking execution
-            response = await self.llm.ainvoke(messages)
+            response = await self.llm.ainvoke(messages, trace_id=trace_id)
             
             # 3. Parse result
             should_store, importance, fact = self._parse_judgement(response.content)

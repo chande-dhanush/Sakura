@@ -385,7 +385,7 @@ class SmartAssistant:
                         )
             
             # V10.3: Record turn (Sync)
-            self.summary_memory.add_turn("user", user_input)
+            self.summary_memory.add_turn("user", user_input, trace_id=request_id)
             
             # 5. Response (Async)
             state.record_llm_call("responding")
@@ -436,7 +436,7 @@ class SmartAssistant:
             self.desire_system.on_assistant_message(response_text)
             
             # Record assistant response (Sync)
-            self.summary_memory.add_turn("assistant", response_text)
+            self.summary_memory.add_turn("assistant", response_text, trace_id=request_id)
             
             # V18.2: Memory Judger (BUG-03 FIX)
             # Fire-and-forget: Evaluate if this turn should be stored in long-term memory.

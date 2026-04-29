@@ -335,17 +335,10 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
         
         size = temp_file.stat().st_size
         print(f"[TTS] ✓ Audio file created: {size} bytes", file=sys.stderr)
-        # === AGGRESSIVE MEMORY CLEANUP ===
-        # Offload Kokoro immediately to save RAM
-        del audio, gen
-        if pipe:
-            del pipe
-            _pipeline = None
-        cleanup_memory()
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        print("[TTS] ✓ Kokoro offloaded, memory freed", file=sys.stderr)
+        
+        # V19 FIX: Remove aggressive offloading. 
+        # Let the background _background_idle_checker handle cleanup after 5 mins of inactivity.
+        # This fixes the ~10s delay on every speaker button click.
         
         _last_used_time = time.time()
         

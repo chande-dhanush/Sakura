@@ -141,7 +141,7 @@ class Executor:
         # 5. Dispatch based on mode
         try:
             if mode == ExecutionMode.CHAT:
-                result = ExecutionResult.empty()
+                result = ExecutionResult.empty(mode=mode.value)
             
             elif mode == ExecutionMode.ONE_SHOT:
                 result = await self._dispatch_one_shot(tool_hint, ctx, llm_overrides=llm_overrides)
@@ -168,8 +168,7 @@ class Executor:
         
         except Exception as e:
             logger.error(f" [Executor] Execution failed: {e}")
-            result = ExecutionResult.error(str(e))
-            result.last_result = {"mode": mode.value if 'mode' in locals() else "unknown"}
+            result = ExecutionResult.error(str(e), mode=mode.value if 'mode' in locals() else "unknown")
         
         # 6. Log completion
         elapsed_ms = (time.time() - start_time) * 1000

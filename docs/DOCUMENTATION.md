@@ -1,4 +1,4 @@
-# Sakura V19.2 — Execution Stability & Hardening
+# Sakura V19.5 — Execution Stability & Hardening
 *System Certified: April 28, 2026*
 
 ---
@@ -8,7 +8,8 @@
 **V17.5 "Precise Soul":** Featuring **Model-Specific Token Counting**, **SSE Tool Streaming**, V17.4 **Observability Fix**, plus all prior architecture (Stable Soul, Dependency Injection, Search Cascade).
 **V18.1 "Ironclad Reliability":** 8-point surgical fix sprint eliminating production bugs: Fixed Token Tracking (BUG-04), Tool Result Propagation (BUG-05), Memory Recall Routing (BUG-08), Personal Fact Persistence (BUG-03), Tool Hint Alignment (BUG-01), Weather Hallucination Guard (BUG-02), Cleaner Arg Extraction (BUG-06), and Executor Success Guard (BUG-07).
 **V19.0 "DeepSeek Integration":** Added DeepSeek as a first-class provider. Implemented request-time LLM overrides for stage-specific model hot-swapping. Enforced request-scoped safety rails (MAX_LLM_CALLS) across the full request lifecycle (Router -> Planner -> Verifier -> Responder).
-**V19.2 "Execution Stability & Hardening":** Resolved critical regressions in clipboard routing and planning loops. Implemented tool alias normalization and terminal action enforcement for system-level tasks. Hardened metadata preservation during budget failures to eliminate `mode="unknown"` issues.
+**V19.5 "Execution Stability & Hardening":** Resolved critical regressions in clipboard routing and planning loops. Implemented tool alias normalization and terminal action enforcement for system-level tasks. Hardened metadata preservation during budget failures to eliminate `mode="unknown"` issues.
+**V19.5 "Reliability Audit & Restoration":** Full-stack forensic audit. Eliminated CHAT "Planner" leakage by relabeling compression stages. Fixed orphaned background telemetry through explicit `trace_id` propagation. Restored Voice/TTS performance via a "keep-warm" strategy and fixed dev-mode asset protocol access errors in Tauri.
 
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
@@ -99,6 +100,11 @@
 | **Terminal Enforcement** | **V19.2** | System actions (clipboard, screen) terminate planning loops instantly to save budget |
 | **Tool Alias Resilience** | **V19.2** | Support for common hallucinated names (e.g., `read_clipboard` → `clipboard_read`) |
 | **Metadata Hardening** | **V19.2** | Guarantees consistent `mode` and `tool_used` metadata in all error/budget paths |
+| **MemoryManager Labels** | **V19.5** | Relabeled SummaryMemory calls to prevent false "Planner" spans in CHAT traces |
+| **Trace Propagation** | **V19.5** | Explicit `trace_id` passing for background tasks (e.g., MemoryJudger) |
+| **TTS Keep-Warm** | **V19.5** | Removed aggressive offloading to eliminate 10s latency on speaker button |
+| **Tauri Audio Access** | **V19.5** | Fixed asset protocol permissions for `temp_audio` in dev mode |
+| **Voice Production Flag** | **V19.5** | Ensured `--voice` is passed to the sidecar in production builds |
 
 
 ---
@@ -195,6 +201,30 @@ V19.2 addresses operational "ghosting" bugs where tools were successfully execut
 ### 4. Mode & Metadata Persistence
 * **The Vulnerability:** Exceptions (Budget/Timeout) occasionally returned `mode="unknown"` and empty tool lists in metadata, breaking auditability.
 * **The Fix:** Hardened the pipeline's error response contract to always preserve the `RouteResult` classification and accurately reflect any tools that were executed prior to the failure.
+
+---
+
+## 🌸 Sakura V19.5 — Reliability Audit & Restoration
+
+V19.5 represents a comprehensive forensic audit to eliminate "ghost" planner calls and restore full-stack Voice/TTS functionality.
+
+### 1. Memory Stage Relabeling (Execution Path Hardening)
+* **The Vulnerability:** LLM calls during memory compression were using the default model name, which often defaulted to "Planner" in global traces. This caused CHAT route traces to incorrectly show a "Planner" stage, implying an execution-path regression.
+* **The Fix:** Explicitly relabeled `SummaryMemory` compression calls to **"MemoryManager"**. This preserves trace integrity and confirms that CHAT routes remain zero-tool paths.
+
+### 2. Background Telemetry Attribution
+* **The Vulnerability:** Background tasks (like `MemoryJudger`) and nested LLM calls (like `SummaryMemory`) were losing context, resulting in `trace_id: null` in Flight Recorder logs.
+* **The Fix:** Updated `ReliableLLM` and `FlightRecorder` to support explicit `trace_id` overrides. Propagated the request ID through all `asyncio` task boundaries and synchronous wrappers.
+
+### 3. Voice & TTS Restoration
+* **The Vulnerability:** Pressing the speaker button in the UI had a ~10-15s delay or failed entirely due to aggressive model offloading and Tauri security restrictions on local assets.
+* **The Keep-Warm Fix:** Removed the "aggressive offloading" logic that deleted the Kokoro model after every call. The model now stays warm in RAM for 5 minutes of idle time, reducing latency by **7x** (~14s → ~2s).
+* **The Capability Fix:** Updated Tauri's `fs:allow-read` permissions to allow the frontend to access `backend/temp_audio` via the asset protocol in dev mode.
+* **The Production Fix:** Ensured the `--voice` flag is passed to the bundled backend sidecar in production builds within `lib.rs`.
+
+### 4. Registry Cleanup
+* **The Vulnerability:** Hallucinated `query_memory` tool hints persisted in system prompts and routing patterns, causing the Planner to try calling a non-existent tool.
+* **The Fix:** Purged all remaining `query_memory` references from `config.py` and `forced_router.py`. Memory handling is now correctly delegated to the context window and RAG layers.
 
 
 ---

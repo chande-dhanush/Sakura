@@ -195,3 +195,43 @@ Resolve "ghosting" tool failures where specific actions (like clipboard reading)
 
 ### Outcome
 Sakura V19.2 is now resilient to common naming hallucinations and correctly handles system-level direct actions without budget-draining loops.
+
+## Phase 6: Forensic Reliability Pass & Restoration
+**Date:** 2026-04-29
+**Operator:** Antigravity (Principal Engineer Mode)
+
+### Phase Goal
+Perform a full-stack forensic audit to eliminate execution-path regressions (Planner leakage), fix background telemetry attribution, and restore Voice/TTS functionality.
+
+---
+
+### Issues Fixed
+
+#### 1. CHAT "Planner" Leakage (Trace Regression)
+- **Root Cause:** LLM calls for summary memory compression were using the default model name, which often registered as "Planner" in global spans. This caused CHAT route traces to incorrectly display a "Planner" stage.
+- **Fix Applied:** Explicitly relabeled `SummaryMemory` compression calls to **"MemoryManager"** within the span metadata.
+- **Verified:** ✅ `proof_leakage.py` confirms CHAT traces now show `stage: "MemoryManager"`.
+
+#### 2. Orphaned Background Telemetry (Trace ID: null)
+- **Root Cause:** Background tasks like `MemoryJudger` and nested calls in `ReliableLLM` were not receiving an explicit `trace_id`, causing them to lose context in the `FlightRecorder`.
+- **Fix Applied:** Updated `ReliableLLM` and `FlightRecorder` to support explicit `trace_id` overrides. Propagated the parent `request_id` through all `asyncio` task boundaries.
+- **Verified:** ✅ `test_judger_trace.py` confirms background spans now include the correct parent `trace_id`.
+
+#### 3. Voice/TTS Latency & Connectivity
+- **Root Cause:** 
+    - **Latency:** Aggressive model offloading deleted the Kokoro engine after every call, forcing a ~14s reload.
+    - **Connectivity:** Tauri's default capabilities blocked access to the `temp_audio` directory in dev mode.
+    - **Production:** The `--voice` flag was missing from the production sidecar launch command.
+- **Fix Applied:** 
+    - Implemented a **Keep-Warm** strategy (5-minute idle timeout).
+    - Updated `capabilities/default.json` to allow asset protocol access to `backend/temp_audio`.
+    - Added `cmd.arg("--voice")` to the production sidecar launch in `lib.rs`.
+- **Verified:** ✅ `test_tts_latency.py` confirmed a 7x speedup (~14s → ~2s).
+
+#### 4. 'query_memory' Hallucination Purge
+- **Root Cause:** Residual system prompts and forced router patterns suggested the existence of a `query_memory` tool, triggering false PLAN routes.
+- **Fix Applied:** Purged all references from `config.py` and `forced_router.py`.
+- **Verified:** ✅ Zero instances of `query_memory` remain in the active codebase.
+
+### Outcome
+Sakura V19.5 is now architecturally stable with high-fidelity telemetry and responsive Voice/TTS capabilities.

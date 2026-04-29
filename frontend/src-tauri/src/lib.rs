@@ -217,6 +217,7 @@ fn start_backend(app: &tauri::App) -> Result<(), String> {
             println!("   Path: {:?}", path);
             
             let mut cmd = Command::new(&path);
+            cmd.arg("--voice"); // V19 FIX: Ensure voice is enabled in production
             #[cfg(windows)]
             {
                 use std::os::windows::process::CommandExt;
