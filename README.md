@@ -116,7 +116,6 @@ graph TD
 For deep-dives into architecture and safety protocols, refer to:
 - [DOCUMENTATION.md](docs/DOCUMENTATION.md) — Full API & Schema reference.
 - [FIX_LOG.md](docs/FIX_LOG.md) — Historical forensic bug reports.
-- [SECURITY.md](docs/SECURITY.md) — Path sandboxing and prompt injection defense.
 
 ---
 
