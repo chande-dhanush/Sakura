@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sakura V13 - Linux/Mac Setup Script
+# Sakura V19.5 - Linux/Mac Setup Script
 # Run from project root: ./scripts/setup.sh
 
 set -e
@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
-echo -e "\033[35m🌸 Sakura V13 Setup Script\033[0m"
+echo -e "\033[35m🌸 Sakura V19.5 Setup Script\033[0m"
 echo -e "\033[35m==========================\033[0m"
 echo -e "\033[36mProject Root: $PROJECT_ROOT\033[0m"
 

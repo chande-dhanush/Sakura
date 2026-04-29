@@ -1,155 +1,87 @@
-# 🌸 Sakura V19.2 — Execution Stability & Tool Hardening
+# 🌸 Sakura V19.5 — Forensic Reliability & Restoration
 
-**Production-ready Personal AI Assistant.**
+**The Ultimate Production-Ready Personal AI Assistant.**
 *Tauri + Svelte (Frontend) | FastAPI + LangChain (Backend)*
 
-![Version](https://img.shields.io/badge/version-19.2-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-19.5-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
-![License](https://img.shields.io/badge/license-MIT-gray?style=for-the-badge)
-![Stability](https://img.shields.io/badge/architecture-Stable%20Soul-purple?style=for-the-badge)
-
-<p align="center">
-  <img src="docs/sakura_demo.gif" alt="Sakura Demo" width="600"/>
-</p>
+![Stability](https://img.shields.io/badge/architecture-Forensic%20Soul-purple?style=for-the-badge)
 
 ---
 
-## ✨ What is Sakura?
+## ✨ Why Sakura?
 
-Sakura is a **desktop AI assistant** that can:
-- 🎵 Control Spotify, YouTube, and system media
-- 📧 Read/send Gmail, manage Calendar & Tasks
-- 🔍 Search the web, scrape websites, take notes
-- 🎹 **Execute Python code** in a secure Docker sandbox
-- 🎧 **Transcribe & summarize audio** files
-- 🎙️ Respond to voice commands ("Hey Sakura")
-- 🖼️ Analyze images and screenshots
-- 🧠 Remember context with **temporal decay**
-- 💓 **Feel moods** — tracks social battery & loneliness (V15)
-- 💌 **Reach out when lonely** — proactive check-ins (V15)
-- 🛡️ **Respects your focus** — won't interrupt when hidden (V15.2)
-- 🏰 **Stable Soul** — Reactive Identity + EventBus + Dependency Injection (V16.2)
-- 🚦 **Search Cascade** — Fallback logic for Wikipedia > Tavily (V16.1)
-- 🧠 **Deterministic Context** — segmented Planner/Responder pruning (V15.4)
-- 🔄 **Unified Context API** — single source of truth for LLM data (V15.4)
-- 🛡️ **Ironclad Reliability** — LLM Core Budgets (6 calls), Fidelity checks, Search Cascade Parity (V18)
-- 👁️ **AI Vision (Llama 4 Scout)** — High-performance screenshot & image analysis (V18)
-- 🧠 **DeepSeek Integration** — First-class support for DeepSeek V3/V4 (V19)
-- 🎭 **Model Abstraction** — Dynamic per-stage model assignment (Router/Planner/Responder/Verifier) (V19)
-- 🧬 **Request Overrides** — Hot-swap models per query for specialized tasks (V19)
-- 🛡️ **Budget Sync** — Request-scoped LLM call limits enforced across full lifecycle (V19)
-- 📋 **Terminal Enforcement** — System actions (clipboard, screen) terminate planning loops instantly (V19.2)
-- 🧬 **Alias Normalization** — Tool naming resilience (read_clipboard vs clipboard_read) (V19.2)
-- ⚡ **Direct Path Exception** — "my clipboard" correctly bypasses planner for zero-latency execution (V19.2)
+Sakura is not just a chatbot; it's a **Cognitive Operating System** for your desktop. It bridges the gap between high-level reasoning and physical system control.
 
-**Free to run** — Uses Groq (Llama 3.3 70B) and Google Gemini free tiers.
+### 🧠 Cognitive Architecture
+- **Stable Soul (V16.2)**: Reactive Identity + EventBus + Dependency Injection for rock-solid state management.
+- **Memory Judger (V4+)**: LLM-based importance filtering and temporal decay (30-day half-life).
+- **DesireSystem (V15)**: CPU-based mood tracking (social battery & loneliness).
+- **Proactive Intelligence**: Reaches out when lonely, but respects your focus (Bubble-Gate UX).
+
+### 🛠️ Physical Capabilities
+- **54+ Integrated Tools**: Gmail, Calendar, Spotify, Notes, Vision, RAG, Code, and System control.
+- **Code Interpreter (V13)**: Secure execution of Python code in Docker sandboxes.
+- **AI Vision (V18)**: High-performance screenshot and image analysis via Llama-4 Scout.
+- **Voice Synthesis (V19.5)**: Ultra-responsive Kokoro TTS with **Keep-Warm** strategy (sub-2s latency).
+
+### 🧬 Multi-Model Intelligence
+- **Dynamic Routing**: Automatic selection between DIRECT, PLAN, and CHAT paths.
+- **Model Abstraction**: Granular stage assignment (Router, Planner, Responder, Verifier).
+- **DeepSeek Integration**: First-class support for DeepSeek V3/V4 with strict ID validation.
+- **Execution Budgets**: Request-scoped LLM call limits (6 calls) to prevent runaway costs.
 
 ---
 
-## 🚀 Quick Start (5 Minutes)
+## 🚀 Quick Start (Windows)
 
-### Prerequisites
+### 1. Prerequisites
+Ensure you have the following installed:
+- [Python 3.11+](https://www.python.org/downloads/)
+- [Node.js 18+](https://nodejs.org/)
+- [Rust & Cargo](https://rustup.rs/)
+- [FFmpeg](https://www.ffmpeg.org/download.html) (Optional, for Audio Tools)
 
-| Requirement | How to Install |
-|-------------|----------------|
-| Python 3.11+ | [python.org/downloads](https://www.python.org/downloads/) |
-| Node.js 18+ | [nodejs.org](https://nodejs.org/) |
-| Rust | [rustup.rs](https://rustup.rs/) |
-| Docker Desktop | [docker.com](https://www.docker.com/products/docker-desktop/) (for Code Interpreter) |
-| ffmpeg | `winget install FFmpeg` (for Audio Tools) |
-| Groq API Key | [console.groq.com](https://console.groq.com) (Free) |
-
-### Windows Setup
-
+### 2. Automated Setup
 ```powershell
-# 1. Clone the repo
+# Clone the repository
 git clone https://github.com/chande-dhanush/Sakura.git
 cd Sakura
 
-# 2. Run automated setup (as Administrator)
+# Run the setup script (as Administrator)
 .\scripts\setup.ps1
-
-# 3. Create .env file with your API key
-Copy-Item .env.example .env
-notepad .env   # Add your GROQ_API_KEY
-
-# 4. First-time setup (Google OAuth + Voice templates)
-cd backend
-..\PA\Scripts\python first_setup.py
-
-# 5. Launch!
-cd ..\frontend
-npm run tauri dev
 ```
 
-### Linux / macOS Setup
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/chande-dhanush/Sakura.git
-cd Sakura
-
-# 2. Run automated setup
-chmod +x scripts/setup.sh
-./scripts/setup.sh
-
-# 3. Create .env file
-cp .env.example .env
-nano .env   # Add your GROQ_API_KEY
-
-# 4. First-time setup
-cd backend
-source ../PA/bin/activate
-python first_setup.py
-
-# 5. Launch!
-cd ../frontend
+### 3. Launch
+The Sakura dev environment handles sidecar bypass and auto-reloading.
+```powershell
+cd frontend
 npm run tauri dev
 ```
 
 ---
 
-## 🔑 API Keys
+## 🔑 Configuration
 
-Create a `.env` file in the project root:
+Sakura features a built-in **Setup Screen** for first-time configuration. Simply launch the app and navigate to the Setup tab to configure:
+- **API Keys**: Groq, DeepSeek, Google, Tavily.
+- **Identity**: Your name, assistant name, and personality traits.
+- **Providers**: Stage-specific model overrides.
 
-```env
-# REQUIRED (Free/Cheap)
-GROQ_API_KEY=gsk_your_key_here        # https://console.groq.com
-DEEPSEEK_API_KEY=sk-your_key_here     # https://platform.deepseek.com
-
-# OPTIONAL (Enhances features)
-OPENROUTER_API_KEY=sk-or-your_key     # Vision - https://openrouter.ai
-TAVILY_API_KEY=tvly-your_key          # Web search - https://tavily.com
-
-# OPTIONAL (Spotify integration)
-SPOTIFY_CLIENT_ID=your_id
-SPOTIFY_CLIENT_SECRET=your_secret
-```
-
-| Service | Free/Paid Tier | What It Enables |
-|---------|----------------|-----------------|
-| Groq | 30 RPM | Core LLM (Llama 3.3 70B) |
-| DeepSeek | Paid (Cheap) | Reasoning & Planning (V4 Flash) |
-| Tavily | 1000/mo | Web search tool |
-| OpenRouter | $5 free | Vision analysis |
-| Spotify | Unlimited | Music control |
+Alternatively, you can manually edit the `.env` file in the root directory.
 
 ---
 
-## 📱 Google Integration (Optional)
+## 🌸 What's New in V19.5?
 
-Gmail, Calendar, and Tasks require Google OAuth:
+V19.5 is the **Forensic Reliability Update**, focusing on eliminating execution regressions and restoring full-stack stability.
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Create a project → Enable `Gmail API`, `Calendar API`, `Tasks API`
-3. OAuth consent screen → Add your email as test user
-4. Credentials → Create OAuth 2.0 Client ID → Desktop App
-5. Download JSON → Rename to `credentials.json` → Place in `backend/`
-6. Run `python first_setup.py` → Authorize in browser
-
-> **Tip:** Google integration is optional. Sakura works fine without it!
+- **Forensic Relabeling**: Purged "Planner" span leakage from CHAT routes by explicitly relabeling memory compression stages.
+- **Keep-Warm TTS**: Eliminated the 10s delay on manual speaker-button clicks by persisting the Kokoro model in memory.
+- **Telemetry Attribution**: Fixed orphaned trace logs by propagating `trace_id` through all background tasks and LLM wrappers.
+- **Tauri Asset Fix**: Resolved "Asset Protocol Access Denied" errors for local audio playback in development mode.
+- **Hallucination Purge**: Removed all residual references to hallucinated tools like `query_memory`.
 
 ---
 
@@ -157,145 +89,34 @@ Gmail, Calendar, and Tasks require Google OAuth:
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+S` | Toggle Quick Search (Omnibox) |
-| `Alt+F` | Toggle Full Window |
-| `Alt+M` | Hide Mode (for movies) |
-| `Escape` | Stop AI generation |
-| Say "Sakura" | Voice activation |
+| `Alt + S` | Toggle Quick Search (Omnibox) |
+| `Alt + F` | Toggle Full Window |
+| `Alt + M` | Toggle Hide Mode (for movies) |
+| `Escape` | Terminate current AI generation |
+| Say "Sakura" | Voice activation (requires `first_setup.py`) |
 
 ---
 
-## 🛠️ Project Structure
+## 🏗️ Technical Architecture
 
-```
-Sakura/
-├── frontend/               # Tauri + Svelte UI
-│   ├── src/                # Svelte components
-│   └── src-tauri/          # Rust window manager
-├── backend/                # FastAPI + LangChain
-│   ├── server.py           # Main API server
-│   ├── sakura_assistant/
-│   │   ├── core/           # Router, Executor, Planner
-│   │   │   ├── cognitive/  # V15: DesireSystem, ProactiveScheduler
-│   │   │   └── context_manager.py # V15.4: Deterministic Context Router
-│   │   └── tools_libs/     # 54 tool implementations
-│   ├── tests/              # All test suites
-│   └── data/               # World graph, templates
-├── scripts/                # Setup & build scripts
-├── docs/                   # Documentation
-└── README.md               # This file
+```mermaid
+graph TD
+    UI[Tauri Frontend] <--> API[FastAPI Backend]
+    API --> Router{Smart Router}
+    Router -->|Simple| Responder[Responder]
+    Router -->|Complex| Planner[ReAct Planner]
+    Planner --> Tools[Tool Executor]
+    Tools --> RAG[Ephemeral RAG / World Graph]
+    Responder --> TTS[Kokoro TTS Engine]
 ```
 
 ---
 
-## 🏗️ Building for Production
-
-```powershell
-# Option 1: Full automated build
-.\scripts\build_bundle.ps1
-
-# Option 2: Manual build
-cd frontend
-npm run tauri build
-```
-
-**Output:** `frontend/src-tauri/target/release/bundle/nsis/Sakura_18.0_x64-setup.exe`
-
----
-
-## 🆕 What's New in V15.4
-
-| Feature | Description |
-|---------|-------------|
-| **Deterministic Router** | Segmented pruning (Planner context vs Responder context) |
-| **Unified Context API** | Single source of truth for all LLM context injection |
-| **ContextSignals** | Dataclass-driven intent detection for deterministic routing |
-| **Cognitive Architecture** | DesireSystem tracks mood, loneliness, social battery |
-| **Proactive Check-ins** | Sakura reaches out when lonely (0 LLM cost) |
-| **Bubble-Gate UX** | Respects your focus — won't interrupt when hidden |
-| **Reactive Themes** | UI colors shift based on mood (5 palettes) |
-| **Port 3210** | Optimized port to avoid conflicts |
-
-| Feature | Description |
-|---------|-------------|
-| **DeepSeek Integration** | First-class provider with strict validation (Model ID required) |
-| **Model Abstraction** | Independent model selection for Router, Planner, Responder, and Verifier |
-| **Request Overrides** | Pass `llm_overrides` in `/chat` to hot-swap models per turn |
-| **Unified Budgeting** | `max_llm_calls` enforced across router + planner + verifier + responder |
-| **UI Validation** | Provider gating in Setup (disabled if key missing) + DeepSeek ID warning |
-
-## 🆕 What's New in V18.0
-
-### Previous Versions
-
-<details>
-<summary>V14 Features</summary>
-
-- Unified ReflectionEngine (background constraint detection)
-- Sleep Cycle (startup fact crystallization)
-- Dream Journal endpoint
-- Physical constraints bypass vector similarity
-</details>
-
-<details>
-<summary>V13 Features</summary>
-
-- Code Interpreter (Docker sandbox)
-- Audio Tools (transcribe & summarize)
-- Temporal Decay (30-day half-life)
-- 54 Tools
-</details>
-
----
-
-## 🐛 Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| "No module named..." | Activate venv: `.\PA\Scripts\activate` |
-| Wake word not working | Run `python first_setup.py` |
-| Gmail/Calendar errors | Check `credentials.json` placement |
-| Code Interpreter fails | Start Docker Desktop first |
-| Audio tools fail | Install ffmpeg: `winget install FFmpeg` |
-| App won't start | Check `backend/data/flight_recorder.jsonl` for errors |
-| Rate limited | Wait 1-2 minutes (free tier limits) |
-
----
-
-## 👤 Customization
-
-Edit `backend/sakura_assistant/config.py`:
-
-```python
-USER_DETAILS = """
-Name: Your Name
-Role: Your Role
-Interests: Your interests
-"""
-
-SYSTEM_PERSONALITY = """
-You are Sakura, a helpful AI assistant...
-"""
-```
-
----
-
-## � Documentation
-
-For those who want to dive deeper:
-
-| Document | Description |
-|----------|-------------|
-| [DOCUMENTATION.md](docs/DOCUMENTATION.md) | Full API documentation & architecture |
-| [V13_AUDIT_REPORT.md](docs/V13_AUDIT_REPORT.md) | Test coverage & certification report |
-| [V13_WALKTHROUGH.md](docs/V13_WALKTHROUGH.md) | Feature walkthrough with code examples |
-| [TEST_AUDIT.md](docs/TEST_AUDIT.md) | Test suite analysis & benchmarks |
-
----
-
-## �📝 License
-
-MIT License - See [LICENSE](LICENSE)
+## 🛡️ Documentation & Security
+For deep-dives into architecture and safety protocols, refer to:
+- [DOCUMENTATION.md](docs/DOCUMENTATION.md) — Full API & Schema reference.
+- [FIX_LOG.md](docs/FIX_LOG.md) — Historical forensic bug reports.
+- [SECURITY.md](docs/SECURITY.md) — Path sandboxing and prompt injection defense.
 
 ---
 

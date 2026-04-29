@@ -1,4 +1,4 @@
-# Sakura V18.0 - Windows Setup Script
+# Sakura V19.5 - Windows Setup Script
 # Run from project root: .\scripts\setup.ps1
 
 $ErrorActionPreference = "Stop"
@@ -8,7 +8,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 Set-Location $ProjectRoot
 
-Write-Host "🌸 Sakura V18.0 Setup Script" -ForegroundColor Magenta
+Write-Host "🌸 Sakura V19.5 Setup Script" -ForegroundColor Magenta
 Write-Host "==========================" -ForegroundColor Magenta
 Write-Host "Project Root: $ProjectRoot" -ForegroundColor Gray
 
