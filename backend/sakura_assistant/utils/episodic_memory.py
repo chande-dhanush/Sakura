@@ -22,7 +22,7 @@ class EpisodicMemoryStore:
                 with open(EPISODES_FILE, 'r', encoding='utf-8') as f:
                     self.episodes = json.load(f)
             except Exception as e:
-                print(f"⚠️ Error loading episodes: {e}")
+                print(f"   Error loading episodes: {e}")
                 self.episodes = []
         else:
             self.episodes = []

@@ -164,7 +164,7 @@ class EphemeralManager:
             gc.collect()
             gc.collect()
         except Exception as e:
-            print(f"⚠️ Standard delete failed for {eph_id}: {e}")
+            print(f"   Standard delete failed for {eph_id}: {e}")
 
         # 2. Manual cleanup of folder (Robust Windows Logic)
         from ...config import get_project_root
@@ -205,7 +205,7 @@ class EphemeralManager:
                 print(f" Deleted folder: {path}")
             else:
                 # --- STRATEGY: Rename Fallback (Last Resort) ---
-                print(f"⚠️ Delete failed ({error_msg}). Executing RENAME FALLBACK.")
+                print(f"   Delete failed ({error_msg}). Executing RENAME FALLBACK.")
                 try:
                     new_path = f"{path}_TRASH_{uuid.uuid4().hex}"
                     os.rename(path, new_path)
@@ -245,7 +245,7 @@ class EphemeralManager:
                 embedder = get_embedder()
                 return embedder.embed_documents(texts)
             except Exception as e:
-                print(f"⚠️ EphemeralManager: Could not import get_embedder: {e}")
+                print(f"   EphemeralManager: Could not import get_embedder: {e}")
                 return []
 
 

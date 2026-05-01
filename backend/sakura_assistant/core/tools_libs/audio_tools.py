@@ -213,7 +213,7 @@ def summarize_audio(
         style_prompts = {
             "concise": "Summarize this transcript in 2-3 sentences:",
             "detailed": "Provide a detailed summary of this transcript with main points and context:",
-            "bullet_points": "Summarize this transcript as bullet points (• format):"
+            "bullet_points": "Summarize this transcript as bullet points (  format):"
         }
         
         prompt = f"""{style_prompts.get(style, style_prompts["concise"])}

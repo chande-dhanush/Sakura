@@ -221,7 +221,7 @@ def get_micro_toolset(intent: str, all_tools: list, tool_hint: str = None, fallb
     min_tools = 1 if tool_hint else 2
     
     if len(micro_tools) >= min_tools:
-        print(f"⚡ [Micro-Toolset] {intent}: {len(micro_tools)} tools")
+        print(f"  [Micro-Toolset] {intent}: {len(micro_tools)} tools")
         return micro_tools
     
     # Fallback: return None to signal caller should use full filtering

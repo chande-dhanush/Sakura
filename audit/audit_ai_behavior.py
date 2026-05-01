@@ -41,7 +41,7 @@ def audit_guard():
 audit_guard()
 
 """
-Sakura V19.5 — AI Behavior Audit
+Sakura V19.5   AI Behavior Audit
 Checks: identity protection, EQ layer, hallucination guards,
 memory lifecycle, ephemeral RAG, temporal grounding, search cascade
 """

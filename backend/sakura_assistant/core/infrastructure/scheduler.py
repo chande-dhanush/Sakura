@@ -281,7 +281,7 @@ def remind_me(message: str, delay_seconds: float, callback: Callable[[str], None
     Quick reminder scheduling.
     
     Example:
-        remind_me("Check the oven", 600, lambda msg: print(f"⏰ {msg}"))
+        remind_me("Check the oven", 600, lambda msg: print(f"  {msg}"))
     """
     return get_scheduler().schedule_reminder(message, delay_seconds, callback)
 
@@ -337,9 +337,9 @@ def schedule_memory_maintenance(time_str: str = "03:00") -> str:
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # V14: SLEEP CYCLE - FACT CRYSTALLIZATION & DREAM JOURNAL
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 import json
 import os
@@ -370,7 +370,7 @@ def _log_dream(data: dict):
             f.write(json.dumps(entry) + "\n")
             
     except Exception as e:
-        print(f"⚠️ [Dream Journal] Log failed: {e}")
+        print(f"   [Dream Journal] Log failed: {e}")
 
 
 def _should_crystallize() -> bool:
@@ -405,7 +405,7 @@ def _mark_crystallization_done():
             f.write(str(time.time()))
             
     except Exception as e:
-        print(f"⚠️ [Sleep Cycle] Cooldown mark failed: {e}")
+        print(f"   [Sleep Cycle] Cooldown mark failed: {e}")
 
 
 async def crystallize_facts() -> int:
@@ -618,7 +618,7 @@ def run_sleep_cycle_on_startup():
         # No event loop, create one
         asyncio.run(crystallize_facts())
     except Exception as e:
-        print(f"⚠️ [Sleep Cycle] Startup run failed: {e}")
+        print(f"   [Sleep Cycle] Startup run failed: {e}")
 
 
 def get_dream_journal(limit: int = 10) -> list:
@@ -648,9 +648,9 @@ def get_dream_journal(limit: int = 10) -> list:
         return []
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # V15: COGNITIVE ARCHITECTURE - PROACTIVE FEATURES
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 PLANNED_INITIATIONS_PATH = "data/planned_initiations.json"
 
@@ -723,7 +723,7 @@ Output JSON only:
         # Parse JSON
         data = _safe_parse_crystallize_json(content)
         if not data or "messages" not in data:
-            print("⚠️ [Sleep Cycle] Failed to parse icebreakers")
+            print("   [Sleep Cycle] Failed to parse icebreakers")
             return 0
         
         messages = data["messages"]
@@ -760,12 +760,12 @@ def run_hourly_desire_tick():
         from ..cognitive.desire import get_desire_system
         desire = get_desire_system()
         desire.on_hourly_tick()
-        print(f"✅ [DesireSystem] Hourly tick completed: battery={desire.state.social_battery:.2f}, loneliness={desire.state.loneliness:.2f}")
+        print(f"  [DesireSystem] Hourly tick completed: battery={desire.state.social_battery:.2f}, loneliness={desire.state.loneliness:.2f}")
     except ImportError as e:
         # V19-FIX-03: NEVER silently swallow import failures
-        print(f"❌ [DesireSystem] IMPORT FAILED (cognitive module unreachable): {e}")
+        print(f"  [DesireSystem] IMPORT FAILED (cognitive module unreachable): {e}")
     except Exception as e:
-        print(f"⚠️ [DesireSystem] Hourly tick failed: {e}")
+        print(f"   [DesireSystem] Hourly tick failed: {e}")
 
 
 async def run_hourly_proactive_check():
@@ -777,12 +777,12 @@ async def run_hourly_proactive_check():
         from ..cognitive.proactive import get_proactive_scheduler
         scheduler = get_proactive_scheduler()
         result = await scheduler.check_and_initiate()
-        print(f"✅ [ProactiveScheduler] Hourly check completed (initiated={result})")
+        print(f"  [ProactiveScheduler] Hourly check completed (initiated={result})")
     except ImportError as e:
         # V19-FIX-03: NEVER silently swallow import failures
-        print(f"❌ [ProactiveScheduler] IMPORT FAILED (cognitive module unreachable): {e}")
+        print(f"  [ProactiveScheduler] IMPORT FAILED (cognitive module unreachable): {e}")
     except Exception as e:
-        print(f"⚠️ [ProactiveScheduler] Hourly check failed: {e}")
+        print(f"   [ProactiveScheduler] Hourly check failed: {e}")
 
 
 def schedule_cognitive_tasks():
@@ -827,9 +827,9 @@ def schedule_cognitive_tasks():
     try:
         from ..cognitive.desire import get_desire_system
         from ..cognitive.proactive import get_proactive_scheduler
-        print("✅ [Cognitive] Import verification passed: desire + proactive modules reachable")
+        print("  [Cognitive] Import verification passed: desire + proactive modules reachable")
     except ImportError as e:
-        print(f"❌ [Cognitive] CRITICAL: Cognitive imports FAILED at schedule time: {e}")
+        print(f"  [Cognitive] CRITICAL: Cognitive imports FAILED at schedule time: {e}")
         print(f"   Desire ticks and proactive checks will NOT work until this is fixed.")
 
 

@@ -33,7 +33,7 @@ def _get_int_env(name: str, default: int, min_value: int, max_value: int) -> int
         return default
     return value
 
-# V19: Shared cancellation signal — set by server /stop, checked by ReActLoop
+# V19: Shared cancellation signal   set by server /stop, checked by ReActLoop
 _cancellation_event = threading.Event()
 
 def request_cancellation():
@@ -63,12 +63,13 @@ class ExecutionStatus(Enum):
     """
     Explicit execution outcome.
     
-    v2.1: Partial ≠ Success. These are distinct states.
+    v2.1: Partial   Success. These are distinct states.
     """
     SUCCESS = "success"     # All steps completed successfully
     PARTIAL = "partial"     # Some steps completed, timeout/budget exceeded
     FAILED = "failed"       # Critical error, no useful work done
     SKIPPED = "skipped"     # CHAT mode, no execution needed
+    RATE_LIMITED = "rate_limited" # API quota exceeded
 
 
 @dataclass(frozen=True)
@@ -221,7 +222,7 @@ class ExecutionContext:
         """Returns True if budget is OK, False if limit exceeded."""
         self.llm_call_count += 1
         if self.llm_call_count > self.max_llm_calls:
-            print(f"🛑 [Budget] LLM call limit ({self.max_llm_calls}) exceeded")
+            print(f"  [Budget] LLM call limit ({self.max_llm_calls}) exceeded")
             return False
         return True
     
@@ -304,4 +305,15 @@ class ExecutionResult:
             tool_used="None",
             last_result=None,
             status=ExecutionStatus.PARTIAL
+        )
+
+    @staticmethod
+    def rate_limited(outputs: str = "", tool_messages: list = None) -> "ExecutionResult":
+        """Create result for rate-limited execution."""
+        return ExecutionResult(
+            outputs=outputs + "\n[API Rate Limit Reached]" if outputs else "[API Rate Limit Reached]",
+            tool_messages=tool_messages or [],
+            tool_used="None",
+            last_result=None,
+            status=ExecutionStatus.RATE_LIMITED
         )

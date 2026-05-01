@@ -102,42 +102,42 @@ def main():
     print_header("PER-MODEL TOKEN CONSUMPTION (VERIFIED)")
     
     print("""
- ┌─────────────────────────────────────────────────────────────────────┐
- │  MODEL ASSIGNMENTS (from container.py)                              │
- ├─────────────────────────────────────────────────────────────────────┤
- │  Router:    llama-3.1-8b-instant    (Groq)                          │
- │  Planner:   llama-3.3-70b-versatile (Groq)                          │
- │  Responder: openai/gpt-oss-20b      (OpenRouter)                    │
- │  Backup:    gemini-2.0-flash        (OpenRouter/Google)             │
- └─────────────────────────────────────────────────────────────────────┘
+                                                                        
+    MODEL ASSIGNMENTS (from container.py)                               
+                                                                        
+    Router:    llama-3.1-8b-instant    (Groq)                           
+    Planner:   llama-3.3-70b-versatile (Groq)                           
+    Responder: openai/gpt-oss-20b      (OpenRouter)                     
+    Backup:    gemini-2.0-flash        (OpenRouter/Google)              
+                                                                        
 """)
     
     for model_id, usage in MODEL_USAGE.items():
         limit = LIMITS.get(model_id)
         if not limit:
-            print(f"\n  ⚠️ {usage['name']} - NO LIMIT CONFIGURED!")
+            print(f"\n     {usage['name']} - NO LIMIT CONFIGURED!")
             continue
         
         total_per_turn = usage["input_tokens"] + usage["output_tokens"]
         max_turns = limit.tpm // total_per_turn if total_per_turn > 0 else 0
         usage_pct = round(total_per_turn / limit.tpm * 100, 1)
         
-        print(f"\n  📊 {usage['name']} ({usage['provider']})")
-        print(f"     ├── Stages:      {', '.join(usage['stages'])}")
-        print(f"     ├── Input:       ~{usage['input_tokens']} tokens")
-        print(f"     ├── Output:      ~{usage['output_tokens']} tokens")
-        print(f"     ├── Total/turn:  ~{total_per_turn} tokens")
-        print(f"     ├── TPM Limit:   {limit.tpm:,}")
-        print(f"     ├── RPM Limit:   {limit.rpm}")
-        print(f"     ├── Context:     {limit.context_window:,}")
-        print(f"     └── Max/min:     {max_turns} turns ({usage_pct}% TPM/turn)")
+        print(f"\n    {usage['name']} ({usage['provider']})")
+        print(f"         Stages:      {', '.join(usage['stages'])}")
+        print(f"         Input:       ~{usage['input_tokens']} tokens")
+        print(f"         Output:      ~{usage['output_tokens']} tokens")
+        print(f"         Total/turn:  ~{total_per_turn} tokens")
+        print(f"         TPM Limit:   {limit.tpm:,}")
+        print(f"         RPM Limit:   {limit.rpm}")
+        print(f"         Context:     {limit.context_window:,}")
+        print(f"         Max/min:     {max_turns} turns ({usage_pct}% TPM/turn)")
         
         if total_per_turn > limit.tpm:
-            print(f"     ❌ FAIL: Exceeds TPM!")
+            print(f"       FAIL: Exceeds TPM!")
         elif max_turns < 1:
-            print(f"     ⚠️ WARNING: Can't complete 1 turn/min")
+            print(f"        WARNING: Can't complete 1 turn/min")
         else:
-            print(f"     ✅ SAFE")
+            print(f"       SAFE")
 
 def stress_test():
     """Stress test: What if multiple queries come at once?"""
@@ -145,7 +145,7 @@ def stress_test():
     
     print("""
  Scenario: 5 users send queries in the same minute
- ─────────────────────────────────────────────────────
+                                                      
 """)
     
     for model_id, usage in MODEL_USAGE.items():
@@ -156,11 +156,11 @@ def stress_test():
         total_per_turn = usage["input_tokens"] + usage["output_tokens"]
         tokens_for_5 = total_per_turn * 5
         
-        print(f"  📊 {usage['name']}: {tokens_for_5:,} / {limit.tpm:,} TPM")
+        print(f"    {usage['name']}: {tokens_for_5:,} / {limit.tpm:,} TPM")
         if tokens_for_5 > limit.tpm:
-            print(f"     ❌ FAIL: 5 users would exceed rate limit!")
+            print(f"       FAIL: 5 users would exceed rate limit!")
         else:
-            print(f"     ✅ PASS: Can handle 5 concurrent users.")
+            print(f"       PASS: Can handle 5 concurrent users.")
 
 if __name__ == "__main__":
     main()

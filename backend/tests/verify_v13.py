@@ -59,7 +59,7 @@ def test_temporal_decay():
     entity_boost.touch()
     # Use approximate comparison for floating point
     assert abs(entity_boost.confidence - 0.85) < 0.0001, f"touch() boost wrong: {entity_boost.confidence}"
-    print(f"   touch() boost: 0.8 → {entity_boost.confidence}")
+    print(f"   touch() boost: 0.8   {entity_boost.confidence}")
     
     # Test 4: Demotion
     demote_entity = EntityNode(
@@ -74,7 +74,7 @@ def test_temporal_decay():
     demoted = demote_entity.check_lifecycle_demotion()
     assert demoted == True
     assert demote_entity.lifecycle == EntityLifecycle.CANDIDATE
-    print(f"   Lifecycle demotion: PROMOTED → CANDIDATE")
+    print(f"   Lifecycle demotion: PROMOTED   CANDIDATE")
     
     print("   TEMPORAL DECAY: ALL PASSED")
     return True
@@ -88,9 +88,9 @@ def test_adaptive_routing():
     
     # Force reimport to get latest code
     import importlib
-    import sakura_assistant.core.router as router_module
+    import sakura_assistant.core.routing.router as router_module
     importlib.reload(router_module)
-    from sakura_assistant.core.router import get_urgency, RouteResult
+    from sakura_assistant.core.routing.router import get_urgency, RouteResult
     
     # Test urgency detection
     urgent_tests = [
@@ -103,7 +103,7 @@ def test_adaptive_routing():
     for query, expected in urgent_tests:
         result = get_urgency(query)
         assert result == expected, f"'{query}' expected {expected}, got {result}"
-        print(f"   '{query[:25]}...' → {result}")
+        print(f"   '{query[:25]}...'   {result}")
     
     # Test RouteResult with urgency
     result = RouteResult("DIRECT", "gmail_read_email", "URGENT")
@@ -137,7 +137,7 @@ def test_code_interpreter():
         result = check_code_interpreter_status.invoke({})
         print(f"   Status check: {result[:50]}...")
     else:
-        print("  ⚠️ Docker not running (start Docker Desktop to use)")
+        print("     Docker not running (start Docker Desktop to use)")
     
     print("   CODE INTERPRETER: SETUP VERIFIED")
     return True
@@ -167,14 +167,14 @@ def test_audio_tools():
         from pydub import AudioSegment
         print("   pydub installed")
     except ImportError:
-        print("  ⚠️ pydub not installed: pip install pydub")
+        print("     pydub not installed: pip install pydub")
     
     # Check speech_recognition
     try:
         import speech_recognition as sr
         print("   speech_recognition installed")
     except ImportError:
-        print("  ⚠️ speech_recognition not installed")
+        print("     speech_recognition not installed")
     
     print("   AUDIO TOOLS: SETUP VERIFIED")
     return True
@@ -264,7 +264,7 @@ def main():
     if passed == total:
         print("\n ALL V13 FEATURES VERIFIED!")
     else:
-        print("\n⚠️ Some features need attention")
+        print("\n   Some features need attention")
     
     return passed == total
 

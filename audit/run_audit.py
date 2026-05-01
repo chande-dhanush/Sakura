@@ -23,24 +23,28 @@ SCRIPTS = [
 
 def run_audit(script):
     """Run single audit with timeout"""
-    print(f"\n🧪 {script}")
+    print(f"\n  {script}")
     try:
+        # V19.5 FIX: Detect if we are running from root or audit/ folder
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        script_path = os.path.join(script_dir, script)
+        
         result = subprocess.run(
-            [sys.executable, f"{script}"], 
+            [sys.executable, script_path], 
             cwd=".", timeout=120, capture_output=True, text=True, encoding='utf-8'
         )
         output = result.stdout + "\n" + result.stderr
         if result.returncode == 0:
-            print("✅ PASS")
+            print("  PASS")
             return "PASS", output
         else:
-            print(f"❌ FAIL: {result.stderr[:200]}...")
+            print(f"  FAIL: {result.stderr[:200]}...")
             return "FAIL", output
     except subprocess.TimeoutExpired:
-        print("⏰ TIMEOUT")
+        print("  TIMEOUT")
         return "TIMEOUT", "Execution timed out after 120s"
     except Exception as e:
-        print(f"💥 ERROR: {e}")
+        print(f"  ERROR: {e}")
         return "ERROR", str(e)
 
 def filter_output(text):
@@ -83,13 +87,13 @@ report_path.parent.mkdir(exist_ok=True)
 with open(report_path, "w", encoding="utf-8") as f:
     f.write("# Sakura V19.5 Master Audit Report\n\n")
     f.write(f"**Date:** {Path('.').absolute()}\n")
-    f.write(f"**Status:** {'✅ PASS' if results['pass'] == results['total'] else '❌ FAIL'}\n\n")
+    f.write(f"**Status:** {'  PASS' if results['pass'] == results['total'] else '  FAIL'}\n\n")
     
     f.write("## Summary\n\n")
     f.write("| Script | Status |\n")
     f.write("| :--- | :--- |\n")
     for script, status, _ in report_data:
-        icon = "✅" if status == "PASS" else "❌" if status == "FAIL" else "💥"
+        icon = " " if status == "PASS" else " " if status == "FAIL" else " "
         f.write(f"| {script} | {icon} {status} |\n")
     
     f.write(f"\n**Total:** {results['pass']}/{results['total']} PASS\n")
@@ -102,7 +106,7 @@ with open(report_path, "w", encoding="utf-8") as f:
     f.write("> Repetitive status messages (Message queued, Visibility updates, etc.) have been trimmed for readability.\n\n")
     
     for script, status, output in report_data:
-        icon = "✅" if status == "PASS" else "❌" if status == "FAIL" else "💥"
+        icon = " " if status == "PASS" else " " if status == "FAIL" else " "
         f.write(f"### {icon} {script}\n")
         f.write("```text\n")
         f.write(output.strip() + "\n")
@@ -111,16 +115,16 @@ with open(report_path, "w", encoding="utf-8") as f:
 print("\n" + "="*50)
 print("SAKURA V19.5 AUDIT SUMMARY")
 print("="*50)
-print(f"✅ PASS:  {results['pass']}/{results['total']}")
-print(f"❌ FAIL:  {results['fail']}")
-print(f"💥 ERROR:{results['error']}")
-print(f"⏰ TIMEOUT: {results['timeout']}")
+print(f"  PASS:  {results['pass']}/{results['total']}")
+print(f"  FAIL:  {results['fail']}")
+print(f"  ERROR:{results['error']}")
+print(f"  TIMEOUT: {results['timeout']}")
 
 grade = "A+" if results['pass'] == results['total'] else "A" if results['pass'] >= 13 else "B"
-print(f"🎓 GRADE: {grade}")
+print(f"  GRADE: {grade}")
 
 if results['pass'] == results['total']:
-    print("🚀 PRODUCTION READY — SHIP IT!")
-    print(f"📄 Trimmed Report generated: {report_path}")
+    print("  PRODUCTION READY   SHIP IT!")
+    print(f"  Trimmed Report generated: {report_path}")
 else:
-    print("🔧 Fix remaining failures")
+    print("  Fix remaining failures")

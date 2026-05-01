@@ -41,7 +41,7 @@ def audit_guard():
 audit_guard()
 
 """
-Sakura V19.5 — Security Audit Script
+Sakura V19.5   Security Audit Script
 Checks: path traversal defense, prompt injection sanitization, 
 WebSocket origin validation, auth headers, secret exposure
 """
@@ -58,7 +58,7 @@ def check(name, passed, detail="", severity="HIGH"):
         "detail": detail
     })
 
-# 1. Path traversal — DANGEROUS_PATTERNS blocklist
+# 1. Path traversal   DANGEROUS_PATTERNS blocklist
 try:
     server_src = Path("backend/sakura_assistant/core/execution/executor.py").read_text(encoding="utf-8", errors="ignore")
     has_blocklist = "DANGEROUS_PATTERNS" in server_src and "normpath" in server_src

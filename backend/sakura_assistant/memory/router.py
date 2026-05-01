@@ -68,7 +68,7 @@ class DocumentRouter:
         # 1. Check Ephemeral Cache (EAG)
         cached_results = self.cache.check(query_emb, query_text)
         if cached_results:
-            return self._format_results(cached_results, source="Memory Cache (EAG) ⚡")
+            return self._format_results(cached_results, source="Memory Cache (EAG)  ")
 
         # 2. Get All Metadata
         all_meta = self.meta_manager.list_all_metadata()

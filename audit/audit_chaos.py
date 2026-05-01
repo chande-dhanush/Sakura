@@ -95,16 +95,16 @@ def audit_tool_reliability():
     
     Uses mock tools to avoid actual API calls.
     """
-    print("💥 Starting Chaos Engineering Audit...")
+    print("  Starting Chaos Engineering Audit...")
     
     # Mock tools that simulate real behavior
     def mock_spotify(args):
         time.sleep(0.01)  # Simulate network latency
-        return "✅ Playing: Neon Blade by Moonlight"
+        return "  Playing: Neon Blade by Moonlight"
     
     def mock_weather(args):
         time.sleep(0.01)
-        return "Weather: 22°C, Partly Cloudy"
+        return "Weather: 22 C, Partly Cloudy"
     
     def mock_email(args):
         time.sleep(0.01)
@@ -162,7 +162,7 @@ def audit_llm_failover():
     """
     Test LLM failover chain (Primary -> Backup).
     """
-    print("\n🔄 Starting LLM Failover Audit...")
+    print("\n  Starting LLM Failover Audit...")
     
     results = {
         "failover_configured": False,
@@ -189,7 +189,7 @@ def audit_llm_failover():
         print(f"  Full Failover Configured: {results['failover_configured']}")
         
     except Exception as e:
-        print(f"  ⚠️ Failover audit failed: {e}")
+        print(f"     Failover audit failed: {e}")
     
     return results
 
@@ -200,7 +200,7 @@ def audit_executor_recovery():
     
     Specifically tests the FALLBACK_MAP in executor.py
     """
-    print("\n🛠️ Starting Executor Recovery Audit...")
+    print("\n   Starting Executor Recovery Audit...")
     
     results = {
         "fallback_map_exists": False,
@@ -219,10 +219,10 @@ def audit_executor_recovery():
             for chain in results["fallback_chains"]:
                 print(f"    {chain}")
         else:
-            print("  ⚠️ No FALLBACK_MAP found in executor")
+            print("     No FALLBACK_MAP found in executor")
             
     except Exception as e:
-        print(f"  ⚠️ Recovery audit failed: {e}")
+        print(f"     Recovery audit failed: {e}")
     
     return results
 
@@ -277,7 +277,7 @@ def generate_chaos_report(tool_results, failover_results, executor_results):
         f.write(f"Target: >95% survival under 30% failure injection\n")
         f.write("=" * 60 + "\n")
     
-    print(f"\n✅ Report saved to {report_path}")
+    print(f"\n  Report saved to {report_path}")
     return report_path
 
 

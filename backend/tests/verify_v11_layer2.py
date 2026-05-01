@@ -14,12 +14,12 @@ from unittest.mock import MagicMock, patch
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from sakura_assistant.core.executor import ToolExecutor, ExecutionResult
+from sakura_assistant.core.execution.executor import ToolExecutor, ExecutionResult
 from sakura_assistant.core.ephemeral_manager import EphemeralManager
 from sakura_assistant.core.tools_libs.memory_tools import query_ephemeral
 
 async def test_context_valve():
-    print("\n️ Testing V11.3 Context Valve...")
+    print("\n  Testing V11.3 Context Valve...")
     
     # 1. Setup Mock Ephemeral Manager
     mock_eph_man = MagicMock()
@@ -38,7 +38,7 @@ async def test_context_valve():
     # 3. Initialize Executor with patched Manager
     executor = ToolExecutor([mock_tool])
     
-    with patch('sakura_assistant.core.executor.get_ephemeral_manager', return_value=mock_eph_man):
+    with patch('sakura_assistant.core.execution.executor.get_ephemeral_manager', return_value=mock_eph_man):
         # 4. Execute Plan
         step = {"tool": "big_tool", "args": {}, "id": 1}
         result = await executor.aexecute_plan([step])

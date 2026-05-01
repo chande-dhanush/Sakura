@@ -25,7 +25,7 @@ def get_rss_mb():
         import psutil
         return psutil.Process().memory_info().rss / 1024**2
     except ImportError:
-        print("⚠️ psutil not installed, can't measure RSS")
+        print("   psutil not installed, can't measure RSS")
         return 0
 
 def test_startup_memory():
@@ -70,7 +70,7 @@ def test_mmap_active():
         print(" PASS: FAISS loaded with MMAP")
         return True
     else:
-        print("⚠️ WARN: FAISS not using MMAP (may be unsupported on this platform)")
+        print("   WARN: FAISS not using MMAP (may be unsupported on this platform)")
         return True  # Not a hard failure
 
 def test_history_cap():
@@ -113,7 +113,7 @@ def test_first_use_embedding():
         context = store.get_context_for_query("test query")
         print(f" Retrieved context: {len(context)} chars")
     except Exception as e:
-        print(f"⚠️ Query failed (may be expected if no data): {e}")
+        print(f"   Query failed (may be expected if no data): {e}")
     
     rss_after = get_rss_mb()
     delta = rss_after - rss_before
@@ -129,7 +129,7 @@ def test_first_use_embedding():
             print(f" Memory delta ~{delta:.0f}MB (expected ~350MB for model)")
         return True, rss_after
     else:
-        print("⚠️ WARN: Embeddings may not have loaded (FAISS might not be available)")
+        print("   WARN: Embeddings may not have loaded (FAISS might not be available)")
         return True, rss_after
 
 def test_config_flags():
@@ -151,7 +151,7 @@ def test_config_flags():
     all_pass = True
     for flag, expected in flags:
         val = getattr(config, flag, None)
-        status = "" if val == expected else "⚠️"
+        status = "" if val == expected else "  "
         print(f"{status} {flag} = {val} (expected {expected})")
         if val != expected:
             all_pass = False
@@ -200,7 +200,7 @@ def run_all_tests():
         print("\n ALL TESTS PASSED")
         return 0
     else:
-        print("\n⚠️ SOME TESTS FAILED")
+        print("\n   SOME TESTS FAILED")
         return 1
 
 if __name__ == "__main__":

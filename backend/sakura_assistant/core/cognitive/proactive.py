@@ -72,7 +72,7 @@ class ProactiveScheduler:
                 data = json.load(f)
             self.failed_count = int(data.get("failed_count", 0))
         except Exception as e:
-            print(f"⚠️ [ProactiveScheduler] Failed to load backoff: {e}")
+            print(f"   [ProactiveScheduler] Failed to load backoff: {e}")
             self.failed_count = 0
 
     def _save_backoff(self):
@@ -87,13 +87,13 @@ class ProactiveScheduler:
                     "last_updated": datetime.now().isoformat()
                 }, f, indent=2)
         except Exception as e:
-            print(f"⚠️ [ProactiveScheduler] Failed to save backoff: {e}")
+            print(f"   [ProactiveScheduler] Failed to save backoff: {e}")
 
     def _increment_failed_initiation(self, reason: str):
         """Record a failed proactive initiation attempt."""
         self.failed_count += 1
         self._save_backoff()
-        print(f"⚠️ [ProactiveScheduler] Failed initiation #{self.failed_count}: {reason}")
+        print(f"   [ProactiveScheduler] Failed initiation #{self.failed_count}: {reason}")
     
     def get_planned_initiations(self) -> List[str]:
         """Load pre-computed messages from JSON."""
@@ -105,7 +105,7 @@ class ProactiveScheduler:
                 data = json.load(f)
                 return data.get("messages", [])
         except Exception as e:
-            print(f"⚠️ [ProactiveScheduler] Failed to load initiations: {e}")
+            print(f"   [ProactiveScheduler] Failed to load initiations: {e}")
             return []
     
     def pop_initiation(self) -> Optional[str]:
@@ -126,7 +126,7 @@ class ProactiveScheduler:
             with open(self.initiations_path, "w") as f:
                 json.dump({"messages": messages, "updated": datetime.now().isoformat()}, f, indent=2)
         except Exception as e:
-            print(f"⚠️ [ProactiveScheduler] Failed to save: {e}")
+            print(f"   [ProactiveScheduler] Failed to save: {e}")
         
         return message
     
@@ -192,7 +192,7 @@ class ProactiveScheduler:
         Save pre-computed messages (called by nightly job).
         """
         if not self.initiations_path:
-            print("⚠️ [ProactiveScheduler] No path configured")
+            print("   [ProactiveScheduler] No path configured")
             return
         
         try:
@@ -221,9 +221,9 @@ class ProactiveScheduler:
         }
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # SINGLETON ACCESSOR
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 _proactive_scheduler: Optional[ProactiveScheduler] = None
 

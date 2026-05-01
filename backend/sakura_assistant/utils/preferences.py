@@ -27,7 +27,7 @@ class PreferenceStore:
                     data = json.load(f)
                     self.preferences.update(data)
             except Exception as e:
-                print(f"⚠️ Error loading preferences: {e}")
+                print(f"   Error loading preferences: {e}")
 
     def save(self):
         write_memory_atomic(PREFERENCES_FILE, self.preferences)

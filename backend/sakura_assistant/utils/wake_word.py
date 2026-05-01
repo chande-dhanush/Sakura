@@ -11,7 +11,7 @@ DESIGN:
 PERFORMANCE:
 - <2% CPU during idle (RMS gate skips most frames)
 - ~0.1MB memory (small buffers, no models)
-- O(N²) DTW but N is tiny (~30 frames)
+- O(N ) DTW but N is tiny (~30 frames)
 
 REQUIREMENTS:
 - scipy for signal processing
@@ -78,7 +78,7 @@ MIN_SPEECH_DURATION = 0.15   # 150ms minimum sustained speech - more responsive
 SPEECH_SAMPLES_REQUIRED = int(SAMPLE_RATE * MIN_SPEECH_DURATION / (BUFFER_SIZE / 2))
 
 # V5.1: Template Voting (stricter consensus)
-MIN_TEMPLATE_MATCHES = 2    # Require ≥2 template matches
+MIN_TEMPLATE_MATCHES = 2    # Require  2 template matches
 # Note: If you have 4+ templates, system auto-requires majority
 
 # V5.1: Timing (balanced cooldown)
@@ -125,7 +125,7 @@ class WakeWordDetector:
     Features:
     - Adaptive noise floor (EMA-based)
     - Sustained speech gate (150ms minimum)
-    - Template voting (≥2 matches required)
+    - Template voting ( 2 matches required)
     - WakeState FSM (ACTIVE/PAUSED/LOW_POWER)
     - Hard refractory period after trigger
     
@@ -217,7 +217,7 @@ class WakeWordDetector:
                         self._templates.append(mfcc)
                         print(f"[WAKE]  Converted {fname} to MFCC, shape={mfcc.shape}")
                     else:
-                        print(f"[WAKE] ⚠️ MFCC extraction returned None for {fname}")
+                        print(f"[WAKE]    MFCC extraction returned None for {fname}")
                 except Exception as e:
                     import traceback
                     log_warning(f"Failed to load WAV template {fname}: {e}")
@@ -290,14 +290,14 @@ class WakeWordDetector:
         if self._state != WakeState.PAUSED:
             old_state = self._state
             self._state = WakeState.PAUSED
-            print(f"[WAKE] {old_state.name} → PAUSED")
+            print(f"[WAKE] {old_state.name}   PAUSED")
     
     def resume(self):
         """Resume detection (return to ACTIVE)."""
         if self._state == WakeState.PAUSED:
             self._state = WakeState.ACTIVE
             self._continuous_silence_start = time.time()  # Reset idle tracking
-            print(f"[WAKE] PAUSED → ACTIVE")
+            print(f"[WAKE] PAUSED   ACTIVE")
     
     def is_paused(self) -> bool:
         """Check if detection is paused."""
@@ -314,7 +314,7 @@ class WakeWordDetector:
         Features:
         - Adaptive noise floor (EMA-based)
         - Sustained speech gate (150ms minimum)
-        - Template voting (≥2 matches required)
+        - Template voting ( 2 matches required)
         - Refractory period (2.5s after trigger)
         - Low-power idle state
         """
@@ -348,7 +348,7 @@ class WakeWordDetector:
         # Calculate RMS energy
         rms = np.sqrt(np.mean(audio_buffer ** 2))
         
-        # Speech gate threshold = noise floor × factor
+        # Speech gate threshold = noise floor   factor
         speech_threshold = self._noise_floor * SPEECH_GATE_FACTOR
         
         # V7: Removed verbose per-frame debug logging for performance
@@ -361,10 +361,10 @@ class WakeWordDetector:
             self._last_speech_time = now
             self._continuous_silence_start = now  # Reset silence tracking
             
-            # Check if LOW_POWER → ACTIVE transition needed
+            # Check if LOW_POWER   ACTIVE transition needed
             if self._state == WakeState.LOW_POWER:
                 self._state = WakeState.ACTIVE
-                print(f"[WAKE] LOW_POWER → ACTIVE (RMS spike)")
+                print(f"[WAKE] LOW_POWER   ACTIVE (RMS spike)")
         else:
             # Below speech gate - update noise floor (only when not speaking)
             if not self._in_speech:
@@ -382,7 +382,7 @@ class WakeWordDetector:
             silence_duration = now - self._continuous_silence_start
             if self._state == WakeState.ACTIVE and silence_duration > LOW_POWER_IDLE_SECONDS:
                 self._state = WakeState.LOW_POWER
-                print(f"[WAKE] ACTIVE → LOW_POWER (idle {silence_duration:.1f}s)")
+                print(f"[WAKE] ACTIVE   LOW_POWER (idle {silence_duration:.1f}s)")
             
             # Clear buffer and skip DTW scoring
             self._buffer.clear()
@@ -404,7 +404,7 @@ class WakeWordDetector:
         # Extract MFCC features
         mfcc = self._extract_mfcc(audio_buffer)
         if mfcc is None:
-            print(f"[WAKE] ⚠️ Live MFCC extraction failed (buffer len={len(audio_buffer)})")
+            print(f"[WAKE]    Live MFCC extraction failed (buffer len={len(audio_buffer)})")
             self._buffer.clear()
             return
         
@@ -429,7 +429,7 @@ class WakeWordDetector:
         ratio = rms / self._noise_floor if self._noise_floor > 0 else 0
         print(f"[WAKE] rms={rms:.3f} nf={self._noise_floor:.3f} ratio={ratio:.1f} matches={matches}/{total} best={best_distance:.1f} thresh={self.threshold}")
         
-        # Template voting: require ≥2 matches (or majority if <4 templates)
+        # Template voting: require  2 matches (or majority if <4 templates)
         required_matches = min(MIN_TEMPLATE_MATCHES, max(1, total // 2))
         
         if matches >= required_matches:
@@ -517,14 +517,14 @@ class WakeWordDetector:
     def _dtw_distance(self, seq1: np.ndarray, seq2: np.ndarray) -> float:
         """
         V7 Optimized: FastDTW-style with Sakoe-Chiba band + early termination.
-        Complexity: O(N*W) instead of O(N²), where W is band width.
+        Complexity: O(N*W) instead of O(N ), where W is band width.
         """
         n, m = len(seq1), len(seq2)
         
         if n == 0 or m == 0:
             return float('inf')
         
-        # Sakoe-Chiba band width (±15% of sequence length)
+        # Sakoe-Chiba band width ( 15% of sequence length)
         band_width = max(5, int(0.15 * max(n, m)))
         
         # Cost matrix (only allocate band)

@@ -106,7 +106,7 @@ class DesireSystem:
                     self.state = DesireState.from_dict(data)
                     print(f" [DesireSystem] Loaded state: battery={self.state.social_battery:.2f}, loneliness={self.state.loneliness:.2f}")
             except Exception as e:
-                print(f"⚠️ [DesireSystem] Failed to load state: {e}")
+                print(f"   [DesireSystem] Failed to load state: {e}")
                 self.state = DesireState()
         else:
             print(" [DesireSystem] Starting fresh")
@@ -132,11 +132,11 @@ class DesireSystem:
                 with open(self.persist_path, "w") as f:
                     json.dump(self.state.to_dict(), f, indent=2)
             except Exception as e:
-                print(f"⚠️ [DesireSystem] Failed to save: {e}")
+                print(f"   [DesireSystem] Failed to save: {e}")
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # EVENT HANDLERS
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def on_user_message(self, message: str):
         """
@@ -208,11 +208,11 @@ class DesireSystem:
         self.state.curiosity = max(0.0, self.state.curiosity - self.CURIOSITY_DECAY_PER_HOUR)
         
         self.save()
-        print(f"⏰ [DesireSystem] Hourly tick: battery={self.state.social_battery:.2f}, loneliness={self.state.loneliness:.2f}")
+        print(f"  [DesireSystem] Hourly tick: battery={self.state.social_battery:.2f}, loneliness={self.state.loneliness:.2f}")
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # MOOD GENERATION
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def get_mood(self) -> Mood:
         """Determine current mood from desire state."""
@@ -263,9 +263,9 @@ class DesireSystem:
             return f"[MOOD: {mood.value.upper()}] {base} {' '.join(hints)}"
         return f"[MOOD: {mood.value.upper()}] {base}"
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # PROACTIVE INITIATION CHECK
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def should_initiate(self) -> Tuple[bool, str]:
         """
@@ -314,9 +314,9 @@ class DesireSystem:
         return self.state
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # SINGLETON ACCESSOR
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 _desire_system: Optional[DesireSystem] = None
 

@@ -13,7 +13,7 @@ import os
 # Add parent path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from sakura_assistant.core.router import get_urgency, RouteResult
+from sakura_assistant.core.routing.router import get_urgency, RouteResult
 
 
 class TestUrgencyDetection:

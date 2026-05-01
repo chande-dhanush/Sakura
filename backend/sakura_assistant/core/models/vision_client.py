@@ -62,12 +62,12 @@ class VisionClient:
             return await self._call_api(VISION_MODEL, messages, tool_name, full_prompt)
 
         except Exception as e:
-            print(f"⚠️ Primary vision model ({VISION_MODEL}) failed: {e}")
+            print(f"   Primary vision model ({VISION_MODEL}) failed: {e}")
             try:
                 # Retry with Fallback Model
                 return await self._call_api(VISION_MODEL_FALLBACK, messages, tool_name, full_prompt)
             except Exception as e2:
-                print(f"❌ Fallback vision model ({VISION_MODEL_FALLBACK}) also failed: {e2}")
+                print(f"  Fallback vision model ({VISION_MODEL_FALLBACK}) also failed: {e2}")
                 return "Vision analysis unavailable. Please describe what you see manually."
 
     async def _call_api(self, model: str, messages: list, tool_name: str, prompt: str) -> str:

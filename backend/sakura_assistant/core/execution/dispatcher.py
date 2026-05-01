@@ -185,7 +185,7 @@ class Executor:
         try:
             return await self.one_shot_runner.aexecute(tool_name, ctx, llm_overrides=llm_overrides)
         except OneShotArgsIncomplete as e:
-            logger.warning(f"⚠️ [Executor] ONE_SHOT failed for '{e.tool_name}', missing: {e.missing_fields}. Falling back to ITERATIVE.")
+            logger.warning(f"   [Executor] ONE_SHOT failed for '{e.tool_name}', missing: {e.missing_fields}. Falling back to ITERATIVE.")
             new_ctx = ExecutionContext.create(
                 mode=ExecutionMode.ITERATIVE,
                 request_id=ctx.request_id,
@@ -227,7 +227,7 @@ class Executor:
             )
             
             if verification.get("verdict") == "FAIL":
-                logger.warning(f"⚠️ [Verifier] Plan failed validation: {verification.get('reason')}")
+                logger.warning(f"   [Verifier] Plan failed validation: {verification.get('reason')}")
                 result.status = ExecutionStatus.FAILED
                 
         except Exception as e:

@@ -41,7 +41,7 @@ def audit_guard():
 audit_guard()
 
 """
-Sakura V19.5 — Integration & E2E Audit Script
+Sakura V19.5   Integration & E2E Audit Script
 Checks: System-wide wiring, health endpoints, and provider configuration
 """
 import os, json

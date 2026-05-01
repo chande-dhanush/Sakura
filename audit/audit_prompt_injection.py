@@ -41,7 +41,7 @@ def audit_guard():
 audit_guard()
 
 """
-Sakura V19.5 — Prompt Injection Resistance Audit
+Sakura V19.5   Prompt Injection Resistance Audit
 Tests the sanitization layer against known injection patterns
 """
 import json, sys, os

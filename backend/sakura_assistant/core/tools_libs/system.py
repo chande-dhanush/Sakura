@@ -19,7 +19,7 @@ except ImportError:
 try:
     from AppOpener import open as app_open
 except Exception as e:
-    print(f"⚠️ AppOpener failed to load in system.py: {e}")
+    print(f"   AppOpener failed to load in system.py: {e}")
     app_open = None
 
 try:
@@ -58,9 +58,9 @@ def get_system_info() -> str:
         disk = psutil.disk_usage('/')
         result.append(f" Disk: {disk.percent}% used")
     except ImportError:
-        result.append("⚠️ Install 'psutil' for stats.")
+        result.append("   Install 'psutil' for stats.")
     except Exception as e:
-        result.append(f"⚠️ Stats unavailable: {e}")
+        result.append(f"   Stats unavailable: {e}")
     return "\n".join(result)
 
 @tool
@@ -120,7 +120,7 @@ def read_screen(prompt: str = "Describe what is on the screen in detail.", monit
             description = asyncio.run(_vision_client.analyze(img, prompt=vision_prompt, context=context_str))
 
         if not description or len(description.strip()) < 5:
-             return "⚠️ Vision model returned an empty or invalid response."
+             return "   Vision model returned an empty or invalid response."
 
         return description
 
@@ -162,13 +162,13 @@ def file_read(path: str, max_chars: int = 5000) -> str:
     try:
         from sakura_assistant.core.execution.executor import validate_path
     except ImportError:
-        return f"⛔ Security: Path validation module not found. File access denied."
+        return f"  Security: Path validation module not found. File access denied."
     
     try:
         if not validate_path(path):
-             return f"⛔ Access denied: Path validation failed for '{path}'"
+             return f"  Access denied: Path validation failed for '{path}'"
     except Exception as e:
-        return f"⛔ Security check error: {e}"
+        return f"  Security check error: {e}"
 
     try:
         safe_path = _validate_path(path)
@@ -187,13 +187,13 @@ def file_write(path: str, content: str) -> str:
     try:
         from sakura_assistant.core.execution.executor import validate_path
     except ImportError:
-        return f"⛔ Security: Path validation module not found. File access denied."
+        return f"  Security: Path validation module not found. File access denied."
 
     try:
         if not validate_path(path):
-             return f"⛔ Access denied: Path validation failed for '{path}'"
+             return f"  Access denied: Path validation failed for '{path}'"
     except Exception as e:
-        return f"⛔ Security check error: {e}"
+        return f"  Security check error: {e}"
 
     try:
         safe_path = _validate_path(path)
@@ -219,14 +219,14 @@ def file_open(file_path: str) -> str:
     except ImportError:
         # Fallback if import fails - fail safe
         # Fallback if import fails - fail safe
-        return f"⛔ Security: Path validation module not found. File access denied."
+        return f"  Security: Path validation module not found. File access denied."
     
     # Validate path before opening
     try:
         if not validate_path(file_path):
-            return f"⛔ Access denied: Path validation failed for '{file_path}'"
+            return f"  Access denied: Path validation failed for '{file_path}'"
     except Exception as e:
-        return f"⛔ Access denied: {str(e)}"
+        return f"  Access denied: {str(e)}"
     
     try:
         if "~" in file_path: file_path = os.path.expanduser(file_path)
@@ -299,7 +299,7 @@ def set_reminder(message: str, delay_minutes: float) -> str:
         start_scheduler()
         
         delay_sec = delay_minutes * 60
-        def cb(msg): print(f"\n⏰ REMINDER: {msg}\n")
+        def cb(msg): print(f"\n  REMINDER: {msg}\n")
         
         remind_me(message, delay_sec, cb)
         return f" Reminder set for {delay_minutes} mins."

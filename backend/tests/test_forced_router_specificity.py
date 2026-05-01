@@ -12,7 +12,7 @@ class TestForcedRouterSpecificity:
     """The generic 'search for X' pattern must NOT match queries
     that explicitly target a specialized service."""
 
-    # ── Queries that should NOT be captured by web_search ───────────────
+    #    Queries that should NOT be captured by web_search                
     @pytest.mark.parametrize("query", [
         "search wikipedia for quantum computing",
         "search my calendar for meetings",
@@ -30,7 +30,7 @@ class TestForcedRouterSpecificity:
                 f"Got: {result}"
             )
 
-    # ── Queries that SHOULD still be captured by web_search ────────────
+    #    Queries that SHOULD still be captured by web_search             
     @pytest.mark.parametrize("query,expected_tool", [
         ("search for quantum computing", "web_search"),
         ("search for best restaurants near me", "web_search"),
@@ -45,7 +45,7 @@ class TestForcedRouterSpecificity:
             f"'{query}' should force {expected_tool}, got {result['tool']}"
         )
 
-    # ── Explicit web search phrases still work ─────────────────────────
+    #    Explicit web search phrases still work                          
     @pytest.mark.parametrize("query", [
         "search the web for climate change",
         "google the web for quantum computing",

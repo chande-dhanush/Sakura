@@ -54,7 +54,7 @@ class PerDocChromaStore:
                 )
             return True
         except Exception as e:
-            print(f"⚠️ Chroma add failed for {self.doc_id}: {e}")
+            print(f"   Chroma add failed for {self.doc_id}: {e}")
             return False
 
     def query(self, query_embeddings: List[Any], n_results: int = 3) -> Optional[dict]:
@@ -67,7 +67,7 @@ class PerDocChromaStore:
                 n_results=n_results
             )
         except Exception as e:
-            print(f"⚠️ Chroma query failed for {self.doc_id}: {e}")
+            print(f"   Chroma query failed for {self.doc_id}: {e}")
             return None
 
     def unload(self):
@@ -81,7 +81,7 @@ class PerDocChromaStore:
                 # Clear internal caches
                 self.client.clear_system_cache()
             except Exception as e:
-                print(f"⚠️ Chroma unload warning: {e}")
+                print(f"   Chroma unload warning: {e}")
                 
         self.client = None
         self.collection = None
@@ -94,7 +94,7 @@ class PerDocChromaStore:
         import gc
         try:
             # 1. Unload Client
-            print(f"️ Deleting store for {self.doc_id}...")
+            print(f"  Deleting store for {self.doc_id}...")
             self.client = None 
             self.collection = None
             
@@ -110,7 +110,7 @@ class PerDocChromaStore:
                     shutil.rmtree(self.persist_dir)
                     return True
                 except Exception as e:
-                    print(f"⚠️ Retry {i+1} failed to delete {self.persist_dir}: {e}")
+                    print(f"   Retry {i+1} failed to delete {self.persist_dir}: {e}")
                     time.sleep(0.5)
             
             return False

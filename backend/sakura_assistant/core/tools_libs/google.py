@@ -49,7 +49,7 @@ def _sanitize_email_list(raw_messages: List[Dict[str, Any]], snippets: Dict[str,
         if len(snippet) > 80: snippet = snippet[:77] + "..."
 
         # 160 tokens per 5 emails vs 4000 previously
-        entry = f"• **{sender}** | *{subject}*\n  └── {snippet}"
+        entry = f"  **{sender}** | *{subject}*\n      {snippet}"
         summary.append(entry)
         
     return "\n".join(summary) if summary else "No readable emails found."
@@ -206,7 +206,7 @@ def calendar_get_events(
                 start_str = start_dt.strftime("%I:%M %p, %b %d")
             except Exception:
                 start_str = start
-            out.append(f"️ {start_str} - {summary}")
+            out.append(f"  {start_str} - {summary}")
         
         # 2. Birthdays Calendar
         if include_birthdays:
@@ -271,7 +271,7 @@ def calendar_create_event(
             days_diff = (now - start_dt).days
             if days_diff > 365:
                 current_year = now.year
-                return f"⚠️ Date appears to be in the past ({start_time}). Did you mean {current_year} instead of {start_dt.year}? Please try again with the correct year."
+                return f"   Date appears to be in the past ({start_time}). Did you mean {current_year} instead of {start_dt.year}? Please try again with the correct year."
         except Exception:
             pass  # If parsing fails, let Google API handle it
         
@@ -295,7 +295,7 @@ def calendar_create_event(
                 event['recurrence'] = [recurrence]
             else:
                 # Try to be helpful
-                print(f"⚠️ Unknown recurrence: {recurrence}, creating one-time event")
+                print(f"   Unknown recurrence: {recurrence}, creating one-time event")
         
         event = service.events().insert(calendarId='primary', body=event).execute()
         
@@ -331,7 +331,7 @@ def tasks_list(show_completed: bool = False, max_results: int = 20) -> str:
         
         out = []
         for t in items:
-            status = "☑️" if t.get('status') == 'completed' else "☐"
+            status = "  " if t.get('status') == 'completed' else " "
             title = t.get('title', '(No Title)')
             due = t.get('due', '')
             if due:

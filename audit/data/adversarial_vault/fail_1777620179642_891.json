@@ -1,0 +1,8 @@
+{
+  "id": "fail_1777620179642_891",
+  "input": "Do that again but better.",
+  "failure_type": "FailureType.SEMANTIC_DEVIATION",
+  "trace": [],
+  "output": "{'content': 'I don\u2019t have a fresh update on that topic. Which specific subject are you after? Let me know, and I\u2019ll dig it straight up.', 'mode': 'CHAT', 'tool_used': 'None', 'tools_used': [], 'metadata': {'latency': '1.20s', 'status': 'success', 'async': True, 'execution_status': 'skipped'}}",
+  "timestamp": 1777620179.642242
+}

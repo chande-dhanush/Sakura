@@ -73,7 +73,7 @@ class ResponseEmitter:
         async with self._lock:
             if self._emitted:
                 logger.warning(
-                    f"⚠️ [Emitter] Duplicate emission blocked for request {self._request_id}. "
+                    f"   [Emitter] Duplicate emission blocked for request {self._request_id}. "
                     f"Original: {self._emission_content[:50] if self._emission_content else 'None'}... "
                     f"Blocked: {response[:50]}..."
                 )
@@ -114,7 +114,7 @@ class ResponseEmitter:
         Only use at HTTP boundary where async is not available.
         """
         if self._emitted:
-            logger.warning(f"⚠️ [Emitter] Duplicate emission blocked (sync) for {self._request_id}")
+            logger.warning(f"   [Emitter] Duplicate emission blocked (sync) for {self._request_id}")
             return False
         
         self._emitted = True

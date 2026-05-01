@@ -1,0 +1,104 @@
+{
+  "start_time": "2026-05-01T22:27:06.021467",
+  "turns": [
+    {
+      "turn": 0,
+      "query": "Search for a recipe for chocolate cake.",
+      "content": "I apologize, but I encountered an issue. Could you please try again?",
+      "mode": "DIRECT",
+      "tool_used": "None",
+      "latency": "2.60s",
+      "success": true,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_success": true,
+      "chaos_applied": [
+        {
+          "type": "rate_limit",
+          "tool": "web_search",
+          "timestamp": 1777654626.7356787
+        }
+      ],
+      "error": null
+    },
+    {
+      "turn": 1,
+      "query": "Actually, I hate chocolate. Find me a vanilla one instead.",
+      "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+      "mode": "PLAN",
+      "tool_used": "None",
+      "latency": null,
+      "success": false,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_success": null,
+      "chaos_applied": [],
+      "error": "budget_exceeded"
+    },
+    {
+      "turn": 2,
+      "query": "Wait, what did I just ask you?",
+      "content": "You asked for a vanilla chocolate\u2014since you hate chocolate, you want a vanilla\u2011flavored one instead. I\u2019m still stuck on the rate\u2011limit, so I can\u2019t fetch it right now. Let me know if you want me to try again later.",
+      "mode": "CHAT",
+      "tool_used": "None",
+      "latency": "9.60s",
+      "success": true,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_success": null,
+      "chaos_applied": [],
+      "error": null
+    },
+    {
+      "turn": 3,
+      "query": "Forget that. Tell me the weather in Tokyo.",
+      "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+      "mode": "PLAN",
+      "tool_used": "None",
+      "latency": null,
+      "success": false,
+      "is_hallucination": true,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_success": false,
+      "chaos_applied": [
+        {
+          "type": "empty_data",
+          "tool": "get_weather",
+          "timestamp": 1777654642.5168958
+        }
+      ],
+      "error": "budget_exceeded"
+    },
+    {
+      "turn": 4,
+      "query": "Can you write a poem about the weather you just found?",
+      "content": "I apologize, but I encountered an issue. Could you please try again?",
+      "mode": "PLAN",
+      "tool_used": "quick_math",
+      "latency": "12.90s",
+      "success": true,
+      "is_hallucination": true,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_success": true,
+      "chaos_applied": [
+        {
+          "type": "empty_data",
+          "tool": "get_weather",
+          "timestamp": 1777654643.7424302
+        },
+        {
+          "type": "timeout",
+          "tool": "quick_math",
+          "timestamp": 1777654644.2584171
+        }
+      ],
+      "error": null
+    }
+  ],
+  "metrics": {}
+}

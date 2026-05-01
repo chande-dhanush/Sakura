@@ -1,5 +1,5 @@
 """
-Phase 1 Stabilization Tests — V19 Fixes
+Phase 1 Stabilization Tests   V19 Fixes
 ========================================
 Tests for BUG-01 (Router arg mismatch), BUG-02 (Reference resolution ghosting),
 BUG-03 (Scheduler import path silent death).
@@ -21,9 +21,9 @@ from typing import Optional, List, Dict, Any
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # TEST GROUP A: Router Argument Safety (BUG-01)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class TestRouterArgumentSafety(unittest.TestCase):
     """
@@ -43,7 +43,7 @@ class TestRouterArgumentSafety(unittest.TestCase):
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there!"}
         ]
-        # Should NOT crash — this is the normal path
+        # Should NOT crash   this is the normal path
         result = self.router.route(query="play music", history=history)
         self.assertIsNotNone(result)
         self.assertIn(result.classification, ("DIRECT", "PLAN", "CHAT"))
@@ -73,7 +73,7 @@ class TestRouterArgumentSafety(unittest.TestCase):
         This confirms why V19-FIX-01 switched to keyword arguments.
         """
         # Simulate the exact operation the router does internally:
-        # history[-3:] — this MUST fail on a boolean
+        # history[-3:]   this MUST fail on a boolean
         with self.assertRaises(TypeError):
             # This is what happened before the fix: study_mode_active=True
             # was passed as the history parameter
@@ -100,9 +100,9 @@ class TestRouterArgumentSafety(unittest.TestCase):
         self.assertIsNotNone(result.tool_hint)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # TEST GROUP B: Reference Resolution Injection (BUG-02)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class TestReferenceResolutionInjection(unittest.TestCase):
     """
@@ -143,7 +143,7 @@ class TestReferenceResolutionInjection(unittest.TestCase):
             if isinstance(resolution.resolved, EntityNode):
                 reference_context = (
                     f"[REFERENCE RESOLVED] refers to: "
-                    f"{resolution.resolved.name} — {resolution.resolved.summary or 'No description'} "
+                    f"{resolution.resolved.name}   {resolution.resolved.summary or 'No description'} "
                     f"(confidence: {resolution.confidence:.0%})"
                 )
 
@@ -171,7 +171,7 @@ class TestReferenceResolutionInjection(unittest.TestCase):
             if isinstance(resolution.resolved, ActionNode):
                 reference_context = (
                     f"[REFERENCE RESOLVED] refers to previous action: "
-                    f"{resolution.resolved.tool or 'chat'} — {resolution.resolved.summary or 'No description'} "
+                    f"{resolution.resolved.tool or 'chat'}   {resolution.resolved.summary or 'No description'} "
                     f"(confidence: {resolution.confidence:.0%})"
                 )
             if resolution.action:
@@ -224,9 +224,9 @@ class TestReferenceResolutionInjection(unittest.TestCase):
         self.assertIn("DO NOT search externally", reference_context)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # TEST GROUP C: Scheduler Import Paths (BUG-03)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class TestSchedulerImportPaths(unittest.TestCase):
     """
@@ -291,9 +291,9 @@ class TestSchedulerImportPaths(unittest.TestCase):
             self.fail(f"Cognitive imports failed (scheduler would silently die): {e}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# TEST GROUP D: Integration — Full Pipeline Path
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
+# TEST GROUP D: Integration   Full Pipeline Path
+#                                                                                
 
 class TestPipelineIntegration(unittest.TestCase):
     """
@@ -368,6 +368,6 @@ class TestPipelineIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("Phase 1 Stabilization Tests — V19 Fixes")
+    print("Phase 1 Stabilization Tests   V19 Fixes")
     print("=" * 70)
     unittest.main(verbosity=2)

@@ -19,16 +19,16 @@ from typing import Optional, Dict, Any
 from dataclasses import dataclass, field
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # CONFIGURATION
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 TTL_SECONDS: int = 2 * 60 * 60  # 2 hours - messages older than this are discarded
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # STATE DATACLASS
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 @dataclass
 class ProactiveState:
@@ -84,7 +84,7 @@ class ProactiveState:
             # Check TTL
             if age_seconds > TTL_SECONDS:
                 age_hours = age_seconds / 3600
-                print(f"️ [State] Message expired ({age_hours:.1f}h old, TTL={TTL_SECONDS/3600}h)")
+                print(f"  [State] Message expired ({age_hours:.1f}h old, TTL={TTL_SECONDS/3600}h)")
                 self.on_message_expired()
                 return None
             
@@ -100,7 +100,7 @@ class ProactiveState:
             was_visible = self.ui_visible
             self.ui_visible = visible
             
-            print(f"️ [State] Visibility: {was_visible} → {visible}")
+            print(f"  [State] Visibility: {was_visible}   {visible}")
             
             # If becoming visible, check for pending messages
             if visible and not was_visible:
@@ -152,7 +152,7 @@ class ProactiveState:
                     self.failed_initiation_count = data.get("failed_count", 0)
                     print(f" [State] Loaded backoff state: {self.failed_initiation_count} failures")
         except Exception as e:
-            print(f"⚠️ [State] Failed to load backoff state: {e}")
+            print(f"   [State] Failed to load backoff state: {e}")
     
     def _save_persistent_state(self) -> None:
         """Save backoff state to disk."""
@@ -162,12 +162,12 @@ class ProactiveState:
             with open(path, "w") as f:
                 json.dump({"failed_count": self.failed_initiation_count}, f)
         except Exception as e:
-            print(f"⚠️ [State] Failed to save backoff state: {e}")
+            print(f"   [State] Failed to save backoff state: {e}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # SINGLETON INSTANCE
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 # Global state instance - imported by both server.py and proactive.py
 _state: Optional[ProactiveState] = None

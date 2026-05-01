@@ -41,8 +41,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 PASS = ""
 FAIL = ""
-WARN = "⚠️"
-INFO = "ℹ️"
+WARN = "[WARN]"
+INFO = "[INFO]"
 
 results = []
 benchmarks = []
@@ -78,9 +78,9 @@ def section(title: str):
     print(f"{'='*60}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 1. IMPORTS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_imports():
     """Test all V15.2.2 imports."""
@@ -130,7 +130,7 @@ def audit_imports():
     
     # V15.2.2 Security imports
     try:
-        from sakura_assistant.core.executor import (
+        from sakura_assistant.core.execution.executor import (
             validate_path, SecurityError, DANGEROUS_PATTERNS
         )
         test("V15.2.2 SecurityError import", True)
@@ -139,9 +139,9 @@ def audit_imports():
         test("V15.2.2 Security imports", False, str(e))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 2. DESIRE SYSTEM
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_desire_system():
     """Test DesireSystem functionality."""
@@ -170,21 +170,21 @@ def audit_desire_system():
     
     # Test mood states
     ds.state.social_battery = 0.1
-    test("Low battery → TIRED mood", ds.get_mood() == Mood.TIRED)
+    test("Low battery -> TIRED mood", ds.get_mood() == Mood.TIRED)
     
     ds.state.social_battery = 0.5
     ds.state.loneliness = 0.8
-    test("High loneliness → MELANCHOLIC mood", ds.get_mood() == Mood.MELANCHOLIC)
+    test("High loneliness -> MELANCHOLIC mood", ds.get_mood() == Mood.MELANCHOLIC)
     
     # Test initiation logic
     ds.state.loneliness = 0.3
     should_act, reason = ds.should_initiate()
-    test("Low loneliness → no initiation", should_act is False)
+    test("Low loneliness -> no initiation", should_act is False)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 3. PROACTIVE SCHEDULER
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_proactive_scheduler():
     """Test ProactiveScheduler functionality."""
@@ -217,9 +217,9 @@ def audit_proactive_scheduler():
     os.unlink(ps.initiations_path)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 4. PROACTIVE STATE (V15.2.2 Thread Safety)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_proactive_state():
     """Test ProactiveState thread safety (V15.2.2)."""
@@ -273,9 +273,9 @@ def audit_proactive_state():
     test("Has _save_persistent_state", hasattr(state, '_save_persistent_state'))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 5. SECURITY HARDENING (V15.2.2)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_security():
     """Audit V15.2.2 security hardening - OWASP compliance."""
@@ -284,7 +284,7 @@ def audit_security():
     # 5.1 Path Injection Defense (CWE-22)
     print("\n  --- 5.1 Path Traversal Defense (CWE-22) ---")
     
-    from sakura_assistant.core.executor import validate_path, SecurityError, DANGEROUS_PATTERNS
+    from sakura_assistant.core.execution.executor import validate_path, SecurityError, DANGEROUS_PATTERNS
     
     # Test dangerous paths are blocked
     dangerous_paths = [
@@ -357,9 +357,9 @@ def audit_security():
     test("Caps content at 10k chars", len(sanitized) <= 10100)  # Allow for [TRUNCATED] suffix
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 6. PROMPTS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_prompts():
     """Audit system prompts for consistency."""
@@ -376,15 +376,15 @@ def audit_prompts():
     
     # Router prompt (V15.2.1 temporal grounding)
     try:
-        from sakura_assistant.core.router import ROUTER_SYSTEM_PROMPT_TEMPLATE
+        from sakura_assistant.core.routing.router import ROUTER_SYSTEM_PROMPT_TEMPLATE
         test("Router has datetime placeholder", "{current_datetime}" in ROUTER_SYSTEM_PROMPT_TEMPLATE)
     except:
         warn("Could not check Router prompt template")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 7. WORLD GRAPH
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_world_graph():
     """Audit World Graph configuration."""
@@ -416,9 +416,9 @@ def audit_world_graph():
     del wg.entities["constraint:test"]
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 8. DATA FILES
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_data_files():
     """Audit data file integrity."""
@@ -456,16 +456,16 @@ def audit_data_files():
             print(f"  {INFO} {filename} exists (optional)")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 9. PERFORMANCE BENCHMARKS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_performance():
     """Benchmark critical paths."""
     section("9. PERFORMANCE BENCHMARKS")
     
     # 9.1 Path validation speed
-    from sakura_assistant.core.executor import validate_path
+    from sakura_assistant.core.execution.executor import validate_path
     
     test_path = "/home/user/documents/safe_file.txt"
     iterations = 1000
@@ -512,15 +512,15 @@ def audit_performance():
     benchmark("Lock contention (4 threads, 800 ops)", elapsed, "ms", target=500)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 10. COGNITIVE ARCHITECTURE (Pseudo-AGI Checks)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_cognitive():
     """Audit cognitive architecture for completeness."""
     section("10. COGNITIVE ARCHITECTURE")
     
-    # 10.1 Desire System → Proactive Scheduler integration
+    # 10.1 Desire System -> Proactive Scheduler integration
     from sakura_assistant.core.cognitive.desire import get_desire_system
     from sakura_assistant.core.cognitive.proactive import get_proactive_scheduler
     
@@ -552,9 +552,9 @@ def audit_cognitive():
     test("World Graph provides context", len(context) > 0)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # SUMMARY
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def print_summary():
     """Print summary of all tests."""
@@ -593,9 +593,9 @@ def print_summary():
     return failed == 0
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # 11. SOLID PRINCIPLES (Local Desktop App)
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def audit_solid():
     """Audit SOLID principles compliance for local desktop app."""
@@ -604,16 +604,16 @@ def audit_solid():
     import inspect
     from pathlib import Path
     
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     # S - Single Responsibility Principle
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     print("\n  --- S: Single Responsibility ---")
     
     # Check that core modules have focused responsibilities
-    from sakura_assistant.core.router import IntentRouter
-    from sakura_assistant.core.executor import ToolExecutor
-    from sakura_assistant.core.responder import ResponseGenerator
-    from sakura_assistant.core.planner import Planner
+    from sakura_assistant.core.routing.router import IntentRouter
+    from sakura_assistant.core.execution.executor import ToolExecutor
+    from sakura_assistant.core.models.responder import ResponseGenerator
+    from sakura_assistant.core.execution.planner import Planner
     
     # Each class should have a clear single purpose
     test("Router: classify intent only", 
@@ -625,9 +625,9 @@ def audit_solid():
     test("Planner: plan generation only",
          hasattr(Planner, 'plan') and not hasattr(Planner, 'generate'))
     
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     # O - Open/Closed Principle
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     print("\n  --- O: Open/Closed Principle ---")
     
     # Tools should be extensible without modifying core
@@ -640,9 +640,9 @@ def audit_solid():
     all_decorated = all(hasattr(t, 'name') and hasattr(t, 'description') for t in sample_tools)
     test("Tools use @tool decorator pattern", all_decorated)
     
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     # L - Liskov Substitution Principle
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     print("\n  --- L: Liskov Substitution ---")
     
     # Enum types should be safely substitutable
@@ -653,9 +653,9 @@ def audit_solid():
     test("EntityLifecycle values are strings", all(isinstance(e.value, str) for e in EntityLifecycle))
     test("EntitySource values are strings", all(isinstance(e.value, str) for e in EntitySource))
     
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     # I - Interface Segregation Principle
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     print("\n  --- I: Interface Segregation ---")
     
     # Check that singletons have minimal public interfaces
@@ -672,9 +672,9 @@ def audit_solid():
     test("ProactiveState has focused interface",
          len(state_public) < 15, f"{len(state_public)} public methods")
     
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     # D - Dependency Inversion Principle
-    # ─────────────────────────────────────────────────────────────────────────────
+    # -----------------------------------------------------------------------------
     print("\n  --- D: Dependency Inversion ---")
     
     # Check that high-level modules use abstractions
@@ -691,14 +691,14 @@ def audit_solid():
     test("WorldGraph supports injection (set_world_graph)", callable(set_world_graph))
     
     # Check broadcaster uses callback pattern (loose coupling)
-    from sakura_assistant.core.broadcaster import get_broadcaster
+    from sakura_assistant.core.infrastructure.broadcaster import get_broadcaster
     broadcaster = get_broadcaster()
     test("Broadcaster uses callback pattern", hasattr(broadcaster, 'add_listener'))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 # MAIN
-# ═══════════════════════════════════════════════════════════════════════════════
+# ===============================================================================
 
 def main():
     print()
@@ -722,7 +722,7 @@ def main():
     
     if success:
         print(" All checks passed! V15.2.2 is production-ready.")
-        print("️ Security hardening verified (OWASP compliant)")
+        print("  Security hardening verified (OWASP compliant)")
         print(" SOLID principles verified (desktop app)")
     else:
         print(" Some checks failed. Please fix before deploying.")

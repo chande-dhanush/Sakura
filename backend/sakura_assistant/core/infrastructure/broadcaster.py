@@ -35,11 +35,11 @@ class Broadcaster:
             
         # Log to console for dev visibility
         emoji_map = {
-            "rate_limit": "⏳",
+            "rate_limit": " ",
             "thinking": "",
-            "tool_start": "️",
-            "research_start": "️",
-            "cache_hit": "⚡",
+            "tool_start": " ",
+            "research_start": " ",
+            "cache_hit": " ",
         }
         icon = emoji_map.get(event, "")
         
@@ -50,7 +50,7 @@ class Broadcaster:
             try:
                 listener(event, data)
             except Exception as e:
-                print(f"⚠️ Broadcast listener error: {e}")
+                print(f"   Broadcast listener error: {e}")
 
 # Singleton accessor
 def get_broadcaster():

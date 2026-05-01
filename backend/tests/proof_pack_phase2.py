@@ -167,7 +167,7 @@ exec_ctx = ExecutionContext.create(
 t2_checks["exec_ctx.reference_context_populated"] = bool(exec_ctx.reference_context)
 t2_checks["exec_ctx.reference_context_matches_req_state"] = exec_ctx.reference_context == req_state.reference_context
 
-# Step E: Simulate what executor.py does — build graph_context_parts
+# Step E: Simulate what executor.py does   build graph_context_parts
 graph_context_parts = []
 if exec_ctx.reference_context:
     graph_context_parts.append(exec_ctx.reference_context)

@@ -58,6 +58,7 @@ class ResponseContext:
     study_mode: bool = False
     data_reasoning: bool = False
     session_summary: str = ""  # V10.5 Session Memory Injection
+    requires_facts: bool = False  # V19.6: If True and no tools, soften tone
     
     def __post_init__(self):
         if self.history is None:
@@ -111,10 +112,18 @@ class ResponseGenerator:
             
             raw_response = response.content
             
+            # V19.6: Conditional Confidence Gating
+            is_low_confidence = "[LOW_CONFIDENCE]" in context.tool_outputs
+            if (context.requires_facts and not context.tool_outputs) or is_low_confidence:
+                # Soften response if facts needed but missing, or if tool output was nonsense
+                softener = "I'm not fully sure, but " if is_low_confidence else "I might be wrong, but "
+                if not raw_response.lower().startswith(("i'm", "i might", "i am", "possibly", "maybe")):
+                    raw_response = softener + raw_response[0].lower() + raw_response[1:]
+            
             # Validate and clean response
             final_response, had_violation = self.validate_output(raw_response)
             if had_violation:
-                print("⚠️ Responder tool-call violation detected and stripped")
+                print("   Responder tool-call violation detected and stripped")
             
             # V15.2: DEV ASSERTION - Catch tool_success + fallback bug
             # This should NEVER happen: tool ran successfully but responder says it can't
@@ -132,7 +141,7 @@ class ResponseGenerator:
                 response_lower = final_response.lower()
                 for phrase in fallback_phrases:
                     if phrase in response_lower:
-                        print(f"⚠️ [DEV ASSERTION FAILED] Tool succeeded but responder used fallback!")
+                        print(f"   [DEV ASSERTION FAILED] Tool succeeded but responder used fallback!")
                         print(f"   Tool output present: {bool(context.tool_outputs)}")
                         print(f"   Fallback phrase found: '{phrase}'")
                         print(f"   Response: {final_response[:200]}")
@@ -152,7 +161,7 @@ class ResponseGenerator:
                 import re
                 # Extract candidate data points: numbers with units, capitalized phrases
                 data_points = re.findall(
-                    r'\b\d+[°%kmKM]?\b|\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)*\b',
+                    r'\b\d+[ %kmKM]?\b|\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)*\b',
                     context.tool_outputs[:500]
                 )
                 key_points = data_points[:5]
@@ -162,7 +171,7 @@ class ResponseGenerator:
                     matches = sum(1 for p in key_points if str(p).lower() in response_lower)
                     
                     if matches == 0:
-                        print(f"⚠️ [Fidelity] Response references none of {key_points}. Regenerating.")
+                        print(f"   [Fidelity] Response references none of {key_points}. Regenerating.")
                         retry_messages = self._build_messages(context, fidelity_override=True)
                         try:
                             retry_resp = await active_llm.ainvoke(retry_messages, tool_choice="none")
@@ -182,12 +191,12 @@ class ResponseGenerator:
                     tool_context=context.tool_outputs[:200] if context.tool_outputs else None
                 )
             except Exception as rec_err:
-                print(f"⚠️ [Responder] Failed to record response (async): {rec_err}")
+                print(f"   [Responder] Failed to record response (async): {rec_err}")
             
             return final_response
             
         except Exception as e:
-            print(f"❌ Async Response generation error: {e}")
+            print(f"  Async Response generation error: {e}")
             return "I apologize, but I encountered an issue. Could you please try again?"
 
     def generate(self, context: ResponseContext) -> str:
@@ -212,11 +221,18 @@ class ResponseGenerator:
                 response = self.llm.invoke(messages)
             
             raw_response = response.content
+
+            # V19.6: Conditional Confidence Gating (Sync)
+            is_low_confidence = "[LOW_CONFIDENCE]" in context.tool_outputs
+            if (context.requires_facts and not context.tool_outputs) or is_low_confidence:
+                softener = "I'm not fully sure, but " if is_low_confidence else "I might be wrong, but "
+                if not raw_response.lower().startswith(("i'm", "i might", "i am", "possibly", "maybe")):
+                    raw_response = softener + raw_response[0].lower() + raw_response[1:]
             
             # Validate and clean response
             final_response, had_violation = self.validate_output(raw_response)
             if had_violation:
-                print("⚠️ Responder tool-call violation detected and stripped")
+                print("   Responder tool-call violation detected and stripped")
             
             # V17.1: DEV ASSERTION - Catch tool_success + fallback bug (sync path)
             if context.tool_outputs:
@@ -233,7 +249,7 @@ class ResponseGenerator:
                 response_lower = final_response.lower()
                 for phrase in fallback_phrases:
                     if phrase in response_lower:
-                        print(f"⚠️ [DEV ASSERTION FAILED] Tool succeeded but responder used fallback!")
+                        print(f"   [DEV ASSERTION FAILED] Tool succeeded but responder used fallback!")
                         print(f"   Tool output present: {bool(context.tool_outputs)}")
                         print(f"   Fallback phrase found: '{phrase}'")
                         print(f"   Response: {final_response[:200]}")
@@ -252,7 +268,7 @@ class ResponseGenerator:
                 import re
                 # Extract candidate data points: numbers with units, capitalized phrases
                 data_points = re.findall(
-                    r'\b\d+[°%kmKM]?\b|\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)*\b',
+                    r'\b\d+[ %kmKM]?\b|\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)*\b',
                     context.tool_outputs[:500]
                 )
                 key_points = data_points[:5]
@@ -262,7 +278,7 @@ class ResponseGenerator:
                     matches = sum(1 for p in key_points if str(p).lower() in response_lower)
                     
                     if matches == 0:
-                        print(f"⚠️ [Fidelity] Response references none of {key_points}. Regenerating.")
+                        print(f"   [Fidelity] Response references none of {key_points}. Regenerating.")
                         retry_messages = self._build_messages(context, fidelity_override=True)
                         try:
                             retry_resp = self.llm.invoke(retry_messages, tool_choice="none")
@@ -282,12 +298,12 @@ class ResponseGenerator:
                     tool_context=context.tool_outputs[:200] if context.tool_outputs else None
                 )
             except Exception as rec_err:
-                print(f"⚠️ [Responder] Failed to record response: {rec_err}")
+                print(f"   [Responder] Failed to record response: {rec_err}")
             
             return final_response
             
         except Exception as e:
-            print(f"❌ Response generation error: {e}")
+            print(f"  Response generation error: {e}")
             return "I apologize, but I encountered an issue. Could you please try again?"
     
     def generate_chat(self, user_input: str, history: List[Dict]) -> str:
@@ -354,14 +370,14 @@ STUDY MODE ACTIVE:
                 system_parts.append("CRITICAL: Your previous response IGNORED the tool data below. You MUST reference these specific results in your answer:\n")
             
             system_parts.append(f"""
-╔══════════════════════════════════════════════════════════════════╗
-║  ⚡ TOOL ALREADY EXECUTED - RESULTS BELOW - YOU MUST USE THESE  ║
-╚══════════════════════════════════════════════════════════════════╝
+                                                                    
+     TOOL ALREADY EXECUTED - RESULTS BELOW - YOU MUST USE THESE   
+                                                                    
 {context.tool_outputs}
-╔══════════════════════════════════════════════════════════════════╗
-║  END OF TOOL RESULTS - Respond using this data, don't say       ║
-║  "I need a tool" - the tool already ran successfully!           ║
-╚══════════════════════════════════════════════════════════════════╝
+                                                                    
+   END OF TOOL RESULTS - Respond using this data, don't say        
+   "I need a tool" - the tool already ran successfully!            
+                                                                    
 """)
         system_parts.append("Task: Respond naturally based on context.")
         
@@ -411,7 +427,7 @@ STUDY MODE ACTIVE:
                 break
         
         if had_violation:
-            print("⚠️ [GUARDRAIL] Responder attempted tool call - stripping JSON")
+            print("   [GUARDRAIL] Responder attempted tool call - stripping JSON")
             # Extract text before the JSON
             clean = _TOOL_SPLIT_PATTERN.split(text)[0].strip()
             if not clean or len(clean) < 10:
@@ -432,7 +448,7 @@ STUDY MODE ACTIVE:
         
         for pattern in _ACTION_CLAIM_PATTERNS:
             if pattern.search(response_lower):
-                print("⚠️ [GUARDRAIL] False action claim detected")
+                print("   [GUARDRAIL] False action claim detected")
                 return "I understand you want me to do something, but I wasn't able to take any action. Could you clarify what you'd like me to do?"
         
         return response
@@ -454,7 +470,7 @@ STUDY MODE ACTIVE:
             is_valid, violation = im.check_claim(response)
             
             if not is_valid:
-                print(f"️ [V16 Self-Check] Identity violation: {violation}")
+                print(f"  [V16 Self-Check] Identity violation: {violation}")
                 # V16.1: Seamless Correction (User Feedback)
                 # Instead of appending a "Note:", return a clean, truthful response.
                 # We use the IdentityManager's safe summary.
@@ -473,5 +489,5 @@ STUDY MODE ACTIVE:
             
         except Exception as e:
             # Self-check should never crash the response
-            print(f"⚠️ [V16 Self-Check] Error (non-fatal): {e}")
+            print(f"   [V16 Self-Check] Error (non-fatal): {e}")
             return response

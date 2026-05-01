@@ -41,7 +41,7 @@ def audit_guard():
 audit_guard()
 
 """
-Sakura V19.5 — Observability Audit Script
+Sakura V19.5   Observability Audit Script
 Checks: FlightRecorder integration, structured logging, and trace propagation
 """
 import os, json

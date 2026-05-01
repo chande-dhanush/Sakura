@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from sakura_assistant.core.tools_libs.research import SmartResearcher
-from sakura_assistant.core.broadcaster import get_broadcaster
+from sakura_assistant.core.infrastructure.broadcaster import get_broadcaster
 
 # Mock Embedder
 class MockEmbedder:

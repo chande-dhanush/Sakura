@@ -48,7 +48,7 @@ class VoiceEngine:
             print(" Voice Engine: Wake Detector init failed (missing templates/libs?)")
             return
 
-        print("️ Voice Engine: Starting...")
+        print("  Voice Engine: Starting...")
         
         # Start Shared Mic
         if not start_shared_mic():
@@ -129,13 +129,13 @@ class VoiceEngine:
             try:
                 # Use Google Speech Recognition (free, reliable)
                 text = self.recognizer.recognize_google(audio)
-                print(f"️ User said: '{text}'")
+                print(f"  User said: '{text}'")
                 return text
             except sr.UnknownValueError:
                 print(" STT: Could not understand audio")
                 return None
             except sr.RequestError as e:
-                print(f"⚠️ STT Error: {e}")
+                print(f"   STT Error: {e}")
                 return None
                 
         except Exception as e:
@@ -153,7 +153,7 @@ class VoiceEngine:
                 if command:
                     # --- PROCESSING PHASE ---
                     self.processing = True
-                    print("⚙️ Processing command...")
+                    print("   Processing command...")
                     
                     try:
                         # V10: Get history from central memory store

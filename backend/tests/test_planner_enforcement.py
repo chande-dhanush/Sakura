@@ -14,7 +14,7 @@ from langchain_core.tools import tool as langchain_tool
 from sakura_assistant.core.execution.planner import Planner
 
 
-# ── Helpers ────────────────────────────────────────────────────────────
+#    Helpers                                                             
 
 def _make_dummy_tools():
     """Create minimal LangChain tools for testing."""
@@ -71,7 +71,7 @@ def _make_mock_llm(responses):
     return mock
 
 
-# ── Sync Tests ─────────────────────────────────────────────────────────
+#    Sync Tests                                                          
 
 class TestPlannerEnforcementSync:
     """Sync plan() enforcement gate tests."""
@@ -189,7 +189,7 @@ class TestPlannerEnforcementSync:
         assert "search_wikipedia" in enforcement_content
 
 
-# ── Async Tests ────────────────────────────────────────────────────────
+#    Async Tests                                                         
 
 class TestPlannerEnforcementAsync:
     """Async aplan() enforcement gate tests."""
@@ -261,5 +261,5 @@ class TestPlannerEnforcementAsync:
         
         assert result["steps"] == []
         assert result["complete"] is True
-        # Empty list is falsy → no enforcement
+        # Empty list is falsy   no enforcement
         assert mock_llm._call_count["n"] == 1

@@ -125,7 +125,7 @@ class ContextGovernor:
         if current_chars <= budget_chars:
             return messages, tool_outputs, tool_history or []
         
-        print(f"⚠️ [Governor] {stage}: {current_chars:,} chars > {budget_chars:,} limit")
+        print(f"   [Governor] {stage}: {current_chars:,} chars > {budget_chars:,} limit")
         
         # Dev mode: log only, don't enforce
         if self.DEV_LOG_ONLY:
@@ -165,13 +165,13 @@ class ContextGovernor:
         if len(text) <= budget_chars:
             return text
         
-        print(f"⚠️ [Governor] {stage}: {len(text):,} chars > {budget_chars:,} limit")
+        print(f"   [Governor] {stage}: {len(text):,} chars > {budget_chars:,} limit")
         
         if self.DEV_LOG_ONLY:
             return text
         
         # Simple truncation with notice
-        degraded = text[:budget_chars - 100] + f"\n\n[DEGRADED by Governor: {len(text):,} → {budget_chars:,} chars]"
+        degraded = text[:budget_chars - 100] + f"\n\n[DEGRADED by Governor: {len(text):,}   {budget_chars:,} chars]"
         
         return degraded
     
@@ -233,7 +233,7 @@ class ContextGovernor:
         if len(history) <= max_items:
             return history
         
-        print(f" [Governor] Trimmed history: {len(history)} → {max_items}")
+        print(f" [Governor] Trimmed history: {len(history)}   {max_items}")
         return history[-max_items:]
     
     def _rebuild_messages_with_degraded_outputs(

@@ -1,0 +1,8 @@
+{
+  "id": "fail_1777619904861_906",
+  "input": "Turn 12: What is the latest update on the previous topic?",
+  "failure_type": "FailureType.SEMANTIC_DEVIATION",
+  "trace": [],
+  "output": "{'content': 'Sure, here\u2019s a quick vanilla cake recipe: mix 2\\u202fcups flour, 1.5\\u202fcups sugar, 3 eggs, 1\\u202fcup milk, \u00bd\\u202fcup melted butter, 2\\u202ftsp baking powder, and a splash of vanilla; pour into a greased pan and bake at 350\\u202f\u00b0F for 30\u201335\\u202fminutes. If you\u2019re feeling experimental, swap the sugar for honey or add a tablespoon of cocoa for a chocolate twist. Let me know if you want a frosting idea or a different flavor profile.', 'mode': 'DIRECT', 'tool_used': 'search_wikipedia', 'tools_used': ['search_wikipedia'], 'metadata': {'latency': '9.22s', 'status': 'success', 'async': True, 'execution_status': 'failed'}}",
+  "timestamp": 1777619904.8619604
+}

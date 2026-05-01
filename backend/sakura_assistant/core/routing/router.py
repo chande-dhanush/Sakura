@@ -95,16 +95,16 @@ class IntentRouter:
         # V13: Detect urgency first (fast, no LLM)
         urgency = get_urgency(query)
         if urgency == "URGENT":
-            print(f"⚡ [Router] URGENT query detected")
+            print(f"  [Router] URGENT query detected")
         
         # 1. Action command check (CPU bound, fast enough to keep sync logic)
         if self._is_action_command(query):
-            print(f"⚡ [Router] Action command detected (Async), forcing DIRECT")
+            print(f"  [Router] Action command detected (Async), forcing DIRECT")
             tool_hint = self._guess_tool_hint(query)
             return RouteResult("DIRECT", tool_hint, urgency)
 
         if self._should_force_wh_question(query):
-            print(f"🔎 [Router] Wh-question detected (Async), forcing PLAN")
+            print(f"  [Router] Wh-question detected (Async), forcing PLAN")
             return RouteResult("PLAN", self._guess_wh_tool_hint(query), urgency)
             
         # 2. LLM classification
@@ -133,7 +133,7 @@ class IntentRouter:
             if classification == "DIRECT" and tool_hint in music_tools:
                 triggers = ["my ", "it", "that", "the one", "favourite", "fav ", "last ", "same "]
                 if any(t in query.lower() for t in triggers):
-                    print(f"🔄 [Router] Reference detected in music query, forcing PLAN")
+                    print(f"  [Router] Reference detected in music query, forcing PLAN")
                     classification = "PLAN"
 
             # V17.2: Apply safety checks to prevent Tavily Trap
@@ -144,7 +144,7 @@ class IntentRouter:
             raise
         except Exception as e:
             # V18 FIX-01: Default to PLAN (not CHAT) so tools are still available
-            print(f"⚠️ [Router] Async Error: {e}, defaulting to PLAN (safer than CHAT)")
+            print(f"   [Router] Async Error: {e}, defaulting to PLAN (safer than CHAT)")
             return RouteResult("PLAN", "web_search", urgency)
 
     def route(self, query: str, context: str = "", history: List[Dict] = None) -> RouteResult:
@@ -164,12 +164,12 @@ class IntentRouter:
         
         # 1. Check for forced action commands (bypass LLM)
         if self._is_action_command(query):
-            print(f"⚡ [Router] Action command detected, forcing DIRECT")
+            print(f"  [Router] Action command detected, forcing DIRECT")
             tool_hint = self._guess_tool_hint(query)
             return RouteResult("DIRECT", tool_hint, urgency)
 
         if self._should_force_wh_question(query):
-            print(f"🔎 [Router] Wh-question detected, forcing PLAN")
+            print(f"  [Router] Wh-question detected, forcing PLAN")
             return RouteResult("PLAN", self._guess_wh_tool_hint(query), urgency)
         
         # 2. LLM-based classification
@@ -207,7 +207,7 @@ class IntentRouter:
             raise
         except Exception as e:
             # V18 FIX-01: Default to PLAN (not CHAT) so tools are still available
-            print(f"⚠️ [Router] Error: {e}, defaulting to PLAN (safer than CHAT)")
+            print(f"   [Router] Error: {e}, defaulting to PLAN (safer than CHAT)")
             return RouteResult("PLAN", "web_search", urgency)
     
     def _is_action_command(self, user_input: str) -> bool:
@@ -381,9 +381,9 @@ class IntentRouter:
             elif "simple" in lower:
                 return "CHAT", None
             else:
-                # V18 FIX-01: Default to PLAN (not CHAT) — a redundant tool call
+                # V18 FIX-01: Default to PLAN (not CHAT)   a redundant tool call
                 # is always less harmful than a hallucinated text answer
-                print(f"⚠️ [Router] Parse failed, defaulting to PLAN (safer than CHAT)")
+                print(f"   [Router] Parse failed, defaulting to PLAN (safer than CHAT)")
                 return "PLAN", None
 
     def _apply_safety_checks(self, query: str, decision: RouteResult) -> RouteResult:
@@ -392,7 +392,7 @@ class IntentRouter:
         
         Rules:
         1. Greetings MUST be CHAT, never DIRECT/PLAN
-        2. DIRECT without hint is suspicious → force CHAT
+        2. DIRECT without hint is suspicious   force CHAT
         3. PLAN without hint defaults to CHAT (prevents Tavily Trap)
         """
         query_lower = query.lower().strip()
@@ -412,14 +412,14 @@ class IntentRouter:
         
         if is_greeting:
             if decision.classification != "CHAT":
-                print(f"⚠️ [Router Safety] Greeting misclassified as {decision.classification} → forcing CHAT: {query}")
+                print(f"   [Router Safety] Greeting misclassified as {decision.classification}   forcing CHAT: {query}")
                 decision.classification = "CHAT"
                 decision.tool_hint = None
             return decision
         
         # Check 2: DIRECT without hint is suspicious
         if decision.classification == "DIRECT" and not decision.tool_hint:
-            print(f"⚠️ [Router Safety] DIRECT without hint → forcing CHAT: {query}")
+            print(f"   [Router Safety] DIRECT without hint   forcing CHAT: {query}")
             decision.classification = "CHAT"
             return decision
         
@@ -439,7 +439,7 @@ class IntentRouter:
                 "weather", "news", "email", "calendar", "play", "open", "remind",
             ]
             if not any(ind in query_lower for ind in complex_indicators):
-                print(f"⚠️ [Router Safety] PLAN without hint on simple query → forcing CHAT: {query}")
+                print(f"   [Router Safety] PLAN without hint on simple query   forcing CHAT: {query}")
                 decision.classification = "CHAT"
         
         return decision

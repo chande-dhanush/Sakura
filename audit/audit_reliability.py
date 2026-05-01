@@ -41,7 +41,7 @@ def audit_guard():
 audit_guard()
 
 """
-Sakura V19.5 — Reliability Audit
+Sakura V19.5   Reliability Audit
 Checks: budget enforcement wiring, error propagation, terminal actions,
 fidelity check, alias tool registration, context var coverage
 """

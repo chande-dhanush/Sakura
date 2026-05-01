@@ -116,7 +116,7 @@ class AgentState:
         # Validate phase is known
         all_phases = CORE_PHASES | NON_CORE_PHASES | {"idle"}
         if phase not in all_phases:
-            print(f"⚠️ [AgentState] Unknown phase '{phase}' - treating as core")
+            print(f"   [AgentState] Unknown phase '{phase}' - treating as core")
         
         # 3. Check hard limit
         if self.llm_call_count >= effective_limit:
@@ -128,12 +128,12 @@ class AgentState:
         # Check soft limit for non-essential calls
         if not essential and self.llm_call_count >= self.soft_limit:
             raise SoftLimitWarning(
-                f"⚠️ SOFT LIMIT ({self.soft_limit}) exceeded - blocking non-essential '{phase}' call"
+                f"   SOFT LIMIT ({self.soft_limit}) exceeded - blocking non-essential '{phase}' call"
             )
         
         # Log warning if over soft limit but essential
         if self.llm_call_count >= self.soft_limit:
-            print(f"⚠️ [AgentState] Over soft limit ({self.soft_limit}), essential call #{self.llm_call_count + 1} at '{phase}'")
+            print(f"   [AgentState] Over soft limit ({self.soft_limit}), essential call #{self.llm_call_count + 1} at '{phase}'")
         
         # Record call
         self.llm_call_count += 1

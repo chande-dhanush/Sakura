@@ -16,7 +16,7 @@ from sakura_assistant.core.tools_libs.research import SmartResearcher
 from sakura_assistant.core.memory.reflection import ReflectionEngine
 
 async def test_smart_research():
-    print("\n️ Testing V11.1 Smart Researcher...")
+    print("\n  Testing V11.1 Smart Researcher...")
     researcher = SmartResearcher()
     
     # Tier 1 Case

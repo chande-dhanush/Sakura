@@ -69,7 +69,7 @@ from sakura_assistant.memory.faiss_store.store import get_memory_store
 try:
     from langchain_groq import ChatGroq
 except ImportError:
-    print("⚠️ Skipping Groq tests (pip install langchain-groq)")
+    print("   Skipping Groq tests (pip install langchain-groq)")
     ChatGroq = None
 
 if ChatGroq is None:
@@ -88,7 +88,7 @@ try:
     from sakura_assistant.memory.chroma_store.model import get_embedding_model
     DOC_RAG_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ Document RAG imports failed: {e}")
+    print(f"   Document RAG imports failed: {e}")
     DOC_RAG_AVAILABLE = False
 
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "audit_artifacts")
@@ -112,7 +112,7 @@ Return ONLY the numeric score (e.g., 0.8). Do not explain.
 
 class RagAuditor:
     def __init__(self):
-        print("⚖️  Initializing Impartial LLM Judge...")
+        print("    Initializing Impartial LLM Judge...")
         self.container = get_container()
         self.judge_llm = self.container.get_planner_llm()
         self.memory = get_memory_store()
@@ -132,11 +132,11 @@ class RagAuditor:
                 return float(match.group(0))
             return 0.0
         except Exception as e:
-            print(f"   ⚠️ Judge error: {e}")
+            print(f"      Judge error: {e}")
             return 0.0
 
     async def audit_memory_rag(self):
-        print("\n🧠 Auditing Memory RAG (FAISS)...")
+        print("\n  Auditing Memory RAG (FAISS)...")
         
         # 1. Seed Memory with known facts
         seed_facts = [
@@ -145,7 +145,7 @@ class RagAuditor:
             ("Dhanush prefers dark mode interfaces.", "pref_ui")
         ]
         
-        print(f"   🌱 Seeding {len(seed_facts)} test memories...")
+        print(f"     Seeding {len(seed_facts)} test memories...")
         for fact, _ in seed_facts:
             self.memory.add_message(fact, role="system")
         time.sleep(1) # Allow indexing
@@ -158,7 +158,7 @@ class RagAuditor:
         
         results = []
         for query in test_cases:
-            print(f"   🔍 Query: {query}")
+            print(f"     Query: {query}")
             context = self.memory.get_context_for_query(query)
             score = await self.judge_relevance(query, context)
             print(f"      Score: {score}/1.0")
@@ -167,9 +167,9 @@ class RagAuditor:
         return results
 
     async def audit_agentic_rag(self):
-        print("\n🌐 Auditing Agentic RAG (Web Search)...")
+        print("\n  Auditing Agentic RAG (Web Search)...")
         if not WEB_AVAILABLE:
-            print("   ⚠️ Web Search tool not available. Skipping.")
+            print("      Web Search tool not available. Skipping.")
             return []
             
         test_cases = [
@@ -180,7 +180,7 @@ class RagAuditor:
         
         results = []
         for query in test_cases:
-            print(f"   🔍 Query: {query}")
+            print(f"     Query: {query}")
             try:
                 # Use invoke for StructuredTool
                 context = web_search.invoke({"query": query})
@@ -194,9 +194,9 @@ class RagAuditor:
         return results
 
     async def audit_document_rag(self):
-        print("\n📄 Auditing Document RAG (Chroma)...")
+        print("\n  Auditing Document RAG (Chroma)...")
         if not DOC_RAG_AVAILABLE:
-            print("   ⚠️ Document RAG modules not available.")
+            print("      Document RAG modules not available.")
             return []
 
         # 1. Create Dummy Doc
@@ -206,16 +206,16 @@ class RagAuditor:
             f.write(f"CONFIDENTIAL REPORT\n\nSubject: Project Alchemy\n\n{secret_fact}\n\nEnd of Report.")
             
         # 2. Ingest
-        print(f"   📥 Ingesting test document: {dummy_path}")
+        print(f"     Ingesting test document: {dummy_path}")
         pipeline = get_ingestion_pipeline()
         res = pipeline.ingest_file_sync(dummy_path)
         
         if res.get("error"):
-            print(f"   ❌ Ingestion failed: {res.get('message')}")
+            print(f"     Ingestion failed: {res.get('message')}")
             return [{"query": "Doc Lookup", "score": 0.0, "type": "Document"}]
             
         file_id = res["file_id"]
-        print(f"   ✅ Ingested (ID: {file_id})")
+        print(f"     Ingested (ID: {file_id})")
         
         # 3. Query
         try:
@@ -223,7 +223,7 @@ class RagAuditor:
             model = get_embedding_model()
             
             query = "What is the secret ingredient?"
-            print(f"   🔍 Query: {query}")
+            print(f"     Query: {query}")
             
             q_emb = model.encode([query]).tolist()
             retrieval = store.query(query_embeddings=q_emb, n_results=1)
@@ -241,12 +241,12 @@ class RagAuditor:
             try:
                 store.delete_store()
             except Exception as cleanup_err:
-                print(f"   ⚠️ Cleanup warning (non-fatal): {cleanup_err}")
+                print(f"      Cleanup warning (non-fatal): {cleanup_err}")
             
             return [{"query": query, "score": score, "type": "Document"}]
             
         except Exception as e:
-            print(f"   ⚠️ Doc Query failed: {e}")
+            print(f"      Doc Query failed: {e}")
             return [{"query": "Doc Lookup", "score": 0.0, "type": "Document"}]
 
 async def run_audit():
@@ -271,17 +271,17 @@ async def run_audit():
         f.write("==============================\n")
         f.write(f"Judge Model: {auditor.judge_llm.model_name if hasattr(auditor.judge_llm, 'model_name') else 'Llama-70B'}\n\n")
         
-        f.write("🧠 MEMORY RAG (FAISS)\n")
+        f.write("  MEMORY RAG (FAISS)\n")
         f.write(f"Average Relevance Score: {avg_mem:.2f}/1.0\n")
         for r in mem_results:
             f.write(f" - Q: {r['query']}\n   Score: {r['score']}\n")
             
-        f.write("\n🌐 AGENTIC RAG (WEB)\n")
+        f.write("\n  AGENTIC RAG (WEB)\n")
         f.write(f"Average Relevance Score: {avg_web:.2f}/1.0\n")
         for r in web_results:
             f.write(f" - Q: {r['query']}\n   Score: {r['score']}\n")
 
-        f.write("\n📄 DOCUMENT RAG (CHROMA)\n")
+        f.write("\n  DOCUMENT RAG (CHROMA)\n")
         f.write(f"Average Relevance Score: {avg_doc:.2f}/1.0\n")
         for r in doc_results:
             f.write(f" - Q: {r['query']}\n   Score: {r['score']}\n")

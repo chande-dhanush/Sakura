@@ -78,7 +78,7 @@ def execute_actions(actions: List[Dict[str, Any]]) -> str:
         try:
             # Invoke tool
             res = tool_map[tool_name].invoke(args)
-            results.append(f"▶️ {tool_name}: {res}")
+            results.append(f"   {tool_name}: {res}")
         except Exception as e:
             results.append(f" {tool_name} failed: {e}")
             

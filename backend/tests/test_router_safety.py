@@ -15,7 +15,7 @@ class TestRouterSafetyChecks:
         """Create an IntentRouter with a dummy LLM (not used here)."""
         return IntentRouter(llm=None)
 
-    # ── Factual PLAN queries must STAY as PLAN ─────────────────────────
+    #    Factual PLAN queries must STAY as PLAN                          
     @pytest.mark.parametrize("query", [
         "Who is Alan Turing?",
         "What is photosynthesis?",
@@ -43,7 +43,7 @@ class TestRouterSafetyChecks:
             f"'{query}' was demoted from PLAN to {result.classification}"
         )
 
-    # ── Greetings must still be forced to CHAT ─────────────────────────
+    #    Greetings must still be forced to CHAT                          
     @pytest.mark.parametrize("query", [
         "hi",
         "hello",
@@ -60,7 +60,7 @@ class TestRouterSafetyChecks:
             f"Greeting '{query}' should be CHAT, got {result.classification}"
         )
 
-    # ── Truly simple queries without any indicator stay CHAT ───────────
+    #    Truly simple queries without any indicator stay CHAT            
     @pytest.mark.parametrize("query", [
         "thanks",
         "ok cool",
@@ -77,7 +77,7 @@ class TestRouterSafetyChecks:
             f"Simple query '{query}' should be demoted to CHAT, got {result.classification}"
         )
 
-    # ── DIRECT with valid hint must not be touched ─────────────────────
+    #    DIRECT with valid hint must not be touched                      
     def test_direct_with_hint_untouched(self):
         """DIRECT + tool_hint must pass through unchanged."""
         router = self._make_router()
@@ -86,7 +86,7 @@ class TestRouterSafetyChecks:
         assert result.classification == "DIRECT"
         assert result.tool_hint == "get_weather"
 
-    # ── PLAN with hint must not be touched ─────────────────────────────
+    #    PLAN with hint must not be touched                              
     def test_plan_with_hint_untouched(self):
         """PLAN + tool_hint must pass through unchanged (Check 3 only fires
         when tool_hint is None)."""
@@ -96,7 +96,7 @@ class TestRouterSafetyChecks:
         assert result.classification == "PLAN"
         assert result.tool_hint == "web_search"
 
-    # ── Original V17.2 indicators still work ───────────────────────────
+    #    Original V17.2 indicators still work                            
     @pytest.mark.parametrize("query", [
         "first check email and then play music",
         "search for AI news and also open VS Code",

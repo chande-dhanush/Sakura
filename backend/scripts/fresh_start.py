@@ -156,7 +156,7 @@ def main():
     print(f"  Backup saved to: {backup_dir}")
     print()
     
-    print("️  Clearing files...")
+    print("   Clearing files...")
     clear_files()
     print()
     

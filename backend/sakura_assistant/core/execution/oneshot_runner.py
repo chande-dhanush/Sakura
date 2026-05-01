@@ -7,7 +7,7 @@ v2.1 HARD CONSTRAINTS:
 - Zero LLM calls (regex-only arg extraction)
 - Zero retries
 - Zero context/memory access for args
-- If args incomplete → fail fast, raise exception for downgrade to ITERATIVE
+- If args incomplete   fail fast, raise exception for downgrade to ITERATIVE
 
 This is the FAST LANE for simple, obvious tool calls.
 """
@@ -151,7 +151,7 @@ class OneShotRunner:
         
         extraction_time = (time.time() - start_time) * 1000
         if extraction_time > self.MAX_EXTRACTION_TIME_MS:
-            logger.warning(f"⚠️ [OneShotRunner] Slow extraction: {extraction_time:.1f}ms")
+            logger.warning(f"   [OneShotRunner] Slow extraction: {extraction_time:.1f}ms")
         
         # 2. Validate args completeness
         missing = self._get_missing_fields(tool_name, args)
@@ -195,7 +195,7 @@ class OneShotRunner:
                 error=output if not success else None
             )
         except Exception as log_err:
-            logger.warning(f"⚠️ [OneShotRunner] Flight recorder logging failed: {log_err}")
+            logger.warning(f"   [OneShotRunner] Flight recorder logging failed: {log_err}")
         
         # 5. Create ToolMessage
         tool_msg = ToolMessage(
@@ -231,9 +231,9 @@ class OneShotRunner:
         text = user_input.lower()
         args: Dict[str, Any] = {}
         
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         # OPEN APP
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         if tool_name == "open_app":
             # "open X", "launch X", "start X"
             patterns = [
@@ -249,9 +249,9 @@ class OneShotRunner:
                     args["app_name"] = app_name
                     break
         
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         # SPOTIFY CONTROL
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         elif tool_name == "spotify_control":
             if any(w in text for w in ["pause", "stop"]):
                 args["action"] = "pause"
@@ -275,9 +275,9 @@ class OneShotRunner:
                     if song:
                         args["song_name"] = song
         
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         # PLAY YOUTUBE
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         elif tool_name == "play_youtube":
             match = re.search(
                 r'play\s+(.+?)\s+(?:on\s+)?youtube', 
@@ -291,9 +291,9 @@ class OneShotRunner:
                 if match:
                     args["topic"] = match.group(1).strip()
         
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         # GET WEATHER
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         elif tool_name == "get_weather":
             match = re.search(
                 r'weather\s+(?:in\s+|for\s+)?(.+?)(?:\?|$)', 
@@ -303,9 +303,9 @@ class OneShotRunner:
                 args["city"] = match.group(1).strip()
             # Empty is OK - will use default location
         
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         # SET REMINDER
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         elif tool_name == "set_reminder":
             # "remind me to X in Y minutes"
             match = re.search(
@@ -329,9 +329,9 @@ class OneShotRunner:
                     args["message"] = match.group(1).strip()
                     args["delay_minutes"] = 5  # Default 5 min
         
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         # SET TIMER
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         elif tool_name == "set_timer":
             match = re.search(r'(\d+)\s*(min|sec|hour|m|s|h)', user_input, re.I)
             if match:
@@ -344,9 +344,9 @@ class OneShotRunner:
                 else:
                     args["duration"] = amount
         
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         # VOLUME CONTROL
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         elif tool_name == "volume_control":
             if "mute" in text:
                 args["action"] = "mute"
@@ -363,9 +363,9 @@ class OneShotRunner:
                     args["action"] = "set"
                     args["level"] = int(match.group(1))
         
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         # NO-ARG TOOLS
-        # ───────────────────────────────────────────────────────────────────
+        #                                                                    
         elif tool_name in ("get_time", "get_battery", "get_system_info", "screenshot"):
             # These tools require no args
             pass

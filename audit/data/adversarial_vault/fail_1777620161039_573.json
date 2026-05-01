@@ -1,0 +1,8 @@
+{
+  "id": "fail_1777620161039_573",
+  "input": "Turn 11: What is the latest update on the previous topic?",
+  "failure_type": "FailureType.SEMANTIC_DEVIATION",
+  "trace": [],
+  "output": "{'content': 'I apologize, but I encountered an issue. Could you please try again?', 'mode': 'DIRECT', 'tool_used': 'search_wikipedia', 'tools_used': ['search_wikipedia'], 'metadata': {'latency': '9.18s', 'status': 'success', 'async': True, 'execution_status': 'failed'}}",
+  "timestamp": 1777620161.0399988
+}

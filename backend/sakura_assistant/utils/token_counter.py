@@ -4,10 +4,10 @@ V17.5: Model-Specific Token Counter
 Provides precise token counting for different LLM model families.
 
 Supports:
-- OpenAI/GPT models (via tiktoken) - ±1% accuracy
-- Llama models (calibrated estimation) - ±5% accuracy  
-- Gemini models (calibrated estimation) - ±5% accuracy
-- Claude models (calibrated estimation) - ±5% accuracy
+- OpenAI/GPT models (via tiktoken) -  1% accuracy
+- Llama models (calibrated estimation) -  5% accuracy  
+- Gemini models (calibrated estimation) -  5% accuracy
+- Claude models (calibrated estimation) -  5% accuracy
 
 Usage:
     from sakura_assistant.utils.token_counter import count_tokens, estimate_cost
@@ -104,7 +104,7 @@ def count_tokens(text: Union[str, List[Dict]], model: str = "unknown") -> int:
         return _estimate_tokens(text, "default")
         
     except Exception as e:
-        print(f"⚠️ [TokenCounter] Error counting tokens: {e}")
+        print(f"   [TokenCounter] Error counting tokens: {e}")
         return _estimate_tokens(text, "default")
 
 
@@ -160,10 +160,10 @@ def _count_openai_tokens(text: str, model: str) -> int:
         return len(tokens)
         
     except ImportError:
-        print("⚠️ [TokenCounter] tiktoken not installed, using estimation")
+        print("   [TokenCounter] tiktoken not installed, using estimation")
         return _estimate_tokens(text, "openai")
     except Exception as e:
-        print(f"⚠️ [TokenCounter] tiktoken failed: {e}")
+        print(f"   [TokenCounter] tiktoken failed: {e}")
         return _estimate_tokens(text, "openai")
 
 
@@ -260,7 +260,7 @@ def estimate_cost(tokens: Dict[str, int], model: str) -> float:
         return prompt_cost + completion_cost
         
     except Exception as e:
-        print(f"⚠️ [TokenCounter] Cost estimation failed: {e}")
+        print(f"   [TokenCounter] Cost estimation failed: {e}")
         # Fallback: Use default pricing
         prompt_cost = (tokens.get("prompt", 0) / 1_000_000) * 0.5
         completion_cost = (tokens.get("completion", 0) / 1_000_000) * 1.0
@@ -323,17 +323,17 @@ def test_tokenizer():
         ("Claude should count this text.", "claude-3-5-sonnet"),
     ]
     
-    print("🔢 Token Counter Test Results:")
+    print("  Token Counter Test Results:")
     print("-" * 50)
     
     for text, model in test_cases:
         tokens = count_tokens(text, model)
         chars = len(text)
         ratio = chars / tokens if tokens > 0 else 0
-        print(f"  [{model}] '{text[:30]}...' → {tokens} tokens ({chars} chars, {ratio:.1f} c/t)")
+        print(f"  [{model}] '{text[:30]}...'   {tokens} tokens ({chars} chars, {ratio:.1f} c/t)")
     
     print("-" * 50)
-    print("✅ Token counter working!")
+    print("  Token counter working!")
 
 
 if __name__ == "__main__":

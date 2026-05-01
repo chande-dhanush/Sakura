@@ -54,7 +54,7 @@ class FileRegistry:
             
             # Dedupe check
             if self._file_exists_by_hash(file_hash):
-                print(f"⚠️ File '{filename}' already exists (hash match). Skipping registration.")
+                print(f"   File '{filename}' already exists (hash match). Skipping registration.")
                 return
 
         conn = sqlite3.connect(DB_PATH)
@@ -139,7 +139,7 @@ class FileRegistry:
         cursor.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
         conn.commit()
         conn.close()
-        print(f"️ Unregistered file: {file_id}")
+        print(f"  Unregistered file: {file_id}")
 
     def _calculate_hash(self, file_path: str) -> str:
         """Calculate SHA256 hash of a file."""
@@ -150,7 +150,7 @@ class FileRegistry:
                     sha256_hash.update(byte_block)
             return sha256_hash.hexdigest()
         except Exception as e:
-            print(f"⚠️ Hash calc failed: {e}")
+            print(f"   Hash calc failed: {e}")
             return None
 
     def _file_exists_by_hash(self, file_hash: str) -> bool:

@@ -173,7 +173,7 @@ def test_offline_logging():
     
     # Check if directory exists
     if not os.path.exists(log_dir):
-        print("   ⚠️ Log directory doesn't exist yet (will be created on first log)")
+        print("      Log directory doesn't exist yet (will be created on first log)")
         return True  # Not a failure
     
     # Check for today's log
@@ -205,7 +205,7 @@ def test_gemini_backup():
     elif container.openrouter_api_key:
         print("    OpenRouter will be used as backup (priority 2)")
     else:
-        print("   ⚠️ No backup model available")
+        print("      No backup model available")
     
     return True
 

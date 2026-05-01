@@ -69,7 +69,7 @@ def audit_o1_scaling():
     
     Evidence: If lookup time is constant as N grows, it's O(1).
     """
-    print("🚀 Starting O(1) Scaling Audit...")
+    print("  Starting O(1) Scaling Audit...")
     
     from sakura_assistant.core.graph.world_graph import WorldGraph, EntityType, EntitySource
     
@@ -138,11 +138,11 @@ def audit_o1_scaling():
         
         output_path = os.path.join(ARTIFACTS_DIR, "o1_proof.png")
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
-        print(f"✅ Evidence saved to {output_path}")
+        print(f"  Evidence saved to {output_path}")
         plt.close()
         
     except ImportError:
-        print("⚠️ matplotlib not installed, generating text report only")
+        print("   matplotlib not installed, generating text report only")
     
     # 4. Text Report
     report_path = os.path.join(ARTIFACTS_DIR, "o1_scaling_report.txt")
@@ -161,7 +161,7 @@ def audit_o1_scaling():
         f.write(f"VERDICT: {'O(1) CONFIRMED' if variance_ratio < 3 else 'NEEDS INVESTIGATION'}\n")
         f.write(f"Max/Min Ratio: {variance_ratio:.2f}x (< 3x = constant time)\n")
     
-    print(f"✅ Report saved to {report_path}")
+    print(f"  Report saved to {report_path}")
     return results
 
 
@@ -172,7 +172,7 @@ def audit_route_latency():
     Note: Requires actual LLM calls, will use real API if available.
     Falls back to forced router patterns if no API key.
     """
-    print("\n⏱️ Starting Route Latency Audit...")
+    print("\n   Starting Route Latency Audit...")
     
     # Test cases for different routes
     direct_queries = [
@@ -216,7 +216,7 @@ def audit_route_latency():
             print(f"    Direct '{query[:20]}...': {latency_ms:.2f}ms")
             
     except ImportError:
-        print("  ⚠️ Forced router not available, using regex patterns")
+        print("     Forced router not available, using regex patterns")
     
     # Also measure the router classification (if available)
     try:
@@ -227,7 +227,7 @@ def audit_route_latency():
         container = get_container()
         
         if container.has_groq or container.has_openrouter:
-            print("  📡 Testing with real LLM (will use API)...")
+            print("    Testing with real LLM (will use API)...")
             router = IntentRouter(container.get_router_llm())
             
             for query in direct_queries[:2]:
@@ -239,10 +239,10 @@ def audit_route_latency():
                 results["direct"].append(latency_ms)
                 print(f"    LLM Route '{query[:20]}...': {latency_ms:.2f}ms -> {result.classification}")
         else:
-            print("  ⚠️ No LLM API key, skipping LLM latency test")
+            print("     No LLM API key, skipping LLM latency test")
             
     except Exception as e:
-        print(f"  ⚠️ Router test failed: {e}")
+        print(f"     Router test failed: {e}")
     
     # Generate Report
     report_path = os.path.join(ARTIFACTS_DIR, "latency_report.txt")
@@ -265,7 +265,7 @@ def audit_route_latency():
         f.write("  Plan Route: < 5000ms (5s)\n")
         f.write("  Chat Route: < 500ms\n")
     
-    print(f"✅ Latency report saved to {report_path}")
+    print(f"  Latency report saved to {report_path}")
     return results
 
 

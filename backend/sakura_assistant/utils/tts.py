@@ -241,7 +241,7 @@ def kokoro_tts(text, voice='af_heart'):
                 audio = np.concatenate([audio, chunk])
         
         if audio is None:
-             print("[TTS] ✗ Kokoro produced no audio.", file=sys.stderr)
+             print("[TTS]   Kokoro produced no audio.", file=sys.stderr)
              _is_speaking = False
              return False
 
@@ -256,9 +256,9 @@ def kokoro_tts(text, voice='af_heart'):
         # Verify file creation
         if temp_file.exists():
             size = temp_file.stat().st_size
-            print(f"[TTS] ✓ Audio file created: {size} bytes", file=sys.stderr)
+            print(f"[TTS]   Audio file created: {size} bytes", file=sys.stderr)
         else:
-            print(f"[TTS] ✗ ERROR: File NOT created at {temp_file}", file=sys.stderr)
+            print(f"[TTS]   ERROR: File NOT created at {temp_file}", file=sys.stderr)
             _is_speaking = False
             return False
         
@@ -274,7 +274,7 @@ def kokoro_tts(text, voice='af_heart'):
         return play_audio_file(str(temp_file))
         
     except Exception as e:
-        print(f"[TTS] ✗ Kokoro Generation Failed: {e}", file=sys.stderr)
+        print(f"[TTS]   Kokoro Generation Failed: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc(file=sys.stderr)
         _is_speaking = False
@@ -295,12 +295,12 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
     global _pipeline, _last_used_time
     
     if not KOKORO_AVAILABLE:
-        print("[TTS] ✗ Kokoro not available for generation", file=sys.stderr)
+        print("[TTS]   Kokoro not available for generation", file=sys.stderr)
         return None
 
     pipe = get_pipeline()
     if not pipe:
-        print("[TTS] ✗ Failed to get Kokoro pipeline", file=sys.stderr)
+        print("[TTS]   Failed to get Kokoro pipeline", file=sys.stderr)
         return None
     
     # V18: Use proper writable directory for audio files
@@ -322,7 +322,7 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
                 audio = np.concatenate([audio, chunk])
         
         if audio is None:
-            print("[TTS] ✗ Kokoro produced no audio.", file=sys.stderr)
+            print("[TTS]   Kokoro produced no audio.", file=sys.stderr)
             return None
 
         # Save to file
@@ -330,11 +330,11 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
         
         # Verify file creation
         if not temp_file.exists():
-            print(f"[TTS] ✗ ERROR: File NOT created at {temp_file}", file=sys.stderr)
+            print(f"[TTS]   ERROR: File NOT created at {temp_file}", file=sys.stderr)
             return None
         
         size = temp_file.stat().st_size
-        print(f"[TTS] ✓ Audio file created: {size} bytes", file=sys.stderr)
+        print(f"[TTS]   Audio file created: {size} bytes", file=sys.stderr)
         
         # V19 FIX: Remove aggressive offloading. 
         # Let the background _background_idle_checker handle cleanup after 5 mins of inactivity.
@@ -345,7 +345,7 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
         return str(temp_file)
         
     except Exception as e:
-        print(f"[TTS] ✗ Generation Failed: {e}", file=sys.stderr)
+        print(f"[TTS]   Generation Failed: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc(file=sys.stderr)
         if temp_file.exists():

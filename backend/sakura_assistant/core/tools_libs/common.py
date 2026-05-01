@@ -103,7 +103,7 @@ def get_google_creds():
         try:
             creds = Credentials.from_authorized_user_file(token_path, SCOPES)
         except Exception as e:
-            print(f"⚠️ Error loading token from {token_path}: {e}")
+            print(f"   Error loading token from {token_path}: {e}")
             creds = None
             
     if not creds or not creds.valid:
@@ -114,7 +114,7 @@ def get_google_creds():
                 with open(token_path, 'w') as token:
                     token.write(creds.to_json())
             except Exception as e:
-                print(f"⚠️ Token refresh failed: {e}")
+                print(f"   Token refresh failed: {e}")
                 creds = None
                 
         # Fallback to interactive login if still no valid creds

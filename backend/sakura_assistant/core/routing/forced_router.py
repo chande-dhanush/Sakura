@@ -15,16 +15,16 @@ import re
 from typing import Optional, Dict, Any, List
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+#                                                                            
 # FORCED TOOL PATTERNS - ORDER MATTERS (first match wins)
-# ═══════════════════════════════════════════════════════════════════════════
+#                                                                            
 # These patterns guarantee a specific tool is called. No LLM hallucination possible.
 # Tool names must EXACTLY match function names in tools.py
 
 FORCED_PATTERNS: List[Dict[str, Any]] = [
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # WEB SEARCH (High priority - explicit search requests)
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(search|google|look\s*up|find\s*out|browse)\s+(the\s+)?(web|internet|online)\s*(for|about)?\s*(.+)?",
         "tool": "web_search",
@@ -38,9 +38,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "search for X (excludes specialized targets)",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # YOUTUBE (Must come BEFORE generic "play X" pattern!)
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(play|open|watch)\s+(?!it\b|my\b|the\b|that\b|some\b)(.+?)\s+on\s+youtube\b",
         "tool": "play_youtube",
@@ -54,9 +54,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "open youtube",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # MUSIC/SPOTIFY CONTROL
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         # FIXED: Require explicit music context to avoid matching "stop talking"
         "pattern": r"\b(pause|stop)\s+(the\s+)?(music|song|spotify|playback|track)\b",
@@ -77,9 +77,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "previous track",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # REMINDERS/TIMERS
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(remind|reminder)\s+(me\s+)?(to|about)\s+(.+?)(\s+in\s+(\d+)\s*(min|minute|hour|hr|sec|second)s?)?\s*$",
         "tool": "set_reminder",
@@ -93,9 +93,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "set timer for X mins",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # CALENDAR
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(what('s|s| is)|show|check|get)\s+(on\s+)?(my\s+)?calendar\b",
         "tool": "calendar_get_events",
@@ -109,9 +109,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "schedule a meeting (needs LLM refinement)",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # EMAIL (Fixed tool names to match tools.py)
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(check|read|show|get)\s+(my\s+)?(email|inbox|mail|gmail)s?\b",
         "tool": "gmail_read_email",  # FIXED: was "email_read"
@@ -125,9 +125,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "send an email (needs LLM refinement)",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # NOTES (Import from utils/note_tools.py)
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(make|create|add|write)\s+(a\s+)?note\s*[:\-]?\s*(.+)?$",
         "tool": "note_create",  # FIXED: was "note_new"
@@ -141,9 +141,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "show my notes",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # SYSTEM
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(open|launch|start)\s+(.+?)\s*(app|application|program)?\s*$",
         "tool": "open_app",
@@ -163,9 +163,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "read/analyze screen",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # WEATHER (V18.1 BUG-02: Hardened patterns)
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(?:what(?:'s|s|\s+is)\s+the\s+weather|weather\s+(?:in|for|at)|current\s+weather|today(?:'s)?\s+weather|how(?:'s|s|\s+is)\s+it\s+(?:outside|today))\b",
         "tool": "get_weather",
@@ -179,9 +179,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "what's the weather",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # NEWS (V10.1: Force tool use to prevent hallucination)
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(what('s|s| is|'re|re| are) the |latest |recent |today('s|s)? )?(news|headlines)\b",
         "tool": "get_news",
@@ -201,9 +201,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "news about X",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # CODE INTERPRETER (V13: analyze, calculate, plot, CSV)
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(analyze|analyse)\s+(this\s+)?(data|csv|file|dataset)\b",
         "tool": "execute_python",
@@ -229,9 +229,9 @@ FORCED_PATTERNS: List[Dict[str, Any]] = [
         "description": "run python code",
     },
     
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     # AUDIO TOOLS (V13: transcribe, summarize audio)
-    # ═══════════════════════════════════════════════════════════════════════
+    #                                                                        
     {
         "pattern": r"\b(transcribe|transcription)\s+(this\s+|the\s+)?(audio|recording|voice\s*memo|mp3|wav)\b",
         "tool": "transcribe_audio",
@@ -256,9 +256,9 @@ _COMPILED_PATTERNS = [
 ]
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+#                                                                            
 # HELPER FUNCTIONS
-# ═══════════════════════════════════════════════════════════════════════════
+#                                                                            
 
 def _extract_search_query(text: str) -> str:
     """Extract search query from text, removing command prefixes."""
@@ -337,9 +337,9 @@ def _extract_weather_city(text: str) -> str:
     return ""
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+#                                                                            
 # MAIN ROUTER FUNCTION
-# ═══════════════════════════════════════════════════════════════════════════
+#                                                                            
 
 def get_forced_tool(user_input: str) -> Optional[Dict[str, Any]]:
     """
@@ -377,10 +377,10 @@ def get_forced_tool(user_input: str) -> Optional[Dict[str, Any]]:
                 try:
                     args = pattern_def["args_extractor"](match, user_input)
                 except Exception as e:
-                    print(f"⚠️ [Tier-1] Arg extraction failed: {e}")
+                    print(f"   [Tier-1] Arg extraction failed: {e}")
                     args = {}
             
-            print(f" [Tier-1] Forced: {tool} ← '{pattern_def['description']}'")
+            print(f" [Tier-1] Forced: {tool}   '{pattern_def['description']}'")
             return {"tool": tool, "args": args, "force_complex": False}
     
     return None

@@ -7,7 +7,7 @@ This replaces the implicit hidden state lost in multi-agent decomposition.
 Core Concepts:
 - EntityNode: Things that exist (user, songs, topics, people)
 - ActionNode: Things that happened (tool calls, chats)
-- Lifecycle: Ephemeral → Candidate → Promoted
+- Lifecycle: Ephemeral   Candidate   Promoted
 - Source: Who created this data (USER_STATED, TOOL_RESULT, LLM_INFERRED)
 - Focus Entity: The primary thing an action is "about"
 
@@ -62,9 +62,9 @@ def set_world_graph(instance: "WorldGraph"):
     _world_graph_instance = instance
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # ENUMS
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class EntityType(Enum):
     """Types of entities in the world."""
@@ -128,16 +128,16 @@ class UserIntent(Enum):
     TASK_FOCUSED = "task_focused"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # DATA CLASSES
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 @dataclass
 class EntityNode:
     """
     Represents a thing that exists in the world.
     
-    Lifecycle: EPHEMERAL (default) → CANDIDATE → PROMOTED
+    Lifecycle: EPHEMERAL (default)   CANDIDATE   PROMOTED
     Only PROMOTED entities are trusted and searchable.
     """
     id: str                                         # e.g., "entity:song:shape_of_you"
@@ -189,8 +189,8 @@ class EntityNode:
         if days_since_ref <= 0:
             return self.confidence
         
-        # Exponential decay: confidence(t) = confidence(0) * e^(-λt)
-        # where λ = ln(2) / half_life
+        # Exponential decay: confidence(t) = confidence(0) * e^(- t)
+        # where   = ln(2) / half_life
         half_life_days = 30
         decay_constant = math.log(2) / half_life_days
         decayed = self.confidence * math.exp(-decay_constant * days_since_ref)
@@ -215,8 +215,8 @@ class EntityNode:
         Check and apply lifecycle demotion based on decayed confidence.
         
         V13: Entities get demoted if their confidence drops too low.
-        - PROMOTED → CANDIDATE if confidence < 0.3
-        - CANDIDATE → EPHEMERAL if confidence < 0.15
+        - PROMOTED   CANDIDATE if confidence < 0.3
+        - CANDIDATE   EPHEMERAL if confidence < 0.15
         
         Returns True if entity was demoted.
         """
@@ -228,12 +228,12 @@ class EntityNode:
         
         if self.lifecycle == EntityLifecycle.PROMOTED and current_conf < 0.3:
             self.lifecycle = EntityLifecycle.CANDIDATE
-            print(f" [WorldGraph] Demoted {self.name}: PROMOTED → CANDIDATE (conf={current_conf:.2f})")
+            print(f" [WorldGraph] Demoted {self.name}: PROMOTED   CANDIDATE (conf={current_conf:.2f})")
             return True
         
         if self.lifecycle == EntityLifecycle.CANDIDATE and current_conf < 0.15:
             self.lifecycle = EntityLifecycle.EPHEMERAL
-            print(f" [WorldGraph] Demoted {self.name}: CANDIDATE → EPHEMERAL (conf={current_conf:.2f})")
+            print(f" [WorldGraph] Demoted {self.name}: CANDIDATE   EPHEMERAL (conf={current_conf:.2f})")
             return True
         
         return False
@@ -285,7 +285,7 @@ class ActionNode:
     """
     Represents something that happened.
     
-    Key field: focus_entity — the primary thing this action is "about".
+    Key field: focus_entity   the primary thing this action is "about".
     Reference resolution prioritizes focus_entity over entities_involved.
     """
     id: str                                         # e.g., "action:t-5"
@@ -411,9 +411,9 @@ class ResolutionResult:
     ban_external_search: bool = False               # Hard constraint for identity
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # WORLD GRAPH
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class WorldGraph:
     """
@@ -423,11 +423,11 @@ class WorldGraph:
     The LLM is the voice. The graph is the brain.
     
     Authority Order:
-    1. Graph identity (user:self) — immutable to tools
-    2. Graph entities (promoted) — mutable by approved sources
-    3. User memory (FAISS) — supplements graph
-    4. Tools — add external entities only
-    5. External search — banned for user references
+    1. Graph identity (user:self)   immutable to tools
+    2. Graph entities (promoted)   mutable by approved sources
+    3. User memory (FAISS)   supplements graph
+    4. Tools   add external entities only
+    5. External search   banned for user references
     """
     
     # V17: Identity loaded from injected IdentityManager (no lazy imports)
@@ -473,14 +473,14 @@ class WorldGraph:
         # V7.1: Thread safety lock (protects all mutations)
         self._lock = threading.RLock()
         
-        # ═══════════════════════════════════════════════════════════════════════════
+        #                                                                            
         # V17.1: DEBOUNCED SAVE (FIX FOR CRASH DATA LOSS)
-        # ═══════════════════════════════════════════════════════════════════════════
+        #                                                                            
         self._dirty = False                    # Tracks unsaved changes
         self._last_save_time = time.time()     # Last successful save timestamp
         self._save_interval = 5.0              # Wait 5 seconds before auto-save
         self._save_timer = None                # Threading timer for debounced save
-        # ═══════════════════════════════════════════════════════════════════════════
+        #                                                                            
         
         # Initialize identity
         self._initialize_identity()
@@ -495,9 +495,9 @@ class WorldGraph:
         if self._identity_manager:
             self._subscribe_to_identity_changes()
     
-    # ═════════════════════════════════════════════════════════════════════════════
+    #                                                                              
     # DEBOUNCED SAVE METHODS (V17.1 - Crash Recovery Fix)
-    # ═════════════════════════════════════════════════════════════════════════════
+    #                                                                              
     
     def _mark_dirty(self) -> None:
         """
@@ -531,9 +531,9 @@ class WorldGraph:
                     self.save()
                     self._dirty = False
                     self._last_save_time = time.time()
-                    print(f"💾 [WorldGraph] Auto-saved (debounced)")
+                    print(f"  [WorldGraph] Auto-saved (debounced)")
                 except Exception as e:
-                    print(f"❌ [WorldGraph] Auto-save failed: {e}")
+                    print(f"  [WorldGraph] Auto-save failed: {e}")
                     # Keep dirty flag set for retry
     
     def flush_and_close(self) -> None:
@@ -554,9 +554,9 @@ class WorldGraph:
                 try:
                     self.save()
                     self._dirty = False
-                    print(f"💾 [WorldGraph] Final save on shutdown")
+                    print(f"  [WorldGraph] Final save on shutdown")
                 except Exception as e:
-                    print(f"❌ [WorldGraph] Shutdown save failed: {e}")
+                    print(f"  [WorldGraph] Shutdown save failed: {e}")
 
     def _subscribe_to_identity_changes(self) -> None:
         """V16: Subscribe to EventBus for reactive identity refresh."""
@@ -621,9 +621,9 @@ class WorldGraph:
         interests = ", ".join(attrs.get("interests", []))
         return f"{self.USER_NAME}, {attrs.get('age')}, from {attrs.get('location')}. Interests: {interests}."
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # QUERY METHODS
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def get_user_identity(self) -> EntityNode:
         """
@@ -652,7 +652,7 @@ class WorldGraph:
         
         Returns (is_user, confidence).
         
-        INVARIANT: "me", "myself", "I" → True with confidence=1.0
+        INVARIANT: "me", "myself", "I"   True with confidence=1.0
         """
         text_lower = text.lower().strip()
         
@@ -671,7 +671,7 @@ class WorldGraph:
         # Check user's name
         user = self.get_user_identity()
         if user.name.lower() in text_lower:
-            # Could be user or external — check context
+            # Could be user or external   check context
             if any(ctx in text_lower for ctx in ["about", "tell me", "who is", "what about"]):
                 return True, 0.75  # Likely user
             return False, 0.3  # More likely external
@@ -683,9 +683,9 @@ class WorldGraph:
         Resolve pronouns and references with multi-hypothesis support.
         
         Priority:
-        1. "me/myself/I" → user:self (confidence=1.0)
-        2. "this/that/it" → focus_entity > entities_involved > action
-        3. "again" → repeat last action
+        1. "me/myself/I"   user:self (confidence=1.0)
+        2. "this/that/it"   focus_entity > entities_involved > action
+        3. "again"   repeat last action
         4. Name lookup (fuzzy)
         5. Graceful fallback
         
@@ -710,7 +710,7 @@ class WorldGraph:
                 ban_external_search=True
             )
         
-        # Priority 2: Demonstrative pronouns → last action's focus
+        # Priority 2: Demonstrative pronouns   last action's focus
         # Check if "it", "that", "this" appears ANYWHERE in the input (not just exact match)
         words = ref_lower.split()
         has_demonstrative = any(word in ["this", "that", "it"] for word in words)
@@ -742,7 +742,7 @@ class WorldGraph:
                     confidence=0.5,
                 )
         
-        # Priority 3: "again" / "repeat" → repeat last action
+        # Priority 3: "again" / "repeat"   repeat last action
         if "again" in ref_lower or "repeat" in ref_lower:
             last_action = self.get_last_action()
             if last_action:
@@ -752,7 +752,7 @@ class WorldGraph:
                     action="repeat"
                 )
         
-        # Priority 4: "instead" → same query, different tool
+        # Priority 4: "instead"   same query, different tool
         if "instead" in ref_lower:
             last_action = self.get_last_action()
             if last_action and last_action.args:
@@ -831,7 +831,7 @@ class WorldGraph:
             for c in constraints[:3]:  # Max 3 constraints
                 implications = c.attributes.get("implications", [])
                 impl_str = f" (Avoid: {', '.join(implications[:5])})" if implications else ""
-                parts.append(f"⚠️ {c.summary}{impl_str}")
+                parts.append(f"   {c.summary}{impl_str}")
             parts.append("")  # Blank line separator
         
         # User identity (always)
@@ -857,16 +857,16 @@ class WorldGraph:
             parts.append(f"[COMMUNICATION STYLE]\n{legacy_prefs.summary}")
         
         if likes:
-            parts.append("[LIKES]\n• " + "\n• ".join(likes[:10]))
+            parts.append("[LIKES]\n  " + "\n  ".join(likes[:10]))
         if dislikes:
-            parts.append("[DISLIKES]\n• " + "\n• ".join(dislikes[:10]))
+            parts.append("[DISLIKES]\n  " + "\n  ".join(dislikes[:10]))
         if facts:
-            parts.append("[KNOWN FACTS]\n• " + "\n• ".join(facts[:5]))
+            parts.append("[KNOWN FACTS]\n  " + "\n  ".join(facts[:5]))
         
         # V17.1: Recent Actions (moved from PLAN-only gating)
         recent_actions = self.get_recent_actions(3)
         if recent_actions:
-            action_strs = [f"• Turn {a.turn}: {a.summary}" for a in recent_actions if a.summary]
+            action_strs = [f"  Turn {a.turn}: {a.summary}" for a in recent_actions if a.summary]
             if action_strs:
                 parts.append("[RECENT ACTIONS]\n" + "\n".join(action_strs))
         
@@ -933,9 +933,9 @@ class WorldGraph:
         else:
             return f"You recently asked about {', '.join(topics[:-1])}, and {topics[-1]}."
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # UPDATE METHODS
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def get_or_create_entity(
         self,
@@ -1000,17 +1000,17 @@ class WorldGraph:
         """
         # V9: Explicit identity guard (for auditors)
         if entity_id == "user:self" and source not in {EntitySource.USER_STATED, EntitySource.USER_CONFIRMED}:
-            print(f"️ BLOCKED mutation of user:self from source {source.value}")
+            print(f"  BLOCKED mutation of user:self from source {source.value}")
             return False
         
         entity = self.entities.get(entity_id)
         if not entity:
-            print(f"⚠️ [WorldGraph] Entity not found: {entity_id}")
+            print(f"   [WorldGraph] Entity not found: {entity_id}")
             return False
         
         # Check permission (generic entities)
         if not entity.can_be_mutated_by(source):
-            print(f"⛔ [WorldGraph] Blocked mutation of {entity_id} by {source.value}")
+            print(f"  [WorldGraph] Blocked mutation of {entity_id} by {source.value}")
             return False
         
         # Apply updates
@@ -1080,7 +1080,7 @@ class WorldGraph:
             # V17.1: Mark dirty to trigger debounced save
             self._mark_dirty()
             
-            print(f"✅ [WorldGraph] Recorded action: {action_id} (focus={action.focus_entity})")
+            print(f"  [WorldGraph] Recorded action: {action_id} (focus={action.focus_entity})")
             
             return action
     
@@ -1106,19 +1106,19 @@ class WorldGraph:
             # V17.1: Mark dirty to trigger debounced save
             self._mark_dirty()
             
-            print(f"✅ [WorldGraph] Recorded response: Turn {self.current_turn}, mode={mode}")
+            print(f"  [WorldGraph] Recorded response: Turn {self.current_turn}, mode={mode}")
     
     def _infer_focus_entity(self, tool: Optional[str], args: Dict[str, Any]) -> Optional[str]:
         """
         Infer the primary entity this action is about.
         
         This is critical for reference resolution:
-        "Play Shape of You" → "Who sings this?" should resolve to the SONG, not the action.
+        "Play Shape of You"   "Who sings this?" should resolve to the SONG, not the action.
         """
         if not tool:
             return None
         
-        # Spotify → song is focus
+        # Spotify   song is focus
         if tool in ["spotify_control", "play_music", "spotify"]:
             song_name = args.get("song_name") or args.get("song") or args.get("track")
             if song_name:
@@ -1129,7 +1129,7 @@ class WorldGraph:
                 )
                 return entity.id
         
-        # Search → query is focus
+        # Search   query is focus
         if tool in ["web_search", "arxiv_search", "search", "wikipedia"]:
             query = args.get("query") or args.get("q") or args.get("search_query")
             if query:
@@ -1140,7 +1140,7 @@ class WorldGraph:
                 )
                 return entity.id
         
-        # App open → app is focus
+        # App open   app is focus
         if tool in ["open_app", "launch"]:
             app_name = args.get("app_name") or args.get("app")
             if app_name:
@@ -1334,7 +1334,7 @@ class WorldGraph:
         
         Steps:
         1. Remove EPHEMERAL entities older than 1 hour with ref_count < 2
-        2. Demote stale CANDIDATES (not referenced in 7 days) → delete
+        2. Demote stale CANDIDATES (not referenced in 7 days)   delete
         3. Enforce hard caps per EntityType (oldest promoted first)
         """
         now = datetime.now()
@@ -1404,11 +1404,11 @@ class WorldGraph:
         # --- Logging ---
         if to_remove:
             ephemeral_count = len(to_remove) - stale_demoted - caps_deleted
-            print(f"️ [WorldGraph] GC: {ephemeral_count} ephemeral, {stale_demoted} stale candidates, {caps_deleted} caps exceeded")
+            print(f"  [WorldGraph] GC: {ephemeral_count} ephemeral, {stale_demoted} stale candidates, {caps_deleted} caps exceeded")
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # VALIDATION (Graph Veto)
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def validate_plan(self, plan: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         """
@@ -1435,9 +1435,9 @@ class WorldGraph:
         
         return True, None
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # PERSISTENCE
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def save(self) -> None:
         """
@@ -1507,7 +1507,7 @@ class WorldGraph:
                 # 1. Delete persisted file
                 if os.path.exists(self.persist_path):
                     os.remove(self.persist_path)
-                    print(f"️ [WorldGraph] Deleted {self.persist_path}")
+                    print(f"  [WorldGraph] Deleted {self.persist_path}")
                 
                 # 2. Clear all in-memory state
                 self.entities.clear()
@@ -1532,7 +1532,7 @@ class WorldGraph:
                 data = json.load(f)
             
             if data.get("version") not in ("v7", "v7.1"):  # V17.1: Accept both versions
-                print(f"⚠️ [WorldGraph] Version mismatch, starting fresh")
+                print(f"   [WorldGraph] Version mismatch, starting fresh")
                 return
             
             self.current_turn = data.get("current_turn", 0)
@@ -1557,14 +1557,14 @@ class WorldGraph:
             for rdata in data.get("responses", []):
                 self.responses.append(ResponseNode.from_dict(rdata))
             
-            print(f"✅ [WorldGraph] Loaded {len(self.entities)} entities, {len(self.actions)} actions, {len(self.responses)} responses")
+            print(f"  [WorldGraph] Loaded {len(self.entities)} entities, {len(self.actions)} actions, {len(self.responses)} responses")
             
         except Exception as e:
-            print(f"⚠️ [WorldGraph] Load failed: {e}")
+            print(f"   [WorldGraph] Load failed: {e}")
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # UTILITIES
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def reset_session(self) -> None:
         """Start a new session (preserves entities and actions)."""
@@ -1588,9 +1588,9 @@ class WorldGraph:
             "current_intent": self._current_intent.value if hasattr(self, '_current_intent') else "casual",
         }
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # PHASE 6: EQ LAYER (Emotional Intelligence)
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def infer_user_intent(self, user_input: str, history: List[Dict] = None) -> UserIntent:
         """
@@ -1734,9 +1734,9 @@ class WorldGraph:
         intent = getattr(self, '_current_intent', UserIntent.CASUAL)
         return intent.value
     
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     # EDGE COLLAPSING (For repeated patterns)
-    # ═══════════════════════════════════════════════════════════════════════════
+    #                                                                            
     
     def _collapse_edges(self) -> None:
         """
@@ -1786,9 +1786,9 @@ class WorldGraph:
         print(f" [WorldGraph] Collapsed edges for {len(entity_interactions)} entities")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # EMBEDDING MANAGER (Phase 2)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class EmbeddingManager:
     """
@@ -1838,7 +1838,7 @@ class EmbeddingManager:
                     self._model = SentenceTransformer(self.EMBEDDING_MODEL)
                     print(" [EmbeddingManager] Model loaded")
                 except Exception as e:
-                    print(f"⚠️ [EmbeddingManager] Failed to load: {e}")
+                    print(f"   [EmbeddingManager] Failed to load: {e}")
                     return None
             
             self._last_used = time.time()
@@ -1929,9 +1929,9 @@ def get_embedding_manager() -> EmbeddingManager:
     return _embedding_manager
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # SEMANTIC RECALL EXTENSION
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 def add_semantic_recall_to_graph():
     """Add semantic_recall method to WorldGraph class."""
@@ -2013,4 +2013,4 @@ def add_semantic_recall_to_graph():
 try:
     add_semantic_recall_to_graph()
 except Exception as e:
-    print(f"⚠️ [WorldGraph] Failed to add semantic_recall: {e}")
+    print(f"   [WorldGraph] Failed to add semantic_recall: {e}")

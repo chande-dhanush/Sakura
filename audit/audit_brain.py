@@ -121,7 +121,7 @@ def audit_router_accuracy():
     """
     Run all test cases through router and measure accuracy.
     """
-    print("🧠 Starting Router Brain Audit...")
+    print("  Starting Router Brain Audit...")
     print(f"   Test cases: {len(TEST_CASES)}")
     
     y_true = []
@@ -184,12 +184,12 @@ def audit_router_accuracy():
                     "expected": expected,
                     "predicted": predicted
                 })
-                print(f"   ❌ '{query}' -> {predicted} (expected {expected})")
+                print(f"     '{query}' -> {predicted} (expected {expected})")
             else:
-                print(f"   ✓ '{query}' -> {predicted}")
+                print(f"     '{query}' -> {predicted}")
                 
     except Exception as e:
-        print(f"   ⚠️ Router test failed: {e}")
+        print(f"      Router test failed: {e}")
         return None
     
     return y_true, y_pred, misclassifications
@@ -260,11 +260,11 @@ def generate_confusion_matrix(y_true, y_pred, misclassifications):
         
         output_path = os.path.join(ARTIFACTS_DIR, "router_confusion_matrix.png")
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
-        print(f"\n✅ Confusion matrix saved to {output_path}")
+        print(f"\n  Confusion matrix saved to {output_path}")
         plt.close()
         
     except ImportError:
-        print("⚠️ matplotlib not available, generating text report only")
+        print("   matplotlib not available, generating text report only")
     
     # Generate text report
     report_path = os.path.join(ARTIFACTS_DIR, "router_accuracy_report.txt")
@@ -306,7 +306,7 @@ def generate_confusion_matrix(y_true, y_pred, misclassifications):
         f.write(f"ROUTER GRADE: {grade} ({accuracy:.1f}%)\n")
         f.write("=" * 60 + "\n")
     
-    print(f"✅ Accuracy report saved to {report_path}")
+    print(f"  Accuracy report saved to {report_path}")
     
     return accuracy, class_metrics
 

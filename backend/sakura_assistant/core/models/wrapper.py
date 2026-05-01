@@ -128,14 +128,14 @@ def _extract_tokens(result: Any, messages: Any = None, model: str = "unknown") -
                     "total": prompt_tokens + completion_tokens
                 }
                 
-                print(f"🔢 [TokenCounter] Calculated tokens: {tokens['total']} (prompt: {tokens['prompt']}, completion: {tokens['completion']}) [PRECISE]")
+                print(f"  [TokenCounter] Calculated tokens: {tokens['total']} (prompt: {tokens['prompt']}, completion: {tokens['completion']}) [PRECISE]")
                 return tokens
                 
             except Exception as tc_err:
-                print(f"⚠️ [TokenCounter] Precise counting failed: {tc_err}")
+                print(f"   [TokenCounter] Precise counting failed: {tc_err}")
             
     except Exception as e:
-        print(f"⚠️ [Token Extract] Failed: {e}")
+        print(f"   [Token Extract] Failed: {e}")
     
     return tokens
 
@@ -164,10 +164,10 @@ def _log_llm_tokens(stage: str, model_name: str, result: Any, messages: Any, dur
                 trace_id=trace_id # V19 FIX: Pass trace_id
             )
             cost = estimate_cost(tokens, model_name)
-            print(f"📊 [{stage}] Logged {tokens['total']} tokens (${cost:.6f})")
+            print(f"  [{stage}] Logged {tokens['total']} tokens (${cost:.6f})")
     except Exception as e:
         # Never break the request due to logging failures
-        print(f"⚠️ [Token Log] Failed (non-fatal): {e}")
+        print(f"   [Token Log] Failed (non-fatal): {e}")
 
 def invoke_with_timeout(llm, messages, timeout=LLM_TIMEOUT, **kwargs):
     """
@@ -228,7 +228,7 @@ class ReliableLLM:
                 bucket._refill()
                 if bucket.tokens < 1:
                     sleep_time = (1 - bucket.tokens) / bucket.rate
-                    print(f"⏳ [{self.name}] Rate limited: waiting {sleep_time:.2f}s")
+                    print(f"  [{self.name}] Rate limited: waiting {sleep_time:.2f}s")
                     time.sleep(min(sleep_time, 2.0))  # Cap at 2s per iteration
             bucket.tokens -= 1
             bucket.total_requests += 1
@@ -268,7 +268,7 @@ class ReliableLLM:
                                 duration_ms=duration_ms,
                                 success=True
                             )
-                            print(f"📊 [{self.name}] Logged ~500 estimated tokens (recovered from XML)")
+                            print(f"  [{self.name}] Logged ~500 estimated tokens (recovered from XML)")
                         except:
                             pass
                         return match_tools
@@ -276,7 +276,7 @@ class ReliableLLM:
                     print(f" Recovery failed: {parse_err}")
 
             if self.backup:
-                print(f"⚠️ {self.name} Primary failed: {e}. fallback_activated=true path=sync")
+                print(f"   {self.name} Primary failed: {e}. fallback_activated=true path=sync")
                 try:
                     backup_start = time.time()
                     backup_model = getattr(self.backup, 'model_name', None) or \
@@ -379,7 +379,7 @@ class ReliableLLM:
         wait_time = await limiter.acquire(model_name)
         
         if wait_time > 0:
-            print(f"⏳ [{self.name}] Rate limited: waited {wait_time:.2f}s")
+            print(f"  [{self.name}] Rate limited: waited {wait_time:.2f}s")
         
         print(f" [{self.name}] Async invoking LLM... path=async model={model_name}")
         start_time = time.time()
@@ -424,7 +424,7 @@ class ReliableLLM:
                                 duration_ms=duration_ms,
                                 success=True
                             )
-                            print(f"📊 [{self.name}] Logged ~500 estimated tokens (recovered from XML)")
+                            print(f"  [{self.name}] Logged ~500 estimated tokens (recovered from XML)")
                         except:
                             pass
                         return match_tools
@@ -433,7 +433,7 @@ class ReliableLLM:
             
             # Try backup
             if self.backup:
-                print(f"⚠️ {self.name} Primary async failed: {e}. fallback_activated=true path=async")
+                print(f"   {self.name} Primary async failed: {e}. fallback_activated=true path=async")
                 try:
                     backup_start = time.time()
                     backup_model = getattr(self.backup, 'model_name', None) or \

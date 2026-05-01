@@ -124,7 +124,7 @@ class ReflectionEngine:
             # V14: Robust JSON parsing (Red Team requirement)
             data = self._safe_parse_json(content)
             if not data:
-                print("⚠️ [Reflection] JSON parse failed, skipping")
+                print("   [Reflection] JSON parse failed, skipping")
                 return
             
             # Process entities
@@ -179,7 +179,7 @@ class ReflectionEngine:
             pass
         
         # Strategy 5: Return empty structure (graceful degradation)
-        print(f"⚠️ [Reflection] All JSON parse strategies failed for: {content[:100]}...")
+        print(f"   [Reflection] All JSON parse strategies failed for: {content[:100]}...")
         return None
 
     def _process_entities(self, entities: List[Dict]):
@@ -269,7 +269,7 @@ class ReflectionEngine:
                 print(f" [Reflection] CRITICAL Constraint: {constraint_id} (criticality={criticality})")
             else:
                 node.confidence = max(node.confidence, 0.8)
-                print(f"⚠️ [Reflection] Constraint: {constraint_id} -> {summary}")
+                print(f"   [Reflection] Constraint: {constraint_id} -> {summary}")
 
     def _process_retirements(self, retirements: List[str]):
         """

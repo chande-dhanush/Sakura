@@ -131,7 +131,7 @@ def perform_reset():
 
 if __name__ == "__main__":
     # Confirmation prompt
-    print("\n⚠️  WARNING: This will delete ALL conversation history, memories,")
+    print("\n    WARNING: This will delete ALL conversation history, memories,")
     print("    WorldGraph, and uploaded documents. This cannot be undone.")
     print()
     confirm = input("Type 'RESET' to confirm: ")

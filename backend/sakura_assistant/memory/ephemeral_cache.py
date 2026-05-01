@@ -63,7 +63,7 @@ class EphemeralCache:
                     best_results = entry['results']
 
         if best_score >= self.similarity_threshold:
-            logger.info(f"⚡ EAG Cache Hit! Score: {best_score:.4f} for query: '{query_text}'")
+            logger.info(f"  EAG Cache Hit! Score: {best_score:.4f} for query: '{query_text}'")
             return best_results
         
         return None

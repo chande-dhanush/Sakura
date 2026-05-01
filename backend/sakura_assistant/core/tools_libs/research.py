@@ -58,7 +58,7 @@ class SmartResearcher:
         # 0. Broadcasting Start
         broadcast("research_start", {"query": query, "step": "Checking Cache..."})
         if emitter:
-            emitter.tool_progress("research_topic", f"🔬 Starting research on '{query[:40]}...'")
+            emitter.tool_progress("research_topic", f"  Starting research on '{query[:40]}...'")
         
         # --- SMART CACHING START ---
         collection = None
@@ -72,7 +72,7 @@ class SmartResearcher:
             collection = client.get_or_create_collection(name="search_cache")
             
             if emitter:
-                emitter.tool_progress("research_topic", "📂 Checking cache...")
+                emitter.tool_progress("research_topic", "  Checking cache...")
             
             # Embed query
             try:
@@ -84,7 +84,7 @@ class SmartResearcher:
                      raise ImportError("Model failed to load")
             except Exception as e:
                 # Fallback for Test Environment
-                print(f"⚠️ [Research] Embedder Load Failed: {e}. Using Mock.")
+                print(f"   [Research] Embedder Load Failed: {e}. Using Mock.")
                 import random
                 rng = random.Random(query) 
                 query_emb = [rng.random() for _ in range(384)]
@@ -102,15 +102,15 @@ class SmartResearcher:
                 if distance < 0.1: 
                     cached_summary = results["documents"][0][0]
                     timestamp = results["metadatas"][0][0].get("timestamp")
-                    print(f"⚡ SmartResearcher: Cache Hit (dist={distance:.4f})")
+                    print(f"  SmartResearcher: Cache Hit (dist={distance:.4f})")
                     broadcast("cache_hit", {"query": query, "distance": distance})
                     if emitter:
-                        emitter.tool_success("research_topic", f"⚡ Cache hit! Using cached result")
+                        emitter.tool_success("research_topic", f"  Cache hit! Using cached result")
                     
-                    prefix = " [⚠️ Degraded Mode]" if is_degraded else ""
+                    prefix = " [   Degraded Mode]" if is_degraded else ""
                     return f"{prefix} **[Cached Result - {timestamp}]:**\n{cached_summary}"
         except Exception as e:
-            print(f"⚠️ Cache check failed: {e}")
+            print(f"   Cache check failed: {e}")
             # Do NOT crash, proceed to live search
 
         # --- SMART CACHING END ---
@@ -122,11 +122,11 @@ class SmartResearcher:
         client = TavilyClient(api_key=api_key)
         tier = self._determine_tier(query)
         
-        print(f"️ SmartResearcher: Analyzing '{query}' via Tier: {tier.upper()}")
+        print(f"  SmartResearcher: Analyzing '{query}' via Tier: {tier.upper()}")
         broadcast("tool_start", {"tool": "Tavily", "tier": tier, "query": query})
         
         if emitter:
-            emitter.tool_progress("research_topic", f"🔍 Phase 1/3: Searching with Tavily ({tier})...")
+            emitter.tool_progress("research_topic", f"  Phase 1/3: Searching with Tavily ({tier})...")
         
         try:
             results = []
@@ -140,11 +140,11 @@ class SmartResearcher:
                 # Simple summary for basic facts
                 if not results:
                     if emitter:
-                        emitter.tool_progress("research_topic", "⚠️ No results found")
+                        emitter.tool_progress("research_topic", "   No results found")
                     return " No results found."
                 
                 if emitter:
-                    emitter.tool_progress("research_topic", f"📄 Phase 2/3: Found {len(results)} sources")
+                    emitter.tool_progress("research_topic", f"  Phase 2/3: Found {len(results)} sources")
                 
                 # Just return a neat list for basic facts, or simple synthesis
                 out = [f"**Research Results (Basic):**"]
@@ -159,11 +159,11 @@ class SmartResearcher:
                 
                 if not results:
                     if emitter:
-                        emitter.tool_progress("research_topic", "⚠️ No results found")
+                        emitter.tool_progress("research_topic", "   No results found")
                     return " No results found."
                 
                 if emitter:
-                    emitter.tool_progress("research_topic", f"📄 Phase 2/3: Found {len(results)} sources, extracting content...")
+                    emitter.tool_progress("research_topic", f"  Phase 2/3: Found {len(results)} sources, extracting content...")
                 
                 # Synthesize with LLM
                 context = []
@@ -175,7 +175,7 @@ class SmartResearcher:
                 context_str = "\n".join(context)
                 
                 if emitter:
-                    emitter.tool_progress("research_topic", "🧠 Phase 3/3: Synthesizing with LLM...")
+                    emitter.tool_progress("research_topic", "  Phase 3/3: Synthesizing with LLM...")
                 
                 prompt = f"""You are a Research Synthesizer.
                 Query: {query}
@@ -214,14 +214,14 @@ class SmartResearcher:
                     get_logger("Research").warning(f"[Research] Search failed: {e}")
                     return f" Error: {e}"
             else:
-                 print("⚠️ Cache save skipped (collection/embedding missing)")
+                 print("   Cache save skipped (collection/embedding missing)")
             
             # FIX-6: Global prefixing for non-cached results
             if is_degraded:
-                final_output = f"[⚠️ Degraded Mode] {final_output}"
+                final_output = f"[   Degraded Mode] {final_output}"
             
             if emitter:
-                emitter.tool_success("research_topic", f"✅ Research complete ({len(results)} sources)")
+                emitter.tool_success("research_topic", f"  Research complete ({len(results)} sources)")
                 
             return final_output
 

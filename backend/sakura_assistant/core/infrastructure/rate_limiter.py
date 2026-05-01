@@ -73,7 +73,7 @@ class TokenBucket:
                     sleep_time = 60.0 - time_in_minute + 0.1
                     
                     if sleep_time > 0:
-                        print(f"⏳ [RateLimiter:{self.name}] TPM limit hit, waiting {sleep_time:.1f}s")
+                        print(f"  [RateLimiter:{self.name}] TPM limit hit, waiting {sleep_time:.1f}s")
                         
                         # V12: Broadcast throttling event
                         from .broadcaster import broadcast
@@ -105,7 +105,7 @@ class TokenBucket:
                 deficit = cost - self.tokens
                 sleep_time = deficit / self.rate
                 
-                print(f"⏳ [RateLimiter:{self.name}] RPM backpressure: waiting {sleep_time:.2f}s")
+                print(f"  [RateLimiter:{self.name}] RPM backpressure: waiting {sleep_time:.2f}s")
                 
                 # V12: Broadcast throttling event
                 from .broadcaster import broadcast
@@ -253,7 +253,7 @@ class GlobalRateLimiter:
     def disable(self):
         """Disable rate limiting (for testing)."""
         self._enabled = False
-        print("⚠️ [RateLimiter] DISABLED")
+        print("   [RateLimiter] DISABLED")
     
     def enable(self):
         """Enable rate limiting."""

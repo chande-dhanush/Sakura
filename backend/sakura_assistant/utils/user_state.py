@@ -77,7 +77,7 @@ class UserStateTracker:
         new_state = self._compute_state(message, current_hour)
         
         if new_state != self._current_state:
-            log_flow("UserState", f"Transition: {self._current_state} → {new_state}")
+            log_flow("UserState", f"Transition: {self._current_state}   {new_state}")
             self._current_state = new_state
         
         return self._current_state
@@ -87,19 +87,19 @@ class UserStateTracker:
         Pure heuristic computation - no side effects.
         Priority: stressed > busy > tired > idle
         """
-        # Signal 1: Urgent language → stressed
+        # Signal 1: Urgent language   stressed
         if self.URGENT_PATTERNS.search(message):
             return "stressed"
         
-        # Signal 2: High message frequency → stressed
+        # Signal 2: High message frequency   stressed
         if len(self._message_timestamps) >= self.STRESSED_FREQUENCY_THRESHOLD:
             return "stressed"
         
-        # Signal 3: Long message → busy
+        # Signal 3: Long message   busy
         if len(message) > self.BUSY_MESSAGE_LENGTH:
             return "busy"
         
-        # Signal 4: Late night (23:00 - 06:00) → tired
+        # Signal 4: Late night (23:00 - 06:00)   tired
         if hour >= 23 or hour < 6:
             return "tired"
         

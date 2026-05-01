@@ -158,10 +158,10 @@ class MicStreamManager:
                         else:
                             consumer["callback"](samples, data)
                     except Exception as e:
-                        print(f"⚠️ Mic consumer '{consumer['name']}' error: {e}")
+                        print(f"   Mic consumer '{consumer['name']}' error: {e}")
                 
             except Exception as e:
-                print(f"⚠️ Shared Mic frame error: {e}")
+                print(f"   Shared Mic frame error: {e}")
                 time.sleep(0.1)
     
     @staticmethod

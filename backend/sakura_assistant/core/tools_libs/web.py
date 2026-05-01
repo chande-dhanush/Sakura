@@ -83,7 +83,7 @@ def play_youtube(topic: str) -> str:
                 video_id = match.group(1)
                 play_url = f"https://www.youtube.com/watch?v={video_id}&autoplay=1"
                 webbrowser.open(play_url)
-                return f"▶️ Now playing on YouTube: '{topic}'"
+                return f"   Now playing on YouTube: '{topic}'"
         except Exception:
             pass
         
@@ -116,7 +116,7 @@ def get_weather(city: str = "") -> str:
         response = requests.get(url, timeout=5, headers={'User-Agent': 'curl/7.68.0'})
         
         if response.status_code == 200 and "Unknown location" not in response.text:
-            result = f"️ {response.text.strip()}"
+            result = f"  {response.text.strip()}"
             _weather_cache[city_key] = (result, time.time())
             return result
         else:
@@ -201,7 +201,7 @@ def save_bookmark(name: str, url: str, category: str = "custom") -> str:
         with open(bookmarks_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         
-        return f" Saved bookmark: '{name}' → {url}"
+        return f" Saved bookmark: '{name}'   {url}"
     except Exception as e:
         return f" Failed to save bookmark: {e}"
 
@@ -218,7 +218,7 @@ def web_search(query: str, max_results: int = 5) -> str:
         
         # V17.5: Emit progress
         if emitter:
-            emitter.tool_progress("web_search", f"🔍 Searching web for '{query[:30]}...'")
+            emitter.tool_progress("web_search", f"  Searching web for '{query[:30]}...'")
         
         max_results = min(max_results, 10)
         client = TavilyClient(api_key=api_key)
@@ -227,12 +227,12 @@ def web_search(query: str, max_results: int = 5) -> str:
         results = response.get("results", [])
         if not results:
             if emitter:
-                emitter.tool_progress("web_search", "⚠️ No results found")
+                emitter.tool_progress("web_search", "   No results found")
             return " No search results found."
         
         # V17.5: Emit result count
         if emitter:
-            emitter.tool_success("web_search", f"✅ Found {len(results)} results")
+            emitter.tool_success("web_search", f"  Found {len(results)} results")
         
         out = []
         for r in results:
@@ -255,7 +255,7 @@ def search_wikipedia(query: str) -> str:
     
     # V17.5: Emit progress
     if emitter:
-        emitter.tool_progress("search_wikipedia", f"🔍 Searching Wikipedia for '{query[:30]}...'")
+        emitter.tool_progress("search_wikipedia", f"  Searching Wikipedia for '{query[:30]}...'")
     
     try:
         import wikipedia
@@ -263,20 +263,20 @@ def search_wikipedia(query: str) -> str:
         search_results = wikipedia.search(query, results=1)
         if not search_results:
             if emitter:
-                emitter.tool_progress("search_wikipedia", "⚠️ No Wikipedia page found")
+                emitter.tool_progress("search_wikipedia", "   No Wikipedia page found")
             return " No Wikipedia page found."
         
         page_title = search_results[0]
         
         # V17.5: Emit found page
         if emitter:
-            emitter.tool_progress("search_wikipedia", f"📖 Found article: {page_title}")
+            emitter.tool_progress("search_wikipedia", f"  Found article: {page_title}")
         
         summary = wikipedia.summary(page_title, sentences=3)
         
         # V17.5: Emit success
         if emitter:
-            emitter.tool_success("search_wikipedia", f"✅ Retrieved summary ({len(summary)} chars)")
+            emitter.tool_success("search_wikipedia", f"  Retrieved summary ({len(summary)} chars)")
         
         return f" Wikipedia ({page_title}):\n{summary}\n(Source: {wikipedia.page(page_title).url})"
     except ImportError:
@@ -320,7 +320,7 @@ def get_news(topic: str = "technology") -> str:
     
     # V17.5: Emit progress
     if emitter:
-        emitter.tool_progress("get_news", f"📰 Fetching {topic} news...")
+        emitter.tool_progress("get_news", f"  Fetching {topic} news...")
     
     try:
         url = f"https://news.google.com/rss/search?q={topic}&hl=en-IN&gl=IN&ceid=IN:en"
@@ -337,12 +337,12 @@ def get_news(topic: str = "technology") -> str:
         
         if not headlines:
             if emitter:
-                emitter.tool_progress("get_news", f"⚠️ No news found for '{topic}'")
+                emitter.tool_progress("get_news", f"   No news found for '{topic}'")
             return f" No news found for '{topic}'"
         
         # V17.5: Emit success
         if emitter:
-            emitter.tool_success("get_news", f"✅ Found {len(headlines)} headlines")
+            emitter.tool_success("get_news", f"  Found {len(headlines)} headlines")
         
         result = [f" **Top {topic} news:**"]
         for i, title in enumerate(headlines, 1):
@@ -366,7 +366,7 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
     
     # V17.5: Emit progress
     if emitter:
-        emitter.tool_progress("web_scrape", f"🌐 Connecting to {url[:40]}...")
+        emitter.tool_progress("web_scrape", f"  Connecting to {url[:40]}...")
     
     try:
         import requests
@@ -380,7 +380,7 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         # V17.5: Emit download complete
         if emitter:
             size_kb = len(response.content) / 1024
-            emitter.tool_progress("web_scrape", f"📥 Downloaded {size_kb:.1f} KB")
+            emitter.tool_progress("web_scrape", f"  Downloaded {size_kb:.1f} KB")
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -392,7 +392,7 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         
         # V17.5: Emit extraction progress
         if emitter:
-            emitter.tool_progress("web_scrape", "🔍 Extracting content...")
+            emitter.tool_progress("web_scrape", "  Extracting content...")
         
         # Try to find main content
         main_content = None
@@ -414,13 +414,13 @@ def web_scrape(url: str, extract_main: bool = True) -> str:
         
         # V17.5: Emit success
         if emitter:
-            emitter.tool_success("web_scrape", f"✅ Extracted {len(clean_text)} characters")
+            emitter.tool_success("web_scrape", f"  Extracted {len(clean_text)} characters")
         
         if len(clean_text) > 2000:
             return f" Content (Truncated, {len(clean_text)} chars):\n{clean_text[:2000]}...\n(Full auto-ingest moved to Memory tools)"
             
         if len(clean_text) < 100:
-            return f"⚠️ Could not extract meaningful content from {url}."
+            return f"   Could not extract meaningful content from {url}."
         
         return clean_text
     except Exception as e:

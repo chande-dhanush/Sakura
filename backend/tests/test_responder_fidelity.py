@@ -32,27 +32,27 @@ class TestResponderFidelity:
         return gen, mock_llm, call_count
 
     def test_fidelity_passes_when_data_referenced(self):
-        """1. When tool_outputs contains '28°C Partly Cloudy' and response contains '28' 
+        """1. When tool_outputs contains '28 C Partly Cloudy' and response contains '28' 
         or 'cloudy' -> fidelity check passes, no regeneration."""
-        gen, mock_llm, counter = self._make_generator(["The temperature is 28°C and it's cloudy."])
+        gen, mock_llm, counter = self._make_generator(["The temperature is 28 C and it's cloudy."])
         
         # Must be >50 chars to trigger fidelity check
-        tool_output = "Weather Data: 28°C Partly Cloudy. Location: Bangalore, India. Additional padding so length is >50 chars for the check."
+        tool_output = "Weather Data: 28 C Partly Cloudy. Location: Bangalore, India. Additional padding so length is >50 chars for the check."
         context = ResponseContext(user_input="weather", tool_outputs=tool_output)
         
         result = gen.generate(context)
         
         assert counter["n"] == 1
-        assert "28°C" in result
+        assert "28 C" in result
 
     def test_fidelity_fails_triggers_regeneration(self):
         """2. When response ignores data -> fidelity fails, regeneration fires exactly once."""
         gen, mock_llm, counter = self._make_generator([
             "It has a warm tropical climate", # Ignition: Hallucination 
-            "The weather in Bangalore is 28°C."      # Retry: Grounded
+            "The weather in Bangalore is 28 C."      # Retry: Grounded
         ])
         
-        tool_output = "Weather Data: 28°C Partly Cloudy. Location: Bangalore, India. Additional padding so length is >50 chars for the check."
+        tool_output = "Weather Data: 28 C Partly Cloudy. Location: Bangalore, India. Additional padding so length is >50 chars for the check."
         context = ResponseContext(user_input="weather", tool_outputs=tool_output)
         
         result = gen.generate(context)
@@ -77,7 +77,7 @@ class TestResponderFidelity:
             "It is located in Asia."
         ])
         
-        tool_output = "Weather Data: 28°C Partly Cloudy. Location: Bangalore, India. Additional padding so length is >50 chars for the check."
+        tool_output = "Weather Data: 28 C Partly Cloudy. Location: Bangalore, India. Additional padding so length is >50 chars for the check."
         context = ResponseContext(user_input="weather", tool_outputs=tool_output)
         
         result = gen.generate(context)
@@ -88,10 +88,10 @@ class TestResponderFidelity:
         """Ensure the async path also executes fidelity correctly."""
         gen, mock_llm, counter = self._make_generator([
             "It has a warm tropical climate", 
-            "The weather in Bangalore is 28°C."      
+            "The weather in Bangalore is 28 C."      
         ])
         
-        tool_output = "Weather Data: 28°C Partly Cloudy. Location: Bangalore, India. Additional padding so length is >50 chars for the check."
+        tool_output = "Weather Data: 28 C Partly Cloudy. Location: Bangalore, India. Additional padding so length is >50 chars for the check."
         context = ResponseContext(user_input="weather", tool_outputs=tool_output)
         
         import asyncio

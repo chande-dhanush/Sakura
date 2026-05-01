@@ -56,7 +56,7 @@ from sakura_assistant.core.execution.planner import Planner
 try:
     from langchain_groq import ChatGroq
 except ImportError:
-    print("⚠️ Skipping Groq tests (pip install langchain-groq)")
+    print("   Skipping Groq tests (pip install langchain-groq)")
     ChatGroq = None
 
 if ChatGroq is None:
@@ -67,7 +67,7 @@ def test_planner_strictness():
     """Verify Planner follows the 'Force Tool' and 'Think Fast' rules."""
     
     # 1. Setup
-    print("🧠 Initializing Planner Audit...")
+    print("  Initializing Planner Audit...")
     reset_container()
     container = get_container()
     llm = container.get_planner_llm()
@@ -92,7 +92,7 @@ def test_planner_strictness():
         }
     ]
     
-    print(f"\n🧪 Testing {len(test_cases)} scenarios...\n")
+    print(f"\n  Testing {len(test_cases)} scenarios...\n")
     
     results = []
     
@@ -113,27 +113,27 @@ def test_planner_strictness():
             success = any(t == expected for t in tool_names)
             
             if success:
-                print(f"   ✅ PASS: Used {tool_names}")
+                print(f"     PASS: Used {tool_names}")
                 results.append(True)
             else:
-                print(f"   ❌ FAIL: Used {tool_names} (Expected: {expected})")
+                print(f"     FAIL: Used {tool_names} (Expected: {expected})")
                 print(f"      Reason: {case['fail_reason']}")
                 results.append(False)
                 
         except Exception as e:
-            print(f"   ⚠️ ERROR: {e}")
+            print(f"      ERROR: {e}")
             results.append(False)
             
         print("-" * 40)
 
     # 3. Summary
     score = sum(results) / len(results) * 100
-    print(f"\n📊 Strictness Score: {score:.1f}% ({sum(results)}/{len(results)})")
+    print(f"\n  Strictness Score: {score:.1f}% ({sum(results)}/{len(results)})")
     
     if score == 100:
-        print("🏆 Planner is STRICT and OBEDIENT.")
+        print("  Planner is STRICT and OBEDIENT.")
     else:
-        print("👮 Planner needs more discipline.")
+        print("  Planner needs more discipline.")
 
 if __name__ == "__main__":
     if sys.platform == "win32":

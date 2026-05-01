@@ -24,7 +24,7 @@ class SummaryMemory:
     Usage:
         memory = SummaryMemory(llm)
         memory.add_turn("user", "What's the weather in Tokyo?")
-        memory.add_turn("assistant", "It's 15°C and sunny in Tokyo.")
+        memory.add_turn("assistant", "It's 15 C and sunny in Tokyo.")
         
         # After 5+ turns, get compressed summary for system prompt
         context = memory.get_context_injection()
@@ -122,7 +122,7 @@ New messages:
                 
             except Exception as e:
                 duration = time_module.time() - start_time
-                print(f"⚠️ [SummaryMemory] LLM compression failed ({duration:.2f}s): {e}")
+                print(f"   [SummaryMemory] LLM compression failed ({duration:.2f}s): {e}")
                 # Fallback: just keep last few messages as-is
                 self.summary += f"\n[Recent: {msgs_text[:200]}...]"
         else:
@@ -154,7 +154,7 @@ New messages:
         self.recent_messages = []
         self.message_count_since_compress = 0
         self._save()
-        print("️ [SummaryMemory] Cleared")
+        print("  [SummaryMemory] Cleared")
     
     def _load(self) -> None:
         """Load persisted summary from disk."""
@@ -165,7 +165,7 @@ New messages:
                     self.summary = data.get("summary", "")
                     print(f" [SummaryMemory] Loaded ({len(self.summary)} chars)")
         except Exception as e:
-            print(f"⚠️ [SummaryMemory] Load failed: {e}")
+            print(f"   [SummaryMemory] Load failed: {e}")
     
     def _save(self) -> None:
         """Persist summary to disk."""
@@ -177,7 +177,7 @@ New messages:
                     "updated_at": datetime.now().isoformat()
                 }, f, indent=2)
         except Exception as e:
-            print(f"⚠️ [SummaryMemory] Save failed: {e}")
+            print(f"   [SummaryMemory] Save failed: {e}")
 
 
 # Singleton for global access

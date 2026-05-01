@@ -61,7 +61,7 @@ class EventBus:
                 try:
                     callback(data)
                 except Exception as e:
-                    print(f"⚠️ [EventBus] Listener error for '{event}': {e}")
+                    print(f"   [EventBus] Listener error for '{event}': {e}")
 
 
 # Singleton accessor
@@ -135,7 +135,7 @@ class IdentityManager:
         path = self._get_settings_path()
         
         if not os.path.exists(path):
-            print(f"⚠️ [IdentityManager] No user_settings.json found")
+            print(f"   [IdentityManager] No user_settings.json found")
             return False
         
         try:

@@ -163,8 +163,8 @@ def note_read(title: str, folder: str = "topics") -> str:
     """
     try:
         path = get_note_path(title, folder)
-        print(f"🐛 [note_read] Looking for '{title}' in folder '{folder}'")
-        print(f"🐛 [note_read] Full path: {path}")
+        print(f"  [note_read] Looking for '{title}' in folder '{folder}'")
+        print(f"  [note_read] Full path: {path}")
 
         if not os.path.exists(path):
             return f" Note '{title}' not found in '{folder}'."
@@ -209,7 +209,7 @@ def note_delete(title: str, folder: str = "topics") -> str:
         shutil.copy2(path, backup_path)
         
         os.remove(path)
-        return f"️ Deleted '{title}' (Backup created: {os.path.basename(backup_path)})"
+        return f"  Deleted '{title}' (Backup created: {os.path.basename(backup_path)})"
     except Exception as e:
         return f" Error deleting note: {e}"
 

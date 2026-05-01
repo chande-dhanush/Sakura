@@ -82,7 +82,7 @@ def audit_memory_leak_lightweight():
     
     Avoids LLM calls to make test fast and repeatable.
     """
-    print("💧 Starting Memory Leak Audit (Lightweight Mode)...")
+    print("  Starting Memory Leak Audit (Lightweight Mode)...")
     
     from sakura_assistant.core.graph.world_graph import WorldGraph, EntityType, EntitySource
     from sakura_assistant.core.tools import get_all_tools
@@ -153,8 +153,8 @@ def audit_memory_leak_lightweight():
     growth = end_mem - start_mem
     growth_percent = (growth / start_mem) * 100 if start_mem > 0 else 0
     
-    print(f"\n🏁 End Memory: {end_mem:.2f} MB")
-    print(f"📈 Total Growth: {growth:.2f} MB ({growth_percent:.1f}%)")
+    print(f"\n  End Memory: {end_mem:.2f} MB")
+    print(f"  Total Growth: {growth:.2f} MB ({growth_percent:.1f}%)")
     
     return {
         "start_mb": start_mem,
@@ -175,12 +175,12 @@ def audit_memory_leak_full():
     
     Warning: This uses API quota and may be slow.
     """
-    print("💧 Starting Memory Leak Audit (Full Mode)...")
+    print("  Starting Memory Leak Audit (Full Mode)...")
     
     try:
         from ..backend.sakura_assistant.core.llm import SmartAssistant
     except ImportError:
-        print("  ⚠️ SmartAssistant not available, using lightweight mode")
+        print("     SmartAssistant not available, using lightweight mode")
         return audit_memory_leak_lightweight()
     
     gc.collect()
@@ -190,7 +190,7 @@ def audit_memory_leak_full():
     try:
         assistant = SmartAssistant()
     except Exception as e:
-        print(f"  ⚠️ Failed to initialize assistant: {e}")
+        print(f"     Failed to initialize assistant: {e}")
         print("  Falling back to lightweight mode...")
         return audit_memory_leak_lightweight()
     
@@ -198,7 +198,7 @@ def audit_memory_leak_full():
     try:
         assistant.run("Hello", [])
     except Exception as e:
-        print(f"  ⚠️ Warmup failed: {e}, continuing with lightweight mode")
+        print(f"     Warmup failed: {e}, continuing with lightweight mode")
         return audit_memory_leak_lightweight()
     
     gc.collect()
@@ -232,8 +232,8 @@ def audit_memory_leak_full():
     end_mem = get_memory_mb()
     growth = end_mem - warm_mem
     
-    print(f"\n🏁 End Memory: {end_mem:.2f} MB")
-    print(f"📈 Growth since warmup: {growth:.2f} MB")
+    print(f"\n  End Memory: {end_mem:.2f} MB")
+    print(f"  Growth since warmup: {growth:.2f} MB")
     
     return {
         "start_mb": start_mem,
@@ -291,7 +291,7 @@ def generate_memory_report(results):
         f.write(f"Criteria: Growth < 50MB AND < 10%\n")
         f.write("=" * 60 + "\n")
     
-    print(f"\n✅ Report saved to {report_path}")
+    print(f"\n  Report saved to {report_path}")
     
     # Also generate a simple graph if matplotlib available
     try:
@@ -319,7 +319,7 @@ def generate_memory_report(results):
             
             output_path = os.path.join(ARTIFACTS_DIR, "memory_trend.png")
             plt.savefig(output_path, dpi=150, bbox_inches='tight')
-            print(f"✅ Memory trend graph saved to {output_path}")
+            print(f"  Memory trend graph saved to {output_path}")
             plt.close()
             
     except ImportError:
@@ -336,9 +336,9 @@ if __name__ == "__main__":
     # Check if psutil is available
     try:
         import psutil
-        print("✓ psutil available for accurate memory tracking\n")
+        print("  psutil available for accurate memory tracking\n")
     except ImportError:
-        print("⚠️ psutil not installed, using fallback memory tracking\n")
+        print("   psutil not installed, using fallback memory tracking\n")
         print("   Install with: pip install psutil\n")
     
     # Run lightweight by default (no API calls)

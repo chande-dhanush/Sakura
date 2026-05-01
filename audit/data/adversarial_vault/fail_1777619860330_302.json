@@ -1,0 +1,8 @@
+{
+  "id": "fail_1777619860330_302",
+  "input": "Turn 4: What is the latest update on the previous topic?",
+  "failure_type": "FailureType.BUDGET_FAILURE",
+  "trace": [],
+  "output": "{'content': \"I'm working too hard and hit a rate limit. Please try again in a moment.\", 'mode': 'DIRECT', 'tool_used': 'None', 'tools_used': [], 'metadata': {'status': 'error', 'execution_status': 'failed', 'tool_used': 'None', 'tools_used': [], 'error': 'budget_exceeded'}}",
+  "timestamp": 1777619860.3308349
+}

@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from sakura_assistant.core.executor import ToolExecutor
+from sakura_assistant.core.execution.executor import ToolExecutor
 from sakura_assistant.core.ephemeral_manager import get_ephemeral_manager, EphemeralManager
 from sakura_assistant.core.tools_libs.memory_tools import query_ephemeral
 from langchain_core.tools import tool

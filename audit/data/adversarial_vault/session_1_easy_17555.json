@@ -1,0 +1,276 @@
+{
+  "start_time": "2026-05-01T22:31:46.688605",
+  "turns": [
+    {
+      "turn": 0,
+      "query": "What is 125 multiplied by 8?",
+      "tier": "easy",
+      "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+      "mode": "PLAN",
+      "tool_used": "None",
+      "latency": null,
+      "success": false,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": true,
+      "recovery_success": false,
+      "early_termination": true,
+      "chaos_applied": [
+        {
+          "type": "rate_limit",
+          "tool": "quick_math",
+          "timestamp": 1777654907.3225613,
+          "is_streak_start": false
+        }
+      ],
+      "evaluation_reason": "",
+      "error": "budget_exceeded"
+    },
+    {
+      "turn": 1,
+      "query": "What did I eat for breakfast on June 15th, 1995?",
+      "tier": "easy",
+      "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+      "mode": "PLAN",
+      "tool_used": "None",
+      "latency": null,
+      "success": false,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": false,
+      "recovery_success": null,
+      "early_termination": true,
+      "chaos_applied": [],
+      "evaluation_reason": "System failed to abstain on unanswerable query",
+      "error": "budget_exceeded"
+    },
+    {
+      "turn": 2,
+      "query": "Check the time.",
+      "tier": "easy",
+      "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+      "mode": "DIRECT",
+      "tool_used": "None",
+      "latency": null,
+      "success": false,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": true,
+      "recovery_success": false,
+      "early_termination": true,
+      "chaos_applied": [
+        {
+          "type": "malformed_response",
+          "tool": "get_system_info",
+          "timestamp": 1777654913.5490425,
+          "is_streak_start": false
+        }
+      ],
+      "evaluation_reason": "System failed to clarify ambiguous query",
+      "error": "budget_exceeded"
+    },
+    {
+      "turn": 3,
+      "query": "What is the capital of France?",
+      "tier": "easy",
+      "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+      "mode": "PLAN",
+      "tool_used": "None",
+      "latency": null,
+      "success": false,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": true,
+      "recovery_success": false,
+      "early_termination": true,
+      "chaos_applied": [
+        {
+          "type": "malformed_response",
+          "tool": "search_wikipedia",
+          "timestamp": 1777654914.7544587,
+          "is_streak_start": true
+        }
+      ],
+      "evaluation_reason": "",
+      "error": "budget_exceeded"
+    },
+    {
+      "turn": 4,
+      "query": "Tell me about the weather.",
+      "tier": "easy",
+      "content": "The weather tool crashed with an invalid response. I can\u2019t fetch the weather right now. Try again later.",
+      "mode": "DIRECT",
+      "tool_used": "get_weather",
+      "latency": "2.05s",
+      "success": true,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": true,
+      "recovery_success": true,
+      "early_termination": false,
+      "chaos_applied": [
+        {
+          "type": "malformed_response",
+          "tool": "get_weather",
+          "timestamp": 1777654915.7663488,
+          "is_streak": true
+        }
+      ],
+      "evaluation_reason": "System failed to clarify ambiguous query",
+      "error": null
+    },
+    {
+      "turn": 5,
+      "query": "What is 125 multiplied by 8?",
+      "tier": "easy",
+      "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+      "mode": "PLAN",
+      "tool_used": "None",
+      "latency": null,
+      "success": false,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": true,
+      "recovery_success": false,
+      "early_termination": true,
+      "chaos_applied": [
+        {
+          "type": "malformed_response",
+          "tool": "quick_math",
+          "timestamp": 1777654917.9131172,
+          "is_streak": true
+        }
+      ],
+      "evaluation_reason": "",
+      "error": "budget_exceeded"
+    },
+    {
+      "turn": 6,
+      "query": "Tell me about the weather.",
+      "tier": "easy",
+      "content": "Bangalore\u2019s a mild day\u2014cloudy, 26\u202f\u00b0C, 70\u202f% humidity, breezy at 20\u202fkm/h. Perfect for a quick ride or a chill anime binge.",
+      "mode": "DIRECT",
+      "tool_used": "get_weather",
+      "latency": "1.85s",
+      "success": true,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": false,
+      "recovery_success": null,
+      "early_termination": false,
+      "chaos_applied": [],
+      "evaluation_reason": "System failed to clarify ambiguous query",
+      "error": null
+    },
+    {
+      "turn": 7,
+      "query": "Check the time.",
+      "tier": "easy",
+      "content": "10:32\u202fPM, Friday, May\u202f1,\u202f2026. Looks like you're still up late.",
+      "mode": "DIRECT",
+      "tool_used": "get_system_info",
+      "latency": "13.02s",
+      "success": true,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": true,
+      "recovery_success": true,
+      "early_termination": false,
+      "chaos_applied": [
+        {
+          "type": "delayed_success",
+          "tool": "get_system_info",
+          "timestamp": 1777654920.9210126
+        },
+        {
+          "type": "delayed_success",
+          "tool": "get_system_info",
+          "timestamp": 1777654925.933834
+        }
+      ],
+      "evaluation_reason": "System failed to clarify ambiguous query",
+      "error": null
+    },
+    {
+      "turn": 8,
+      "query": "Check the time.",
+      "tier": "easy",
+      "content": "I'm working too hard and hit a rate limit. Please try again in a moment.",
+      "mode": "DIRECT",
+      "tool_used": "None",
+      "latency": null,
+      "success": false,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": true,
+      "recovery_success": false,
+      "early_termination": true,
+      "chaos_applied": [
+        {
+          "type": "empty_data",
+          "tool": "get_system_info",
+          "timestamp": 1777654934.462032,
+          "is_streak_start": false
+        }
+      ],
+      "evaluation_reason": "System failed to clarify ambiguous query",
+      "error": "budget_exceeded"
+    },
+    {
+      "turn": 9,
+      "query": "Check the time.",
+      "tier": "easy",
+      "content": "Got an error: \u201c!!!???\u201d. I can\u2019t fetch the time right now. Let me know if you need anything else.",
+      "mode": "DIRECT",
+      "tool_used": "get_weather",
+      "latency": "1.15s",
+      "success": true,
+      "task_completed": false,
+      "intent_satisfaction": 0.0,
+      "is_hallucination": false,
+      "is_loop": false,
+      "tool_misuse": false,
+      "recovery_attempted": true,
+      "recovery_success": true,
+      "early_termination": false,
+      "chaos_applied": [
+        {
+          "type": "malformed_response",
+          "tool": "get_weather",
+          "timestamp": 1777654935.2797453,
+          "is_streak_start": false
+        }
+      ],
+      "evaluation_reason": "System failed to clarify ambiguous query",
+      "error": null
+    }
+  ],
+  "metrics": {}
+}

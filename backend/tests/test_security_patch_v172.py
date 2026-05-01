@@ -43,10 +43,10 @@ def test_path_traversal_protection():
                 lower_res = res.lower()
                 assert "access denied" in lower_res or "validation failed" in lower_res or "security check error" in lower_res or "blocked dangerous path" in lower_res, f"file_{name} failed to block: {path} -> {res}"
         except AssertionError as e:
-            print(f"❌ FAILURE: {e}")
+            print(f"  FAILURE: {e}")
             raise e
     
-    print("✅ Path traversal protection: PASS")
+    print("  Path traversal protection: PASS")
 
 
 def test_folder_sanitization():
@@ -63,14 +63,14 @@ def test_folder_sanitization():
     
     for input_folder, expected in tests:
         result = _sanitize_folder_name(input_folder)
-        assert result == expected, f"Sanitization failed: {input_folder} → {result} (expected {expected})"
+        assert result == expected, f"Sanitization failed: {input_folder}   {result} (expected {expected})"
     
-    print("✅ Folder sanitization: PASS")
+    print("  Folder sanitization: PASS")
 
 
 def test_websocket_origin_validation():
     """Test WebSocket origin enforcement (manual verification required)."""
-    print("⚠️ WebSocket validation requires manual testing:")
+    print("   WebSocket validation requires manual testing:")
     print("1. Try connecting with empty origin (should reject)")
     print("2. Try connecting with 'http://evil.com' (should reject)")
     print("3. Try connecting with 'tauri://localhost' (should accept)")
@@ -90,7 +90,7 @@ def test_validate_path_is_used():
         source = inspect.getsource(func.func)
         assert "validate_path" in source, f"{func.func.__name__} doesn't call validate_path!"
     
-    print("✅ validate_path usage: PASS")
+    print("  validate_path usage: PASS")
 
 def test_validate_path_direct():
     """Debug: Test validate_path directly."""
@@ -102,12 +102,12 @@ def test_validate_path_direct():
     path = "C:/Windows/System32/config/SAM"
     try:
         validate_path(path)
-        print(f"❌ validate_path FAILED to raise for {path}")
+        print(f"  validate_path FAILED to raise for {path}")
         assert False, f"validate_path accepted {path}"
     except SecurityError as e:
-        print(f"✅ validate_path correctly raised: {e}")
+        print(f"  validate_path correctly raised: {e}")
     except Exception as e:
-        print(f"❓ validate_path raised unexpected: {type(e)} {e}")
+        print(f"  validate_path raised unexpected: {type(e)} {e}")
 
 if __name__ == "__main__":
     print("=" * 60)
@@ -122,10 +122,10 @@ if __name__ == "__main__":
         test_websocket_origin_validation()
         
         print("\n" + "=" * 60)
-        print("✅ ALL AUTOMATED TESTS PASSED")
-        print("⚠️ Manually verify WebSocket tests above")
+        print("  ALL AUTOMATED TESTS PASSED")
+        print("   Manually verify WebSocket tests above")
         print("=" * 60)
         
     except AssertionError as e:
-        print(f"\n❌ TEST FAILED: {e}")
+        print(f"\n  TEST FAILED: {e}")
         sys.exit(1)

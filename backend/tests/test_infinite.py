@@ -18,7 +18,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sakura_assistant.core.llm import SmartAssistant
-from sakura_assistant.core.broadcaster import get_broadcaster
+from sakura_assistant.core.infrastructure.broadcaster import get_broadcaster
 
 async def run_infinite_test():
     print(" Starting 'Infinite' Test (V12)...")
@@ -28,9 +28,9 @@ async def run_infinite_test():
         # Filter for key events to keep log clean
         if event in ["thinking", "tool_start", "rate_limit", "pacing", "cache_hit"]:
             emoji = ""
-            if event == "pacing": emoji = "⏳"
-            if event == "cache_hit": emoji = "⚡"
-            if event == "tool_start": emoji = "️"
+            if event == "pacing": emoji = " "
+            if event == "cache_hit": emoji = " "
+            if event == "tool_start": emoji = " "
             if event == "rate_limit": emoji = ""
             
             print(f"{emoji} [{event.upper()}] {data}")

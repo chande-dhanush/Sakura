@@ -25,7 +25,7 @@ try:
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
-    print("⚠️ FAISS/SentenceTransformers not available. Using basic memory.")
+    print("   FAISS/SentenceTransformers not available. Using basic memory.")
 
 # === CONFIGURATION ===
 EMBEDDING_MODEL_NAME = 'all-MiniLM-L6-v2'
@@ -211,7 +211,7 @@ class VectorMemoryStore:
                             print(f" Loaded FAISS index with MMAP ({self.faiss_index.ntotal} vectors)")
                         except Exception as e:
                             logger.warning(f"FAISS mmap failed, falling back to normal read: {e}")
-                            print(f"⚠️ FAISS mmap failed, using normal read: {e}")
+                            print(f"   FAISS mmap failed, using normal read: {e}")
                             self.faiss_index = faiss.read_index(str(FAISS_INDEX_PATH))
                             self._mmap_active = False
                     else:
@@ -235,7 +235,7 @@ class VectorMemoryStore:
                     if not self._mmap_active:
                         print(f" Loaded FAISS index with {self.faiss_index.ntotal} vectors")
                 except Exception as e:
-                    print(f"⚠️ Error loading FAISS index: {e}. Creating new one.")
+                    print(f"   Error loading FAISS index: {e}. Creating new one.")
                     self._create_new_index()
             else:
                 self._create_new_index()
@@ -312,10 +312,10 @@ class VectorMemoryStore:
                 
                 print(f" In-memory history: {len(self.conversation_history)} messages")
             except Exception as e:
-                print(f"⚠️ Error loading conversation: {e}")
+                print(f"   Error loading conversation: {e}")
                 self.conversation_history = []
         else:
-            print(f"⚠️ History file NOT FOUND at {CONVERSATION_FILE}")
+            print(f"   History file NOT FOUND at {CONVERSATION_FILE}")
     
     def get_full_history(self) -> List[Dict]:
         """Load full conversation history from disk (for export/review)."""
@@ -395,7 +395,7 @@ class VectorMemoryStore:
                 last_msg = self.conversation_history[-1]
                 if (last_msg.get('role') == msg.get('role') and 
                     last_msg.get('content') == msg.get('content')):
-                    print(f"⚠️ [DEDUP] Skipping duplicate {msg.get('role')} message")
+                    print(f"   [DEDUP] Skipping duplicate {msg.get('role')} message")
                     return  # Skip duplicate
             
             log_mem("STORE.append()", msg)
@@ -585,7 +585,7 @@ class VectorMemoryStore:
         for idx, text in enumerate(new_texts):
             self._update_inverted_index(text, idx)
             
-        print(f"️ Deleted {deleted_count} memories containing '{keyword}'")
+        print(f"  Deleted {deleted_count} memories containing '{keyword}'")
         return deleted_count
 
     def clear_all_memory(self):
@@ -640,7 +640,7 @@ def save_conversation_async(history: List[Dict]):
         try:
             save_conversation(history)
         except Exception as e:
-            print(f"⚠️ Async save failed: {e}")
+            print(f"   Async save failed: {e}")
     
     threading.Thread(target=_save, daemon=True).start()
 

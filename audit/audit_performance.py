@@ -41,7 +41,7 @@ def audit_guard():
 audit_guard()
 
 """
-Sakura V19.5 — Performance Audit Script
+Sakura V19.5   Performance Audit Script
 Checks: caching strategy, rate limiting, and execution timeouts
 """
 import os, json

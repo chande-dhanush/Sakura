@@ -80,7 +80,7 @@ class SmartAssistant:
                     f"Please check your provider keys and stage-specific model settings."
                 )
         except RuntimeError as config_err:
-             print(f"❌ [CRITICAL] SmartAssistant configuration failed: {config_err}")
+             print(f"  [CRITICAL] SmartAssistant configuration failed: {config_err}")
              # We re-raise to prevent starting in a broken state
              raise
         
@@ -161,7 +161,7 @@ class SmartAssistant:
         V17: No more split-brain architecture. Sync just wraps async.
         All execution semantics unified through dispatcher.
         """
-        print(f" [LLM] SmartAssistant.run() → delegating to arun()")
+        print(f" [LLM] SmartAssistant.run()   delegating to arun()")
         
         # V17: Force through async path (unified semantics)
         import asyncio
@@ -170,7 +170,7 @@ class SmartAssistant:
         except RuntimeError as e:
             # Already in event loop (e.g., Jupyter notebook)
             if "asyncio.run() cannot be called from a running event loop" in str(e):
-                print("⚠️ [LLM] Already in event loop, using get_event_loop().run_until_complete()")
+                print("   [LLM] Already in event loop, using get_event_loop().run_until_complete()")
                 loop = asyncio.get_event_loop()
                 return loop.run_until_complete(self.arun(user_input, history, image_data))
             raise
@@ -229,7 +229,7 @@ class SmartAssistant:
                     with open(settings_path, "r", encoding="utf-8") as f:
                         user_settings = json.load(f)
                 except Exception as e:
-                    print(f"⚠️ [Settings] Load failed: {e}")
+                    print(f"   [Settings] Load failed: {e}")
 
             # 1. Identity Override
             sakura_name = user_settings.get("sakura_name", "Sakura")
@@ -271,17 +271,17 @@ class SmartAssistant:
                 if isinstance(resolution.resolved, EntityNode):
                     reference_context = (
                         f"[REFERENCE RESOLVED] \"{user_input}\" refers to: "
-                        f"{resolution.resolved.name} — {resolution.resolved.summary or 'No description'} "
+                        f"{resolution.resolved.name}   {resolution.resolved.summary or 'No description'} "
                         f"(confidence: {resolution.confidence:.0%})"
                     )
                 elif isinstance(resolution.resolved, ActionNode):
                     reference_context = (
                         f"[REFERENCE RESOLVED] \"{user_input}\" refers to previous action: "
-                        f"{resolution.resolved.tool or 'chat'} — {resolution.resolved.summary or 'No description'} "
+                        f"{resolution.resolved.tool or 'chat'}   {resolution.resolved.summary or 'No description'} "
                         f"(confidence: {resolution.confidence:.0%})"
                     )
                 if resolution.ban_external_search:
-                    reference_context += " [DO NOT search externally for this — use graph data]"
+                    reference_context += " [DO NOT search externally for this   use graph data]"
                 if resolution.action:
                     reference_context += f" [Suggested action: {resolution.action}]"
                 
@@ -333,7 +333,7 @@ class SmartAssistant:
             exec_result = None
             
             if route_result.needs_tools or route_result.tool_hint:
-                print(f"⚙️ V17 Dispatch Phase: {route_result.classification}")
+                print(f"   V17 Dispatch Phase: {route_result.classification}")
                 state.record_llm_call("execution")
                 
                 with span("Executor"):
@@ -374,7 +374,7 @@ class SmartAssistant:
                                  success=True
                              )
                          except Exception as wg_err:
-                             print(f"⚠️ World Graph recording failed: {wg_err}")
+                             print(f"   World Graph recording failed: {wg_err}")
                 
                 # V18 FIX-05: Plan Verification
                 if route_result.classification == "PLAN" and exec_result:
@@ -433,7 +433,8 @@ class SmartAssistant:
                 current_mood=resp_ctx.get("current_mood", "Neutral"),
                 study_mode=req_state.study_mode,
                 data_reasoning=has_ephemeral,
-                session_summary=resp_ctx.get("summary_context", "")
+                session_summary=resp_ctx.get("summary_context", ""),
+                requires_facts=(route_result.classification in ("DIRECT", "PLAN"))
             )
             
             with span("Responder"):
@@ -555,7 +556,7 @@ class SmartAssistant:
         finally:
             # V17: Guaranteed emission safety net
             if not emitter.was_emitted:
-                print(f"⚠️ [V17] Response not emitted - using fallback")
+                print(f"   [V17] Response not emitted - using fallback")
                 await emitter.emit(
                     "I processed your request but encountered an issue. Please try again.",
                     {"status": "unknown"}

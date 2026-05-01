@@ -8,8 +8,8 @@ Usage:
     from sakura_assistant.utils.progress_emitter import get_progress_emitter
     
     emitter = get_progress_emitter()
-    emitter.emit("Tool:web_search", "PROGRESS", "🔍 Searching web...")
-    emitter.emit("Tool:web_search", "SUCCESS", "✅ Found 5 results")
+    emitter.emit("Tool:web_search", "PROGRESS", "  Searching web...")
+    emitter.emit("Tool:web_search", "SUCCESS", "  Found 5 results")
 """
 
 import time
@@ -67,7 +67,7 @@ class ProgressEmitter:
         Args:
             stage: Component reporting progress (e.g., "Tool:web_search", "Executor")
             status: Event type - "PROGRESS", "INFO", "WARNING", "SUCCESS", "ERROR"
-            message: Human-readable status message (e.g., "🔍 Searching...")
+            message: Human-readable status message (e.g., "  Searching...")
             metadata: Optional dict with extra data (e.g., {"result_count": 5})
         """
         if not self._enabled:
@@ -99,24 +99,24 @@ class ProgressEmitter:
                 }
             )
         except Exception as e:
-            print(f"⚠️ [ProgressEmitter] FlightRecorder log failed: {e}")
+            print(f"   [ProgressEmitter] FlightRecorder log failed: {e}")
         
         # Also call direct callback if set (for SSE bypass)
         if self._callback:
             try:
                 self._callback(event)
             except Exception as e:
-                print(f"⚠️ [ProgressEmitter] Callback failed: {e}")
+                print(f"   [ProgressEmitter] Callback failed: {e}")
         
         # Console output for debugging
         status_icons = {
-            "PROGRESS": "⏳",
-            "INFO": "ℹ️",
-            "WARNING": "⚠️",
-            "SUCCESS": "✅",
-            "ERROR": "❌"
+            "PROGRESS": " ",
+            "INFO": "  ",
+            "WARNING": "  ",
+            "SUCCESS": " ",
+            "ERROR": " "
         }
-        icon = status_icons.get(status, "📡")
+        icon = status_icons.get(status, " ")
         print(f"{icon} [Progress] {stage}: {message}")
     
     @contextmanager
@@ -138,7 +138,7 @@ class ProgressEmitter:
             self.emit(
                 stage=stage,
                 status="ERROR",
-                message=f"❌ Failed: {str(e)[:100]}",
+                message=f"  Failed: {str(e)[:100]}",
                 metadata={"duration_ms": duration_ms, "error": str(e)}
             )
             raise
@@ -149,7 +149,7 @@ class ProgressEmitter:
         self.emit(
             stage=f"Tool:{tool_name}",
             status="PROGRESS",
-            message=f"🔧 Executing {tool_name}..." + (f" ({args_preview}...)" if args_preview else ""),
+            message=f"  Executing {tool_name}..." + (f" ({args_preview}...)" if args_preview else ""),
             metadata={"tool": tool_name, "args": args}
         )
     
@@ -176,7 +176,7 @@ class ProgressEmitter:
         self.emit(
             stage=f"Tool:{tool_name}",
             status="ERROR",
-            message=f"❌ {error}",
+            message=f"  {error}",
             metadata={"error": error, **(metadata or {})}
         )
 

@@ -23,12 +23,12 @@ sys.modules['AppOpener'] = MagicMock()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sakura_assistant.core.llm import SmartAssistant
-from sakura_assistant.core.broadcaster import get_broadcaster
+from sakura_assistant.core.infrastructure.broadcaster import get_broadcaster
 from sakura_assistant.core.infrastructure.container import get_container
 from sakura_assistant.core.tools_libs.research import SmartResearcher
 
 async def audit_v12():
-    print("️ STARTING V12 FINAL AUDIT ️")
+    print("  STARTING V12 FINAL AUDIT  ")
     print("===============================")
     
     # Setup Event Listener (Mocking WebSocket)
@@ -75,7 +75,7 @@ async def audit_v12():
     try:
         await assistant.arun(query, [])
     except Exception as e:
-        print(f"   ⚠️ Pipeline Error: {e}")
+        print(f"      Pipeline Error: {e}")
         
     # Verify Events
     event_types = [e["event"] for e in events]
@@ -94,7 +94,7 @@ async def audit_v12():
     if pacing_events:
         print(f"    PASS: 'Wait & See' Pacing Triggered ({len(pacing_events)} pauses)")
     else:
-        print("   ℹ️ Note: No Pacing events (Single step execution?) - Accepted if single step.")
+        print("      Note: No Pacing events (Single step execution?) - Accepted if single step.")
 
     # ---------------------------------------------------------
     # TEST 2: Smart Cache Precision
@@ -127,7 +127,7 @@ async def audit_v12():
     if not cache_hit_events:
         print(f"    PASS: Cache Miss (Duration: {t1-t0:.2f}s)")
     else:
-        print("   ⚠️ WARN: Unexpected Cache Hit on Step A")
+        print("      WARN: Unexpected Cache Hit on Step A")
 
     # Step B: Hit
     print("   Step B: Variant Query (Expect Hit)...")

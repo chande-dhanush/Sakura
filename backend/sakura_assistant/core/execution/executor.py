@@ -39,9 +39,9 @@ if TYPE_CHECKING:
     from .context import ExecutionContext
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # SECURITY LAYER
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class SecurityError(Exception):
     """Raised when a security policy is violated."""
@@ -73,7 +73,7 @@ def _sanitize_path(path: str) -> str:
     import re
     for pattern in DANGEROUS_PATTERNS:
         if re.search(pattern, path, re.IGNORECASE):
-            print(f"⚠️ [Security] Blocked path traversal attempt: {path}")
+            print(f"   [Security] Blocked path traversal attempt: {path}")
             raise SecurityError(f"Blocked dangerous path: {path[:50]}")
             
     # 3. Secure normalization
@@ -105,9 +105,9 @@ def _validate_tool_input(tool_name: str, args: Dict[str, Any]) -> bool:
     return True
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # EXECUTION POLICY (Behavior Rules)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class ExecutionPolicy:
     """
@@ -157,9 +157,9 @@ class ExecutionPolicy:
         return any(ind in output_lower for ind in ExecutionPolicy.FAILURE_INDICATORS)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # OUTPUT HANDLER (Pruning & Summarization)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class OutputHandler:
     """
@@ -181,7 +181,7 @@ class OutputHandler:
         if len(output) <= threshold or not self.ephemeral_manager:
             return output
         
-        print(f"️ [OutputHandler] Intercepting large output ({len(output)} chars)")
+        print(f"  [OutputHandler] Intercepting large output ({len(output)} chars)")
         
         try:
             eph_id = self.ephemeral_manager.ingest_text(output, source_tool=tool_name)
@@ -195,11 +195,11 @@ class OutputHandler:
                     f"to retrieve specific details/sections."
                 )
             else:
-                print(f"⚠️ Ephemeral ingest failed: {eph_id}")
+                print(f"   Ephemeral ingest failed: {eph_id}")
                 return output
                 
         except Exception as e:
-            print(f"⚠️ Ephemeral intercept error: {e}")
+            print(f"   Ephemeral intercept error: {e}")
             return output
     
     def prune(self, output: str, max_chars: int = 1000) -> str:
@@ -303,9 +303,9 @@ Do NOT add information not present in the output."""
             return None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # TOOL RUNNER (Single Tool Execution)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 @dataclass
 class ToolRunResult:
@@ -326,6 +326,18 @@ class ToolRunner:
     def __init__(self, tool_map: Dict[str, Any], policy: ExecutionPolicy):
         self.tool_map = tool_map
         self.policy = policy
+
+    def _is_nonsense_output(self, output: str) -> bool:
+        """Detect obvious nonsense or malformed structure."""
+        if not output or not output.strip():
+            return True
+        # Obvious nonsense: repeated characters, very short random strings
+        if len(output.strip()) < 2:
+            return True
+        # Check for common garbage patterns (simplified)
+        if re.search(r'(.)\1{10,}', output): # 10+ repeated chars
+            return True
+        return False
     
     def run(self, tool_name: str, args: Dict[str, Any], user_input: str = "") -> ToolRunResult:
         """Execute a tool synchronously with fallback recovery."""
@@ -349,6 +361,15 @@ class ToolRunner:
             
             result = self.tool_map[tool_name].invoke(args)
             result_str = str(result)
+            
+            # V19.6: Sanity Check & Retry ONCE
+            if self._is_nonsense_output(result_str):
+                print(f"   [Sanity] Nonsense detected from {tool_name}, retrying once...")
+                result = self.tool_map[tool_name].invoke(args)
+                result_str = str(result)
+                if self._is_nonsense_output(result_str):
+                    print(f"   [Sanity] Still nonsense. Flagging LOW_CONFIDENCE.")
+                    result_str = f"[LOW_CONFIDENCE] The tool returned an invalid response: {result_str[:100]}"
             
             # Check for soft failure
             if self.policy.is_soft_failure(result_str, tool_name):
@@ -408,6 +429,18 @@ class ToolRunner:
             
             result_str = str(result)
             
+            # V19.6: Async Sanity Check & Retry ONCE
+            if self._is_nonsense_output(result_str):
+                print(f"   [Sanity] Async nonsense from {tool_name}, retrying once...")
+                if hasattr(tool_instance, 'ainvoke'):
+                    result = await tool_instance.ainvoke(args)
+                else:
+                    result = await asyncio.to_thread(tool_instance.invoke, args)
+                result_str = str(result)
+                if self._is_nonsense_output(result_str):
+                    print(f"   [Sanity] Still nonsense. Flagging LOW_CONFIDENCE.")
+                    result_str = f"[LOW_CONFIDENCE] The tool returned an invalid response: {result_str[:100]}"
+            
             # Check for soft failure
             if self.policy.is_soft_failure(result_str, tool_name):
                 fallback_result = await self._atry_fallback(tool_name, args, user_input)
@@ -447,7 +480,7 @@ class ToolRunner:
         if not search_term:
             return None
         
-        print(f" [Recovery] {tool_name} → {fallback_tool} ('{search_term}')")
+        print(f" [Recovery] {tool_name}   {fallback_tool} ('{search_term}')")
         
         fallback_args = self._build_fallback_args(fallback_tool, search_term)
         
@@ -460,7 +493,7 @@ class ToolRunner:
                 original_tool=tool_name
             )
         except Exception as e:
-            print(f"⚠️ Fallback also failed: {e}")
+            print(f"   Fallback also failed: {e}")
             return None
     
     async def _atry_fallback(self, tool_name: str, args: Dict, user_input: str) -> Optional[ToolRunResult]:
@@ -474,7 +507,7 @@ class ToolRunner:
         if not search_term:
             return None
         
-        print(f" [Async Recovery] {tool_name} → {fallback_tool} ('{search_term}')")
+        print(f" [Async Recovery] {tool_name}   {fallback_tool} ('{search_term}')")
         
         fallback_args = self._build_fallback_args(fallback_tool, search_term)
         
@@ -487,7 +520,7 @@ class ToolRunner:
                 original_tool=tool_name
             )
         except Exception as e:
-            print(f"⚠️ Async fallback also failed: {e}")
+            print(f"   Async fallback also failed: {e}")
             return None
     
     def _extract_search_term(self, tool_name: str, args: Dict, user_input: str) -> str:
@@ -536,13 +569,13 @@ def _is_empty_or_failed(output: str) -> bool:
     return any(phrase in output_lower for phrase in failure_phrases)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # REACT LOOP (Iteration Controller)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class ReActLoop:
     """
-    Controls Plan → Act → Observe iteration.
+    Controls Plan   Act   Observe iteration.
     
     Single Responsibility: Orchestrate the loop, not the details.
     """
@@ -597,16 +630,16 @@ class ReActLoop:
                 # V18 BUG-07: If no steps in first iteration, it's a planning failure
                 if iteration == 0:
                     status_msg = "Planning failed: No tools selected for action request"
-                    print(f"❌ [ReActLoop] {status_msg}")
+                    print(f"  [ReActLoop] {status_msg}")
                     res = ExecutionResult.error(status_msg)
                     return res
                 
                 error = plan_result.get("error")
                 if error:
-                    print(f"❌ [ReActLoop] Planner error: {error}")
+                    print(f"  [ReActLoop] Planner error: {error}")
                     res = ExecutionResult.error(f"Planning failed: {error}")
                     return res
-                print("⏹️ [ReActLoop] No more steps - complete")
+                print("   [ReActLoop] No more steps - complete")
                 break
             
             # 2. ACT
@@ -616,6 +649,13 @@ class ReActLoop:
             all_tool_messages.extend(exec_result.tool_messages)
             if exec_result.outputs:
                 all_outputs.append(exec_result.outputs)
+            
+            # V19.6: Stop loop on low confidence
+            if exec_result.outputs and "[LOW_CONFIDENCE]" in exec_result.outputs:
+                print(f" [STOP] Sync Low confidence detected - terminating loop")
+                final_tool_used = exec_result.tool_used
+                final_last_result = exec_result.last_result
+                break
             
             final_tool_used = exec_result.tool_used
             final_last_result = exec_result.last_result
@@ -635,7 +675,7 @@ class ReActLoop:
                 )
                 available_tools = expanded if expanded else all_tools_list
                 cascade_activated = True
-                print(f"🔄 [Cascade SYNC] Tier-1 empty/failed → expanded to {len(available_tools)} tools")
+                print(f"  [Cascade SYNC] Tier-1 empty/failed   expanded to {len(available_tools)} tools")
             
             # Terminal actions should end the loop
             if self.policy.is_terminal(final_tool_used) and exec_result.status == ExecutionStatus.SUCCESS:
@@ -694,12 +734,20 @@ class ReActLoop:
         prev_hindsight = None # FIX-4
         executed_tools = []   # BUG-02
         
+        # --- PHASE 1-2: CONTROL LAYER ---
+        from collections import Counter
+        tool_attempts = Counter()
+        tool_call_history = set()  # MD5 hashes for loop detection
+        prev_output_len = 0
+        enable_control = os.getenv("ENABLE_CONTROL_LAYER", "false").lower() == "true"
+        # -------------------------------
+        
         print(f" [ReActLoop] Starting async for: {user_input[:50]}...")
         
         for iteration in range(self.max_iterations):
             # V19: CHECK CANCELLATION before each iteration
             if is_cancelled():
-                print(f"🛑 [ReActLoop] Generation cancelled by user at iteration {iteration + 1}")
+                print(f"  [ReActLoop] Generation cancelled by user at iteration {iteration + 1}")
                 return ExecutionResult.cancelled(
                     outputs="\n".join(all_outputs) if all_outputs else "",
                     tool_messages=all_tool_messages
@@ -708,7 +756,7 @@ class ReActLoop:
             # V17: CHECK BUDGET & LLM CALL LIMIT BEFORE EACH ITERATION
             if ctx:
                 if ctx.is_expired():
-                    print(f"⏱️ [ReActLoop] Budget exceeded ({ctx.elapsed_ms():.0f}ms / {ctx.budget_ms}ms)")
+                    print(f"   [ReActLoop] Budget exceeded ({ctx.elapsed_ms():.0f}ms / {ctx.budget_ms}ms)")
                     return ExecutionResult.timeout(
                         outputs="\n".join(all_outputs) if all_outputs else "",
                         tool_messages=all_tool_messages
@@ -717,7 +765,7 @@ class ReActLoop:
                 # V18 FIX-08: Check LLM call limit (Plan + optional Verify)
                 # We check BEFORE we make the next planner call
                 if ctx.llm_call_count >= ctx.max_llm_calls:
-                    print(f"🛑 [ReActLoop] LLM call limit ({ctx.max_llm_calls}) reached at iteration {iteration + 1}")
+                    print(f"  [ReActLoop] LLM call limit ({ctx.max_llm_calls}) reached at iteration {iteration + 1}")
                     return ExecutionResult.timeout(
                         outputs="\n".join(all_outputs) if all_outputs else "",
                         tool_messages=all_tool_messages
@@ -729,7 +777,7 @@ class ReActLoop:
             try:
                 # V18: Record planner call in context and check limit
                 if ctx and not ctx.record_and_check_llm_call():
-                    print(f"🛑 [ReActLoop] LLM call limit ({ctx.max_llm_calls}) reached during iteration {iteration + 1}")
+                    print(f"  [ReActLoop] LLM call limit ({ctx.max_llm_calls}) reached during iteration {iteration + 1}")
                     return ExecutionResult.timeout(
                         outputs="\n".join(all_outputs) if all_outputs else "",
                         tool_messages=all_tool_messages
@@ -772,7 +820,7 @@ class ReActLoop:
                     )
             
             except asyncio.TimeoutError:
-                print(f"⏱️ [ReActLoop] Planner timeout at iteration {iteration + 1}")
+                print(f"   [ReActLoop] Planner timeout at iteration {iteration + 1}")
                 return ExecutionResult.timeout(
                     outputs="\n".join(all_outputs) if all_outputs else "",
                     tool_messages=all_tool_messages
@@ -784,20 +832,57 @@ class ReActLoop:
                 # V18 BUG-07: If no steps in first iteration, it's a planning failure
                 if iteration == 0:
                     status_msg = "Planning failed: No tools selected for action request (async)"
-                    print(f"❌ [ReActLoop] {status_msg}")
+                    print(f"  [ReActLoop] {status_msg}")
                     res = ExecutionResult.error(status_msg)
                     if ctx: res.last_result = {"mode": ctx.mode.value}
                     return res
 
                 error = plan_result.get("error")
                 if error:
-                    print(f"❌ [ReActLoop] Planner error: {error}")
+                    print(f"  [ReActLoop] Planner error: {error}")
                     res = ExecutionResult.error(f"Planning failed: {error}")
                     if ctx: res.last_result = {"mode": ctx.mode.value}
                     return res
-                print("⏹️ [ReActLoop] No more steps - complete")
+                print("   [ReActLoop] No more steps - complete")
                 break
             
+            # -------------------------------------------------------------------------
+            # PHASE 1: LOOP GUARD & PROGRESS DETECTION
+            # -------------------------------------------------------------------------
+            if enable_control:
+                # 1. Loop Guard (Identical calls)
+                import json
+                plan_str = json.dumps(steps, sort_keys=True)
+                plan_hash = hashlib.md5(plan_str.encode()).hexdigest()
+                
+                if plan_hash in tool_call_history:
+                    print(f" [STOP] Catastrophic loop detected: Identical plan repeated at iteration {iteration + 1}")
+                    return ExecutionResult.error(
+                        message=f"Catastrophic loop detected: Identical plan repeated. Last output: {''.join(all_outputs[-1:])}",
+                        mode="PLAN"
+                    )
+                tool_call_history.add(plan_hash)
+
+                # 2. Progress Detection
+                current_output_len = sum(len(o) for o in all_outputs)
+                if iteration > 1 and current_output_len == prev_output_len:
+                    print(f" [STOP] Progress stagnated at iteration {iteration + 1} - terminating loop")
+                    break
+                prev_output_len = current_output_len
+
+                # 3. Max Attempts per Tool
+                for step in steps:
+                    t_name = step.get("tool")
+                    if t_name:
+                        tool_attempts[t_name] += 1
+                        if tool_attempts[t_name] > 1: # Strict 1-attempt limit
+                            print(f" [STOP] Maximum attempts reached for tool: {t_name}")
+                            return ExecutionResult.error(
+                                message=f"Maximum attempts reached for tool: {t_name}. Please re-phrase your request.",
+                                mode="EXEC"
+                            )
+            # -------------------------------------------------------------------------
+
             # 2. ACT
             exec_result = await self._aexecute_steps(steps, user_input, state, trace_id=ctx.request_id if ctx else None)
             
@@ -805,13 +890,29 @@ class ReActLoop:
             all_tool_messages.extend(exec_result.tool_messages)
             if exec_result.outputs:
                 all_outputs.append(exec_result.outputs)
+
+            # V19.6: Stop loop on low confidence (Async)
+            if exec_result.outputs and "[LOW_CONFIDENCE]" in exec_result.outputs:
+                print(f" [STOP] Async Low confidence detected - terminating loop")
+                final_tool_used = exec_result.tool_used
+                final_last_result = exec_result.last_result
+                break
+            
+            # --- PHASE 2: RATE LIMIT EARLY EXIT ---
+            if exec_result.status == ExecutionStatus.RATE_LIMITED:
+                print(f" [WARN] [ReActLoop] Rate limit detected for {exec_result.tool_used} - aborting loop early")
+                return ExecutionResult.rate_limited(
+                    outputs="\n".join(all_outputs),
+                    tool_messages=all_tool_messages
+                )
+            # --------------------------------------
             
             final_tool_used = exec_result.tool_used
             final_last_result = exec_result.last_result
             
             # BUG-02: minimal track tool name on success
             if exec_result.status == ExecutionStatus.SUCCESS:
-                executed_tools.append(f"{final_tool_used} ✓")
+                executed_tools.append(f"{final_tool_used}  ")
             
             # V18 FIX-04: Search Cascade Activation
             TIER_1_SEARCH_TOOLS = {"search_wikipedia", "search_arxiv"}
@@ -829,7 +930,7 @@ class ReActLoop:
                 )
                 available_tools = expanded if expanded else all_tools_list
                 cascade_activated = True
-                print(f"🔄 [Cascade] Tier-1 empty/failed → expanded toolset to {len(available_tools)} tools")
+                print(f"  [Cascade] Tier-1 empty/failed   expanded toolset to {len(available_tools)} tools")
             
             # FIX-4: Update hindsight for next iteration if not complete
             if exec_result.status != ExecutionStatus.SUCCESS:
@@ -883,7 +984,7 @@ class ReActLoop:
             tool_args = step.get("args", {})
             call_id = step.get("tool_call_id", f"call_{step.get('id', 0)}")
             
-            print(f"▶️ Executing Step {step.get('id')}: {tool_name} {tool_args}")
+            print(f"   Executing Step {step.get('id')}: {tool_name} {tool_args}")
             
             # Run tool
             run_result = self.tool_runner.run(tool_name, tool_args, user_input)
@@ -980,7 +1081,7 @@ class ReActLoop:
                 content=f"Step {i+1}/{len(steps)}: {tool_name}({tool_args})",
             )
             
-            print(f"▶️ Async Executing Step {step.get('id')}: {tool_name} {tool_args}")
+            print(f"   Async Executing Step {step.get('id')}: {tool_name} {tool_args}")
             
             # Pacing between steps
             if step.get('id', 0) > 1:
@@ -1082,9 +1183,9 @@ class ReActLoop:
         )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 # TOOL EXECUTOR (Facade)
-# ═══════════════════════════════════════════════════════════════════════════════
+#                                                                                
 
 class ToolExecutor:
     """

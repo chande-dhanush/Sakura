@@ -122,7 +122,7 @@ def _sanitize_code(code: str) -> str:
     for pattern in dangerous_patterns:
         if pattern in code:
             # Log but don't block - Docker sandbox is the real protection
-            print(f"⚠️ Code contains potentially dangerous pattern: {pattern}")
+            print(f"   Code contains potentially dangerous pattern: {pattern}")
     
     return code
 
@@ -292,7 +292,7 @@ Use execute_python() to run code."""
         return " Docker is not available. Please start Docker Desktop."
     
     else:
-        return "⚠️ Sandbox image not ready. It will be built on first use."
+        return "   Sandbox image not ready. It will be built on first use."
 
 
 # Export tools for registration

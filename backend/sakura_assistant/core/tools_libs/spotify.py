@@ -14,7 +14,7 @@ except ImportError:
 try:
     from AppOpener import open as app_open
 except Exception as e:
-    print(f"⚠️ AppOpener failed to load: {e}")
+    print(f"   AppOpener failed to load: {e}")
     app_open = None
 
 class ToolStateManager:
@@ -116,7 +116,7 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
                         app_open("spotify", match_closest=True, output=False)
                         
                         # Poll for device (up to 20 seconds)
-                        print("⏳ Waiting for Spotify to connect...")
+                        print("  Waiting for Spotify to connect...")
                         for i in range(10):
                             time.sleep(2) # Faster polling
                             try:
@@ -139,7 +139,7 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
                             except:
                                 pass
                     except Exception as e:
-                        print(f"⚠️ App launch failed: {e}")
+                        print(f"   App launch failed: {e}")
 
             if not target_device:
                 available = ", ".join([d['name'] for d in device_list]) if device_list else "None"
@@ -164,22 +164,22 @@ def spotify_control(action: str, song_name: Optional[str] = None) -> str:
                 return f" Song '{song_name}' not found."
             else:
                 client.start_playback()
-                return "▶️ Resumed playback."
+                return "   Resumed playback."
         elif action == "pause":
             client.pause_playback()
-            return "⏸️ Paused."
+            return "   Paused."
         elif action == "next":
             client.next_track()
-            return "⏭️ Skipped."
+            return "   Skipped."
         elif action == "previous":
             client.previous_track()
-            return "⏮️ Previous track."
+            return "   Previous track."
         elif action == "status":
             current = client.current_playback()
             if current and current.get("is_playing"):
                 item = current.get("item", {})
                 return f" Now Playing: {item.get('name')} by {', '.join(a['name'] for a in item.get('artists', []))}"
-            return "⏸️ Nothing playing."
+            return "   Nothing playing."
         return " Unknown action."
     except Exception as e:
         return f" Spotify error: {e}"

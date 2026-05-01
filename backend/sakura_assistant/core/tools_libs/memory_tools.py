@@ -57,12 +57,12 @@ def update_user_memory(category: str, key: str, value: str) -> str:
             wg.save()
             
         except Exception as wg_err:
-            print(f"⚠️ [update_user_memory] WorldGraph sync failed: {wg_err}")
+            print(f"   [update_user_memory] WorldGraph sync failed: {wg_err}")
             # Non-fatal, preference still saved to JSON
         
-        return f"✅ Remembered: {key} = {value}"
+        return f"  Remembered: {key} = {value}"
     except Exception as e:
-        return f"❌ Failed: {e}"
+        return f"  Failed: {e}"
 
 
 @tool
