@@ -82,6 +82,11 @@ V19.5 is the **Forensic Reliability Update**, focusing on eliminating execution 
 - **Telemetry Attribution**: Fixed orphaned trace logs by propagating `trace_id` through all background tasks and LLM wrappers.
 - **Tauri Asset Fix**: Resolved "Asset Protocol Access Denied" errors for local audio playback in development mode.
 - **Hallucination Purge**: Removed all residual references to hallucinated tools like `query_memory`.
+- **Reliability Hardening**:
+    - Added uncertainty-aware execution (LOW_CONFIDENCE propagation).
+    - Reduced hallucinations with strict abstention behavior ("no guessing").
+    - Improved tool reliability with sanity checks and one-shot retry logic.
+    - Enhanced query handling for ambiguous inputs (e.g., weather without location).
 
 ---
 

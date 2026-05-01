@@ -76,6 +76,13 @@ generation_cancelled = False
 SETUP_REQUIRED = False
 INIT_ERROR = None
 
+def atomic_write(file_path: str, content: str):
+    """Write content to a file atomically using a temporary file."""
+    temp_path = file_path + ".tmp"
+    with open(temp_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    os.replace(temp_path, file_path)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
@@ -502,9 +509,10 @@ async def update_settings(request: Request):
                 updated_keys.append(key)
         
         if updated_keys:
-            with open(env_path, "w") as f:
-                for key, val in env_dict.items():
-                    f.write(f"{key}={val}\n")
+            env_content = ""
+            for key, val in env_dict.items():
+                env_content += f"{key}={val}\n"
+            atomic_write(env_path, env_content)
             
             from dotenv import load_dotenv
             load_dotenv(env_path, override=True)
@@ -536,8 +544,7 @@ async def update_settings(request: Request):
         
         if updated_user:
             os.makedirs(os.path.dirname(settings_path), exist_ok=True)
-            with open(settings_path, "w") as f:
-                json.dump(user_settings, f, indent=2)
+            atomic_write(settings_path, json.dumps(user_settings, indent=2))
         
         return {
             "success": True,

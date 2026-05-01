@@ -1,5 +1,5 @@
-# Sakura V19.5 — Execution Stability & Hardening
-*System Certified: April 28, 2026*
+# Sakura V19.6 — Execution Stability & Hardening
+*System Certified: May 1, 2026*
 
 ---
 
@@ -8,11 +8,37 @@
 **V17.5 "Precise Soul":** Featuring **Model-Specific Token Counting**, **SSE Tool Streaming**, V17.4 **Observability Fix**, plus all prior architecture (Stable Soul, Dependency Injection, Search Cascade).
 **V18.1 "Ironclad Reliability":** 8-point surgical fix sprint eliminating production bugs: Fixed Token Tracking (BUG-04), Tool Result Propagation (BUG-05), Memory Recall Routing (BUG-08), Personal Fact Persistence (BUG-03), Tool Hint Alignment (BUG-01), Weather Hallucination Guard (BUG-02), Cleaner Arg Extraction (BUG-06), and Executor Success Guard (BUG-07).
 **V19.0 "DeepSeek Integration":** Added DeepSeek as a first-class provider. Implemented request-time LLM overrides for stage-specific model hot-swapping. Enforced request-scoped safety rails (MAX_LLM_CALLS) across the full request lifecycle (Router -> Planner -> Verifier -> Responder).
-**V19.5 "Execution Stability & Hardening":** Resolved critical regressions in clipboard routing and planning loops. Implemented tool alias normalization and terminal action enforcement for system-level tasks. Hardened metadata preservation during budget failures to eliminate `mode="unknown"` issues.
+**V19.2 "Execution Stability & Hardening":** Resolved critical regressions in clipboard routing and planning loops. Implemented tool alias normalization and terminal action enforcement for system-level tasks. Hardened metadata preservation during budget failures to eliminate `mode="unknown"` issues.
 **V19.5 "Reliability Audit & Restoration":** Full-stack forensic audit. Eliminated CHAT "Planner" leakage by relabeling compression stages. Fixed orphaned background telemetry through explicit `trace_id` propagation. Restored Voice/TTS performance via a "keep-warm" strategy and fixed dev-mode asset protocol access errors in Tauri.
+**V19.6 "Abstention & Confidence Gating":** Implemented surgical reliability fixes to reduce hallucinations. Added `LOW_CONFIDENCE` propagation flow, one-shot nonsense retries in `ToolRunner`, and conditional tone softening in the `Responder` for factual queries without tool verification.
 
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
+
+---
+
+## 🛡️ Reliability & Uncertainty Handling (V19.6)
+
+Sakura V19.6 introduces a "Low Confidence" propagation layer to handle ambiguous or failing execution paths gracefully without hallucinating.
+
+### **The LOW_CONFIDENCE Flow**
+1.  **Detection (ToolRunner)**: If a tool returns nonsense (repeated characters, empty strings) after one retry, it is flagged as `[LOW_CONFIDENCE]`.
+2.  **Propagation (ReActLoop)**: The loop detects this flag and terminates immediately to prevent the Planner from trying to "fix" the nonsense with more tools.
+3.  **Consumption (Responder)**: The flag is passed to the ResponseGenerator, which switches to a cautious tone.
+
+### **Abstention Policy**
+Sakura follows a strict "no guessing" rule defined in `SYSTEM_PERSONALITY`. 
+- If information is missing, unclear, or inconsistent, Sakura is instructed to say she is unsure or ask a clarifying question.
+- **Ambiguity Handling**: Queries like "What's the weather?" without a location are routed to `CHAT` by the Router to ask for the missing info once, rather than entering a blind execution loop.
+
+### **Tool Sanity Checks**
+- **One-Shot Retry**: Every tool execution is validated for "nonsense" patterns. If detected, the system retries exactly once before failing over.
+- **Fallback**: Persistent failures result in a `[LOW_CONFIDENCE]` marker rather than an exception crash or a fake success claim.
+
+### **Conditional Tone Logic**
+Sakura's tone adapts based on execution certainty:
+- **Sharp/Confident**: Standard chat and successful tool execution.
+- **Softened/Cautious**: If a factual query (`requires_facts`) is answered without tools or with `[LOW_CONFIDENCE]` data, Sakura prepends cautious phrasing (e.g., "I might be wrong, but...").
 
 ---
 
@@ -105,7 +131,6 @@
 | **TTS Keep-Warm** | **V19.5** | Removed aggressive offloading to eliminate 10s latency on speaker button |
 | **Tauri Audio Access** | **V19.5** | Fixed asset protocol permissions for `temp_audio` in dev mode |
 | **Voice Production Flag** | **V19.5** | Ensured `--voice` is passed to the sidecar in production builds |
-
 
 ---
 

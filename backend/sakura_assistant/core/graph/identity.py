@@ -172,11 +172,14 @@ class IdentityManager:
         - /setup endpoint after saving
         - File watcher (if implemented)
         """
-        old_name = self._identity.get("name")
+        old_identity = self._identity.copy()
         self._load_settings()
         
-        # Broadcast if changed
-        if self._identity.get("name") != old_name:
+        # Broadcast if any core field changed
+        fields_to_check = ["name", "location", "bio"]
+        changed = any(self._identity.get(f) != old_identity.get(f) for f in fields_to_check)
+        
+        if changed:
             get_event_bus().emit(self.IDENTITY_CHANGED, self._identity.copy())
             print(f" [IdentityManager] Broadcasted identity change")
     

@@ -103,6 +103,12 @@ class IntentRouter:
             tool_hint = self._guess_tool_hint(query)
             return RouteResult("DIRECT", tool_hint, urgency)
 
+        # Fix 4: Short-input guard
+        words = query.lower().split()
+        if len(words) <= 2 and not self._is_action_command(query):
+            print(f"  [Router] Short input detected (Async), forcing CHAT")
+            return RouteResult("CHAT", None, urgency)
+
         if self._should_force_wh_question(query):
             print(f"  [Router] Wh-question detected (Async), forcing PLAN")
             return RouteResult("PLAN", self._guess_wh_tool_hint(query), urgency)
@@ -167,6 +173,12 @@ class IntentRouter:
             print(f"  [Router] Action command detected, forcing DIRECT")
             tool_hint = self._guess_tool_hint(query)
             return RouteResult("DIRECT", tool_hint, urgency)
+
+        # Fix 4: Short-input guard
+        words = query.lower().split()
+        if len(words) <= 2 and not self._is_action_command(query):
+            print(f"  [Router] Short input detected, forcing CHAT")
+            return RouteResult("CHAT", None, urgency)
 
         if self._should_force_wh_question(query):
             print(f"  [Router] Wh-question detected, forcing PLAN")

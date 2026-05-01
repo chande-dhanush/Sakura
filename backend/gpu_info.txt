@@ -1,3 +1,0 @@
-CUDA: False
-Device: N/A
-VRAM: N/A

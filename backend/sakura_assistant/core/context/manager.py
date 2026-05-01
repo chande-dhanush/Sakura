@@ -78,11 +78,13 @@ class ContextManager:
         loc = attrs.get("location", "Unknown")
         
         if is_compact:
-            return f"[USER] {name}, {loc}"
+            bio_short = f", {attrs.get('bio')[:30]}..." if attrs.get("bio") else ""
+            return f"[USER] {name}, {loc}{bio_short}"
             
         # Detail view
         age = attrs.get("age", "?")
-        identity = [f"=== USER IDENTITY ===\nUser: {name}, {age}, {loc}."]
+        bio = attrs.get("bio", "None")
+        identity = [f"=== USER IDENTITY ===\nUser: {name}, {age}, {loc}.\nBio: {bio}"]
         
         interests = attrs.get("interests", [])
         if interests:

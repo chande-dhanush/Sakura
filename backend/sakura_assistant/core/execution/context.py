@@ -117,7 +117,7 @@ class GraphSnapshot:
             # Get user identity
             user_entity = graph.entities.get("user:self")
             user_identity = {
-                "name": user_entity.attributes.get("name", "User") if user_entity else "User",
+                "name": user_entity.name if user_entity else "User",
                 "location": user_entity.attributes.get("location") if user_entity else None,
                 "bio": user_entity.attributes.get("bio") if user_entity else None,
             }

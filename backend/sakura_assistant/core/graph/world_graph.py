@@ -445,6 +445,7 @@ class WorldGraph:
                 "age": im._identity.get("age"),
                 "birthday": im._identity.get("birthday", ""),
                 "location": im.location,
+                "bio": im._identity.get("bio", ""),
                 "interests": im._identity.get("interests", []),
             }
         return {}
@@ -567,6 +568,9 @@ class WorldGraph:
                 user.name = identity_data["name"]
             if identity_data.get("location"):
                 user.attributes["location"] = identity_data["location"]
+            if identity_data.get("bio"):
+                user.attributes["bio"] = identity_data["bio"]
+                
             user.summary = self._generate_user_summary()
             print(f" [WorldGraph] Identity refreshed from EventBus: {user.name}")
         

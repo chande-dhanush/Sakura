@@ -1,4 +1,4 @@
-# Sakura V19.2 Reliability Status Report
+# Sakura V19.6 Reliability Status Report
 
 **Session Date**: 2026-04-18
 **Project Stage**: V19.2 Prototype (Reliability Hardened)
@@ -11,6 +11,17 @@ We performed an exhaustive reliability audit to find "Ghost Components" and sile
 - **Silent Storage Errors**: Bare `except: pass` blocks in the FAISS memory store were swallowing filesystem locks and write failures during memory wipes.
 - **Reference Resolution Failure**: The Router was classifying queries like "play it" as `DIRECT`, causing tools to fail because they couldn't resolve "it" to a previously mentioned song.
 - **Redundant Tool Calls**: The Planner was re-running `read_screen` multiple times in a single loop, wasting time and tokens.
+- **Hallucination Baseline**: Audit recorded ~32% hallucination rate on factual queries without tool support.
+- **Corruption Detection**: 0% detection of nonsensical/garbled tool outputs.
+
+### **Post-Fix Expected Improvements**
+- **Reduced Hallucination**: Significant drop expected via strict abstention policy and confidence gating.
+- **Partial Corruption Detection**: Basic nonsensical outputs are now caught via tool sanity checks.
+- **Improved Ambiguity Handling**: One-shot clarification for underspecified queries reduces planner loop fatigue.
+
+### **Known Trade-offs**
+- **Increased Cautiousness**: Sakura may sound slightly more "insecure" when factual tools are skipped.
+- **Early Termination**: ReActLoop may stop early in low-confidence scenarios to prioritize safety over completeness.
 
 ---
 

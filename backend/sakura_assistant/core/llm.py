@@ -231,31 +231,46 @@ class SmartAssistant:
                 except Exception as e:
                     print(f"   [Settings] Load failed: {e}")
 
-            # 1. Identity Override
-            sakura_name = user_settings.get("sakura_name", "Sakura")
-            
-            # 2. Base Personality Override
+            # 1. Base Layer (Override or Default)
             custom_prompt = user_settings.get("system_prompt_override", "")
             base_personality = custom_prompt if custom_prompt else SYSTEM_PERSONALITY
             
-            # Inject sakura_name so the responder knows its identity
+            # 2. User Context Layer (Always included, no hardcoded defaults)
+            u_name = user_settings.get("user_name", "Dhanush")
+            u_loc = user_settings.get("user_location", "").strip()
+            u_bio = user_settings.get("user_bio", "").strip()
+            
+            ctx_lines = [f"Name: {u_name}"]
+            if u_loc: ctx_lines.append(f"Location: {u_loc}")
+            if u_bio: ctx_lines.append(f"About: {u_bio}")
+            user_context = "\n\n--- USER CONTEXT ---\n" + "\n".join(ctx_lines)
+            
+            # 3. Sakura Identity Layer
+            sakura_name = user_settings.get("sakura_name", "Sakura")
+            identity_instruction = ""
             if sakura_name and sakura_name != "Sakura":
-                base_personality = f"Your name is {sakura_name}. Respond as {sakura_name}.\n\n{base_personality}"
+                identity_instruction = f"\n\nYour name is {sakura_name}. Respond as {sakura_name}."
             
-            # 3. Response Style Enforcement
+            # 4. Style Constraint Layer (Soft guidance for overrides)
             style = user_settings.get("response_style", "balanced").lower()
-            style_blocks = {
-                "concise": "[STYLE: CONCISE] Keep responses under 2 sentences. No fluff, no filler.",
-                "balanced": "[STYLE: BALANCED] Normal response length. Be conversational but not verbose.",
-                "detailed": "[STYLE: DETAILED] Be thorough. Explain fully, use examples where helpful."
-            }
-            style_constraint = style_blocks.get(style, style_blocks["balanced"])
+            is_override = bool(custom_prompt)
             
-            # Update Responder Personality for THIS request
-            # (Note: self.responder is shared, but we update it here safely since 
-            # we are in an async task. For true thread-safety with concurrent requests 
-            # might need a more isolated approach, but this matches V17 singleton pattern)
-            self.responder.personality = f"{base_personality}\n\n{style_constraint}"
+            if is_override:
+                style_blocks = {
+                    "concise": "Guidance: Prefer concise responses where possible.",
+                    "balanced": "Guidance: Maintain a balanced response length.",
+                    "detailed": "Guidance: Be as thorough and detailed as possible."
+                }
+            else:
+                style_blocks = {
+                    "concise": "[STYLE: CONCISE] Keep responses under 2 sentences. No fluff, no filler.",
+                    "balanced": "[STYLE: BALANCED] Normal response length. Be conversational but not verbose.",
+                    "detailed": "[STYLE: DETAILED] Be thorough. Explain fully, use examples where helpful."
+                }
+            style_constraint = "\n\n" + style_blocks.get(style, style_blocks["balanced"])
+            
+            # Final Assembly (Layered Order)
+            self.responder.personality = f"{base_personality}{user_context}{identity_instruction}{style_constraint}"
             
             # 2. Graph & Context (Keep sync for now as it's pure logic + in-memory mostly)
             req_state.study_mode = detect_study_mode(user_input)
@@ -313,8 +328,12 @@ class SmartAssistant:
             with span("Router"):
                 # Use override LLM if provided
                 r_llm = self.container.get_router_llm(overrides=llm_overrides) if llm_overrides else self.router.llm
+                # Fix 1: Pass identity context to router
+                router_ctx = self.context_manager._build_identity_block(is_compact=True)
+                
                 route_result = await self.router.aroute(
                     query=user_input,
+                    context=router_ctx,
                     history=history,
                     llm_override=r_llm if llm_overrides else None
                 )
