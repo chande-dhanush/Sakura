@@ -9,6 +9,23 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { remove } from '@tauri-apps/plugin-fs';
 
 let currentAudio: HTMLAudioElement | null = null;
+const BACKEND_URL = 'http://localhost:3210';
+
+async function shouldSkipForCpu(): Promise<boolean> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/system/cpu`);
+    if (!response.ok) return false;
+    const data = await response.json();
+    const cpu = Number(data.cpu_percent);
+    if (Number.isFinite(cpu) && cpu > 80) {
+      console.warn(`[TTS] Skipped: high CPU (${cpu.toFixed(0)}%)`);
+      return true;
+    }
+  } catch (e) {
+    console.warn('[TTS] CPU guard unavailable:', e);
+  }
+  return false;
+}
 
 /**
  * Generate and play TTS audio
@@ -22,6 +39,10 @@ export async function speak(text: string): Promise<void> {
   }
   
   try {
+    if (await shouldSkipForCpu()) {
+      throw new Error('Skipped: high CPU');
+    }
+
     // Stop any current playback
     stopSpeaking();
     

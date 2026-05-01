@@ -90,6 +90,13 @@ MAX_INMEM_HISTORY = 50               # Cap in-memory conversation history
 EMBEDDING_IDLE_TIMEOUT = 600         # Unload embeddings after 10 min idle
 ENABLE_SILERO = False                # Disable Silero TTS fallback
 
+CACHE_TTL = {
+    "get_weather": 600,
+    "web_search": 0,
+    "get_news": 3600,
+    "define_word": 0,
+}
+
 # Short-Term Memory (Responder Context)
 HISTORY_WINDOW = 20               # Number of recent messages to include
 TOKEN_BUDGET = 1500             # Max estimated tokens for history
@@ -365,7 +372,7 @@ CHAT:   Pure conversation. No tool needed.
 
 === TOOL HINTS ===
 Email→gmail_read_email | Weather→get_weather | Calendar→calendar_get_events
-Timer→set_timer | Reminder→set_reminder | App→open_app | Site→open_site
+Timer→set_timer | Reminder→set_reminder | App→open_app
 Notes→note_list/note_create | Memory→update_user_memory | Search→web_search
 
 === EXAMPLES ===
@@ -414,8 +421,6 @@ TOOL_GROUPS_UNIVERSAL = [
     "clipboard_write",
     "note_create",      # V9.1: Notes are universal utility
     "note_append",      # V9.1: Allow "do X and save a note"
-    "open_site",        # V10: Users often want to open sites quickly
-    "list_bookmarks",   # V10: Bookmarks are common references
 ]
 
 TOOL_SCHEMAS = {

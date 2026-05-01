@@ -1,0 +1,23 @@
+{
+  "texts": [
+    "explicit preference stated"
+  ],
+  "metadata": [
+    {
+      "timestamp": "2026-04-29T10:38:35.083818",
+      "role": "user",
+      "hash": "03edec9b2bcf5711b628f2afd859901a4c79ce3eb478885cbefde49852f23ca1"
+    }
+  ],
+  "inverted_index": {
+    "explicit": [
+      0
+    ],
+    "preference": [
+      0
+    ],
+    "stated": [
+      0
+    ]
+  }
+}

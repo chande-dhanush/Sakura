@@ -6,18 +6,25 @@ import { writable, derived, get } from 'svelte/store';
 
 const BACKEND_URL = 'http://localhost:3210';
 
+/**
+ * @typedef {{ tool: string, args?: Record<string, unknown>, status?: string }} ToolUse
+ * @typedef {{ id?: number | string, role: string, content: string, tools?: ToolUse[], mode?: string, metadata?: Record<string, any>, timestamp?: string }} ChatMessage
+ * @typedef {{ stage?: string, status?: string, ms?: number, info?: string, timestamp: number }} TraceLog
+ * @typedef {{ tts_enabled?: boolean, llm_overrides?: Record<string, unknown> }} SendOptions
+ * @typedef {'starting' | 'ready' | 'error' | 'setup_required'} BackendStatus
+ */
+
 // Stores
-// Stores
-export const messages = writable([]);
+export const messages = writable(/** @type {ChatMessage[]} */ ([]));
 export const isStreaming = writable(false);
 export const mood = writable('neutral');
-export const currentTools = writable([]);
+export const currentTools = writable(/** @type {ToolUse[]} */ ([]));
 export const focusEntity = writable(null);
-export const connectionError = writable(null);
-export const traceLogs = writable([]); // V10.4: Flight Recorder Traces
+export const connectionError = writable(/** @type {string | null} */ (null));
+export const traceLogs = writable(/** @type {TraceLog[]} */ ([])); // V10.4: Flight Recorder Traces
 
 // Backend status: 'starting' | 'ready' | 'error'
-export const backendStatus = writable('starting');
+export const backendStatus = writable(/** @type {BackendStatus} */ ('starting'));
 
 // Voice status
 export const voiceStatus = writable({
@@ -29,6 +36,7 @@ export const voiceStatus = writable({
 
 // Derived store for mood-based colors
 export const moodColors = derived(mood, ($mood) => {
+    /** @type {Record<string, { primary: string, bg: string, glow: string }>} */
     const colors = {
         frustrated: { primary: '#ff4444', bg: 'rgba(26, 0, 0, 0.95)', glow: 'rgba(255, 68, 68, 0.3)' },
         urgent: { primary: '#ff8800', bg: 'rgba(26, 15, 0, 0.95)', glow: 'rgba(255, 136, 0, 0.3)' },
@@ -41,6 +49,8 @@ export const moodColors = derived(mood, ($mood) => {
 
 /**
  * Send a message and stream the response
+ * @param {string} query
+ * @param {SendOptions} options
  */
 export async function sendMessage(query, options = {}) {
     if (!query.trim()) return;
@@ -59,7 +69,8 @@ export async function sendMessage(query, options = {}) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 query,
-                tts_enabled: options.tts_enabled || false
+                tts_enabled: options.tts_enabled || false,
+                llm_overrides: options.llm_overrides || {}
             }),
         });
 
@@ -70,6 +81,7 @@ export async function sendMessage(query, options = {}) {
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let assistantContent = '';
+        /** @type {ToolUse[]} */
         let tools = [];
         let mode = '';
         const assistantId = Date.now() + 1;
@@ -162,7 +174,7 @@ export async function sendMessage(query, options = {}) {
 
     } catch (error) {
         // Friendly error messages instead of raw errors
-        const friendlyError = formatError(error.message);
+        const friendlyError = formatError(error instanceof Error ? error.message : String(error));
 
         // Update the thinking message to show error gracefully
         messages.update(m => {
@@ -187,6 +199,7 @@ export async function sendMessage(query, options = {}) {
 
 /**
  * Format raw errors into user-friendly messages
+ * @param {string} message
  */
 function formatError(message) {
     if (!message) return 'Something went wrong';
@@ -249,6 +262,7 @@ export async function refreshState() {
 
 /**
  * Delete a specific message
+ * @param {number | string} id
  */
 export function deleteMessage(id) {
     messages.update(m => m.filter(msg => msg.id !== id));
@@ -273,7 +287,7 @@ export async function clearChat() {
             }
         }
     } catch (e) {
-        console.warn('[Chat] Clear API failed:', e.message);
+        console.warn('[Chat] Clear API failed:', e instanceof Error ? e.message : String(e));
     }
 
     // Clear frontend store
@@ -296,7 +310,8 @@ export async function loadHistory() {
 
             if (data.messages && data.messages.length > 0) {
                 // Convert backend format to UI format
-                const uiMessages = data.messages.map((msg, i) => ({
+                /** @type {ChatMessage[]} */
+                const uiMessages = data.messages.map((/** @type {{ role: string, content: string }} */ msg, /** @type {number} */ i) => ({
                     id: Date.now() - (data.messages.length - i) * 1000,
                     role: msg.role === 'human' ? 'user' : msg.role,
                     content: msg.content,
@@ -320,7 +335,7 @@ export async function loadHistory() {
             console.warn('[Chat] History endpoint returned', response.status);
         }
     } catch (e) {
-        console.warn('[Chat] History load failed:', e.message);
+        console.warn('[Chat] History load failed:', e instanceof Error ? e.message : String(e));
     }
 }
 

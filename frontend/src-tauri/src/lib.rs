@@ -496,11 +496,11 @@ pub fn run() {
             }
             
             // Wait for backend to be ready (Poll /health)
-            // NOTE: SmartAssistant init takes 5-15s, so use generous timeout
+            // NOTE: 45s timeout, extended from the documented 15s for cold-start safety.
             println!("⏳ Waiting for backend to start...");
             let mut ready = false;
             
-            for _ in 0..45 { // Try for 45 seconds
+            for _ in 0..45 {
                 if let Ok(resp) = client.get("http://127.0.0.1:3210/health").send() {
                     if resp.status().is_success() {
                         println!("✅ Backend ready!");
@@ -515,11 +515,11 @@ pub fn run() {
                 eprintln!("⚠️ Backend startup timed out or failed health check");
             }
             
-            // V10: Show main window after backend is ready
-            if let Some(main_window) = app.get_webview_window("main") {
-                let _ = main_window.show();
-                let _ = main_window.set_focus();
-                println!("🪟 Main window shown");
+            // V19.5: Bubble-first startup; main stays hidden until user opens it.
+            if let Some(bubble_window) = app.get_webview_window("bubble") {
+                let _ = bubble_window.show();
+                position_bubble_bottom_right(&bubble_window);
+                println!("Bubble window shown");
             }
             
             Ok(())

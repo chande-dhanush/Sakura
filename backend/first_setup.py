@@ -13,6 +13,83 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 sys.path.insert(0, script_dir)
 
+def _load_env_values():
+    values = {}
+    env_path = os.path.join(script_dir, ".env")
+    if not os.path.exists(env_path):
+        return values
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                raw = line.strip()
+                if not raw or raw.startswith("#") or "=" not in raw:
+                    continue
+                key, value = raw.split("=", 1)
+                values[key.strip()] = value.strip()
+    except Exception as e:
+        print(f"⚠️  Could not read .env: {e}")
+    return values
+
+
+def _upsert_env_values(updates):
+    env_path = os.path.join(script_dir, ".env")
+    lines = []
+    seen = set()
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    for i, line in enumerate(lines):
+        if "=" not in line or line.lstrip().startswith("#"):
+            continue
+        key = line.split("=", 1)[0].strip()
+        if key in updates:
+            lines[i] = f"{key}={updates[key]}\n"
+            seen.add(key)
+    for key, value in updates.items():
+        if key not in seen:
+            lines.append(f"{key}={value}\n")
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+
+def setup_provider_gating():
+    """V19.0: Validate backend/headless provider configuration."""
+    print("\n" + "="*50)
+    print(" STEP 0: Provider Configuration Check")
+    print("="*50)
+
+    env_values = _load_env_values()
+    groq_key = os.getenv("GROQ_API_KEY") or env_values.get("GROQ_API_KEY", "")
+    google_key = os.getenv("GOOGLE_API_KEY") or env_values.get("GOOGLE_API_KEY", "")
+    deepseek_key = os.getenv("DEEPSEEK_API_KEY") or env_values.get("DEEPSEEK_API_KEY", "")
+    deepseek_model = os.getenv("PLANNER_MODEL") or env_values.get("PLANNER_MODEL", "")
+    planner_provider = (os.getenv("PLANNER_PROVIDER") or env_values.get("PLANNER_PROVIDER", "")).lower()
+
+    if not groq_key:
+        print("⚠️  GROQ_API_KEY missing — primary Groq models will be unavailable.")
+    if not google_key:
+        print("⚠️  GOOGLE_API_KEY missing — Gemini fallback will be unavailable.")
+
+    updates = {}
+    if deepseek_key and (planner_provider == "deepseek" or not deepseek_model):
+        if not deepseek_model:
+            print("⚠️  DeepSeek requires an explicit model name (e.g. deepseek-v4-flash)")
+            deepseek_model = input("DeepSeek model: ").strip()
+            if deepseek_model:
+                updates["PLANNER_MODEL"] = deepseek_model
+            else:
+                print("❌ DeepSeek disabled — no model specified")
+                updates["DEEPSEEK_API_KEY"] = ""
+
+    if updates:
+        try:
+            _upsert_env_values(updates)
+            print(" Provider settings updated in .env")
+        except Exception as e:
+            print(f"⚠️  Failed to update .env: {e}")
+
+    return True
+
 
 def setup_google_auth():
     """Step 1: Google OAuth Setup"""
@@ -107,6 +184,9 @@ def setup_wake_word():
 def main():
     print(" Sakura V10 - First-Time Setup")
     print("================================\n")
+
+    # Step 0: V19 Provider Gating
+    setup_provider_gating()
     
     # Step 1: Google Auth
     google_ok = setup_google_auth()

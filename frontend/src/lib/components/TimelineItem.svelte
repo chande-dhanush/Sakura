@@ -5,9 +5,13 @@
     import MarkdownRenderer from './MarkdownRenderer.svelte';
     import { speak } from '$lib/audioService';
     
+    /** @typedef {{ tool: string, args?: Record<string, unknown>, status?: string }} ToolUse */
+    /** @typedef {{ id?: number | string, role: string, content: string, tools?: ToolUse[], mode?: string, metadata?: Record<string, any> }} ChatMessage */
+    /** @type {ChatMessage} */
     export let message;
     
     let showActions = false;
+    let speakNotice = '';
     
     $: isUser = message.role === 'user';
     $: hasTools = message.tools && message.tools.length > 0;
@@ -22,10 +26,11 @@
     async function handleSpeak() {
         if (!message.content) return;
         try {
+            speakNotice = '';
             await speak(message.content);
         } catch (e) {
+            speakNotice = e instanceof Error ? e.message : 'TTS skipped';
             console.error("Speak failed", e);
-            // TODO: Show toast notification to user
         }
     }
 </script>
@@ -62,6 +67,9 @@
                     {/if}
                     <button on:click={handleDelete} title="Delete">🗑️</button>
                 </div>
+            {/if}
+            {#if speakNotice}
+                <div class="speak-notice">{speakNotice}</div>
             {/if}
         </div>
         
@@ -190,6 +198,12 @@
     
     .actions button:hover {
         opacity: 1;
+    }
+
+    .speak-notice {
+        margin-top: 6px;
+        font-size: 11px;
+        color: rgba(255, 200, 120, 0.9);
     }
     
     .mode-badge {

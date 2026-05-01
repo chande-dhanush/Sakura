@@ -14,10 +14,17 @@ import re
 
 from langchain_core.messages import SystemMessage, HumanMessage
 
+from ..execution.context import LLMBudgetExceededError
+
 
 # V13: Urgency detection pattern (compiled once at module load)
 _URGENT_PATTERNS = re.compile(
     r'\b(urgent(ly)?|asap|emergency|hurry|quick(ly)?|immediately|right now|as soon as possible)\b',
+    re.IGNORECASE
+)
+
+WH_FORCE_PATTERN = re.compile(
+    r"^\s*(who|what|where|when|why|how)\b.{4,}",
     re.IGNORECASE
 )
 
@@ -95,6 +102,10 @@ class IntentRouter:
             print(f"⚡ [Router] Action command detected (Async), forcing DIRECT")
             tool_hint = self._guess_tool_hint(query)
             return RouteResult("DIRECT", tool_hint, urgency)
+
+        if self._should_force_wh_question(query):
+            print(f"🔎 [Router] Wh-question detected (Async), forcing PLAN")
+            return RouteResult("PLAN", self._guess_wh_tool_hint(query), urgency)
             
         # 2. LLM classification
         try:
@@ -129,6 +140,8 @@ class IntentRouter:
             route_result = RouteResult(classification, tool_hint, urgency)
             return self._apply_safety_checks(query, route_result)
             
+        except LLMBudgetExceededError:
+            raise
         except Exception as e:
             # V18 FIX-01: Default to PLAN (not CHAT) so tools are still available
             print(f"⚠️ [Router] Async Error: {e}, defaulting to PLAN (safer than CHAT)")
@@ -154,6 +167,10 @@ class IntentRouter:
             print(f"⚡ [Router] Action command detected, forcing DIRECT")
             tool_hint = self._guess_tool_hint(query)
             return RouteResult("DIRECT", tool_hint, urgency)
+
+        if self._should_force_wh_question(query):
+            print(f"🔎 [Router] Wh-question detected, forcing PLAN")
+            return RouteResult("PLAN", self._guess_wh_tool_hint(query), urgency)
         
         # 2. LLM-based classification
         try:
@@ -186,6 +203,8 @@ class IntentRouter:
             route_result = RouteResult(classification, tool_hint, urgency)
             return self._apply_safety_checks(query, route_result)
             
+        except LLMBudgetExceededError:
+            raise
         except Exception as e:
             # V18 FIX-01: Default to PLAN (not CHAT) so tools are still available
             print(f"⚠️ [Router] Error: {e}, defaulting to PLAN (safer than CHAT)")
@@ -246,6 +265,33 @@ class IntentRouter:
                 return True
         
         return False
+
+    def _should_force_wh_question(self, query: str) -> bool:
+        """Force factual Wh-questions through tool-capable planning before LLM routing."""
+        text = query.lower().strip()
+        conversational_wh = (
+            "how are you", "how's it going", "how is it going",
+            "what's up", "what is up", "what are you doing",
+            "who are you", "what are you"
+        )
+        if any(text.startswith(sig) for sig in conversational_wh):
+            return False
+        return bool(WH_FORCE_PATTERN.match(query))
+
+    def _guess_wh_tool_hint(self, query: str) -> str:
+        """Pick a conservative first tool for forced factual questions."""
+        text = query.lower()
+        if "weather" in text:
+            return "get_weather"
+        if "wikipedia" in text:
+            return "search_wikipedia"
+        if "news" in text:
+            return "get_news"
+        if "screen" in text:
+            return "read_screen"
+        if "clipboard" in text:
+            return "clipboard_read"
+        return "web_search"
     
     def _guess_tool_hint(self, query: str) -> Optional[str]:
         """Guess which tool an action command needs."""

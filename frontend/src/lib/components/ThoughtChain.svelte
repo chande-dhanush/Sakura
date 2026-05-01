@@ -2,7 +2,10 @@
 <script>
     import { moodColors } from '$lib/stores/chat.js';
     
+    /** @type {{ tool: string, status?: string }[]} */
     export let tools = [];
+    export let mode = '';
+    $: void mode;
     
     // Default to COLLAPSED for clean UI - users expand if curious
     let expanded = false;

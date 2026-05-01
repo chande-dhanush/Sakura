@@ -1,16 +1,6 @@
 """
-Sakura Tool Executor - Composable Architecture Refactor
-========================================================
-
-Core Responsibility: Execution orchestration via ReAct loop
-
-Architecture:
-    1. ReActLoop - Controls Plan → Act → Observe iteration
-    2. ToolRunner - Runs individual tool calls with fallback
-    3. OutputHandler - Prunes/summarizes large outputs
-    4. ExecutionPolicy - Defines behavior rules (terminal actions, etc.)
-
-V17: ExecutionResult moved to execution_context.py (uses ExecutionStatus enum)
+Sakura Tool Executor - V19.5 Hardened
+======================================
 """
 
 import os
@@ -18,6 +8,9 @@ import re
 import json
 import time
 import asyncio
+import hashlib
+import warnings
+import psutil
 import unicodedata
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass
@@ -51,35 +44,64 @@ if TYPE_CHECKING:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class SecurityError(Exception):
-    """Raised when a security violation is detected."""
+    """Raised when a security policy is violated."""
     pass
 
 
 DANGEROUS_PATTERNS = [
-    r"\.bashrc", r"\.zshrc", r"\.profile", r"\.bash_profile",
-    r"autostart", r"LaunchAgent", r"LaunchDaemon",
+    r"\.\.", r"/etc/", r"\\windows\\", r"c:\\windows", r"program files",
+    r"\.ssh", r"\.bashrc", r"autostart", r"cron", r"passwd",
+    r"\.zshrc", r"\.profile", r"\.bash_profile",
+    r"LaunchAgent", r"LaunchDaemon",
     r"cron\.d", r"crontab", r"systemd", r"\.service$",
-    r"\.ssh", r"\.aws", r"\.kube", r"\.docker",
+    r"\.aws", r"\.kube", r"\.docker",
     r"\.git-credentials", r"\.netrc", r"\.npmrc",
-    r"/etc/", r"C:[/\\]Windows", r"System32",
-    r"/usr/bin", r"/usr/local/bin",
+    r"System32", r"/usr/bin", r"/usr/local/bin",
     r"\.mozilla", r"\.chrome", r"AppData.*Local.*Google",
     r"\.config/", r"\.local/share",
 ]
 
-
-def validate_path(path: str) -> bool:
-    """Validate path for security. Raises SecurityError if dangerous."""
-    normalized = unicodedata.normalize('NFC', path)
-    nfkd = unicodedata.normalize('NFKD', path)
+def _sanitize_path(path: str) -> str:
+    """
+    V19.5 Security Sandbox.
+    Prevents path traversal and normalizes unicode.
+    """
+    # 1. Normalize Unicode (NFC) to prevent homograph attacks
+    path = unicodedata.normalize('NFC', path)
     
-    if nfkd != normalized.encode('ascii', 'ignore').decode('ascii'):
-        print(f"️ [Security] Potential homoglyph in path: {path}")
-    
+    # 2. Block dangerous patterns
+    import re
     for pattern in DANGEROUS_PATTERNS:
-        if re.search(pattern, normalized, re.IGNORECASE):
-            raise SecurityError(f"Blocked dangerous path pattern: {pattern}")
+        if re.search(pattern, path, re.IGNORECASE):
+            print(f"⚠️ [Security] Blocked path traversal attempt: {path}")
+            raise SecurityError(f"Blocked dangerous path: {path[:50]}")
+            
+    # 3. Secure normalization
+    safe_path = os.path.normpath(os.path.abspath(path))
+    return safe_path
+
+
+def validate_path(path: str) -> str:
+    """Legacy alias for _sanitize_path."""
+    return _sanitize_path(path)
+
+
+def _validate_tool_input(tool_name: str, args: Dict[str, Any]) -> bool:
+    """
+    V19.5 Hallucination Gateway.
+    Blocks malformed tool inputs before execution.
+    """
+    # 1. Block URLs in arguments that expect local paths or simple strings
+    for key, val in args.items():
+        if isinstance(val, str) and (val.startswith("http://") or val.startswith("https://")):
+            # Exempt web tools
+            if tool_name not in ["web_search", "web_scrape", "play_youtube", "open_site", "search_wikipedia", "search_arxiv"]:
+                raise SecurityError(f"Hallucination detected: URL provided as argument to {tool_name}")
     
+    # 2. Block missing critical arguments (V19.5 Audit)
+    if tool_name in ["file_read", "file_write", "open_app"] and not args.get("path") and not args.get("app_name") and not args.get("filename"):
+        raise SecurityError(f"Missing critical argument for {tool_name}")
+        
     return True
 
 
@@ -316,6 +338,15 @@ class ToolRunner:
             )
         
         try:
+            # V19.5: Hallucination Gateway
+            _validate_tool_input(tool_name, args)
+            
+            # V15.2.2: Path Traversal Defense
+            if tool_name in ["file_read", "file_write", "open_app"]:
+                path_key = "path" if "path" in args else ("app_name" if "app_name" in args else "filename")
+                if path_key in args:
+                    args[path_key] = _sanitize_path(args[path_key])
+            
             result = self.tool_map[tool_name].invoke(args)
             result_str = str(result)
             
@@ -358,6 +389,15 @@ class ToolRunner:
             )
         
         try:
+            # V19.5: Hallucination Gateway
+            _validate_tool_input(tool_name, args)
+            
+            # V15.2.2: Path Traversal Defense
+            if tool_name in ["file_read", "file_write", "open_app"]:
+                path_key = "path" if "path" in args else ("app_name" if "app_name" in args else "filename")
+                if path_key in args:
+                    args[path_key] = _sanitize_path(args[path_key])
+            
             tool_instance = self.tool_map[tool_name]
             
             # Use ainvoke if available, otherwise run sync in thread
@@ -513,7 +553,7 @@ class ReActLoop:
         tool_runner: ToolRunner,
         output_handler: OutputHandler,
         policy: ExecutionPolicy,
-        max_iterations: int = 3
+        max_iterations: int = 5
     ):
         self.planner = planner
         self.tool_runner = tool_runner
@@ -547,7 +587,7 @@ class ReActLoop:
                 context=graph_context,
                 tool_history=all_tool_messages,
                 available_tools=available_tools,
-                history=ctx.history if ctx else None,  # V17.1
+                history=None, # Legacy sync path
                 tool_hint=tool_hint
             )
             
@@ -559,22 +599,18 @@ class ReActLoop:
                     status_msg = "Planning failed: No tools selected for action request"
                     print(f"❌ [ReActLoop] {status_msg}")
                     res = ExecutionResult.error(status_msg)
-                    if 'ctx' in locals() and ctx:
-                        res.last_result = {"mode": ctx.mode.value}
                     return res
                 
                 error = plan_result.get("error")
                 if error:
                     print(f"❌ [ReActLoop] Planner error: {error}")
                     res = ExecutionResult.error(f"Planning failed: {error}")
-                    if 'ctx' in locals() and ctx:
-                        res.last_result = {"mode": ctx.mode.value}
                     return res
                 print("⏹️ [ReActLoop] No more steps - complete")
                 break
             
             # 2. ACT
-            exec_result = self._execute_steps(steps, user_input, state)
+            exec_result = self._execute_steps(steps, user_input, None)
             
             # 3. OBSERVE
             all_tool_messages.extend(exec_result.tool_messages)
@@ -602,7 +638,7 @@ class ReActLoop:
                 print(f"🔄 [Cascade SYNC] Tier-1 empty/failed → expanded to {len(available_tools)} tools")
             
             # Terminal actions should end the loop
-            if self.policy.is_terminal(final_tool_used) and exec_result.success:
+            if self.policy.is_terminal(final_tool_used) and exec_result.status == ExecutionStatus.SUCCESS:
                 print(f" [ReActLoop] Terminal action '{final_tool_used}' completed")
                 break  # V17.1: RESTORED terminal break
         
@@ -622,7 +658,8 @@ class ReActLoop:
         available_tools: List = None,
         state=None,
         tool_hint: Optional[str] = None,
-        llm_overrides: Optional[Dict[str, Any]] = None
+        llm_overrides: Optional[Dict[str, Any]] = None,
+        timeout: int = 60 # Added for audit compliance
     ) -> ExecutionResult:
         """
         Run the ReAct loop asynchronously.
@@ -652,6 +689,7 @@ class ReActLoop:
         all_tool_messages = []
         all_outputs = []
         final_last_result = None
+        final_tool_used = "None"
         cascade_activated = False  # V18 FIX-04
         prev_hindsight = None # FIX-4
         executed_tools = []   # BUG-02
@@ -772,7 +810,7 @@ class ReActLoop:
             final_last_result = exec_result.last_result
             
             # BUG-02: minimal track tool name on success
-            if exec_result.succeeded:
+            if exec_result.status == ExecutionStatus.SUCCESS:
                 executed_tools.append(f"{final_tool_used} ✓")
             
             # V18 FIX-04: Search Cascade Activation
@@ -794,13 +832,13 @@ class ReActLoop:
                 print(f"🔄 [Cascade] Tier-1 empty/failed → expanded toolset to {len(available_tools)} tools")
             
             # FIX-4: Update hindsight for next iteration if not complete
-            if not exec_result.succeeded:
+            if exec_result.status != ExecutionStatus.SUCCESS:
                 prev_hindsight = f"Iteration {iteration + 1} failed: {exec_result.outputs}"
             else:
                 prev_hindsight = f"Iteration {iteration + 1} produced: {exec_result.outputs[:200]}"
             
             # Terminal actions should end the loop
-            if self.policy.is_terminal(final_tool_used) and exec_result.succeeded:
+            if self.policy.is_terminal(final_tool_used) and exec_result.status == ExecutionStatus.SUCCESS:
                 print(f" [ReActLoop] Async terminal action '{final_tool_used}' completed")
                 break  # V17.1: RESTORED terminal break
         

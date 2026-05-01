@@ -24,7 +24,7 @@ from .execution import Executor, OneShotRunner, ResponseEmitter, EmitterFactory
 from .graph import WorldGraph
 from ..utils.study_mode import detect_study_mode
 from .context import AgentState, RateLimitExceeded
-from .execution.context import LLMBudgetExceededError
+from .execution.context import LLMBudgetExceededError, ExecutionContext, ExecutionMode, GraphSnapshot
 from .execution.verifier import PlanVerifier  # FIX-5
 from ..utils.memory import cleanup_memory
 
@@ -292,6 +292,17 @@ class SmartAssistant:
             
             # V14: Constraint detection moved to background ReflectionEngine
             # (happens after response, not in hot path)
+
+            # ExecutionContext.create() intentionally sets execution_context_var as a side effect,
+            # so the Router LLM call below is counted by ReliableLLM's budget hook.
+            ExecutionContext.create(
+                mode=ExecutionMode.ITERATIVE,
+                request_id=request_id,
+                user_input=user_input,
+                snapshot=GraphSnapshot.from_graph(self.world_graph),
+                history=history,
+                reference_context=req_state.reference_context
+            )
             
             # 3. Routing (Async)
             # V19-FIX-01: Use keyword arguments to prevent positional mismatch.
@@ -417,7 +428,7 @@ class SmartAssistant:
                 user_input=user_input,
                 tool_outputs=tool_outputs,
                 history=history,
-                graph_context=resp_ctx.get("responder_context", ""),
+                graph_context=responder_context,
                 intent_adjustment=mood_prompt,
                 current_mood=resp_ctx.get("current_mood", "Neutral"),
                 study_mode=req_state.study_mode,
@@ -510,6 +521,8 @@ class SmartAssistant:
             return {
                 "content": error_response,
                 "mode": mode_val,
+                "tool_used": "None",
+                "tools_used": [],
                 "metadata": {
                     "status": "error",
                     "execution_status": "failed",
@@ -529,6 +542,8 @@ class SmartAssistant:
             return {
                 "content": error_response,
                 "mode": mode_val,
+                "tool_used": "None",
+                "tools_used": [],
                 "metadata": {
                     "status": "error",
                     "execution_status": "failed",

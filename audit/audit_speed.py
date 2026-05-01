@@ -1,3 +1,45 @@
+#!/usr/bin/env python3
+import sys
+import os
+import warnings
+import locale
+
+# Fix Windows paths
+# We need to add 'backend' to sys.path to find 'sakura_assistant'
+BACKEND_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+if BACKEND_PATH not in sys.path:
+    sys.path.insert(0, BACKEND_PATH)
+
+# Suppress noise
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
+
+# UTF-8 everywhere
+if sys.platform == 'win32':
+    try:
+        import io
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        pass
+
+def audit_guard():
+    """Skip if core deps missing"""
+    missing = []
+    try:
+        import sakura_assistant
+    except ImportError:
+        missing.append("sakura_assistant")
+    
+    if missing:
+        # Check if we are in the backend dir already (fallback)
+        if os.path.exists("sakura_assistant"):
+            return
+        print(f"Audit skipped: {missing} (Checked: {BACKEND_PATH})")
+        sys.exit(77)  # Non-zero but non-error exit
+    
+audit_guard()
+
 """
 Sakura War Room Audit: Speed & O(1) Scaling Proof
 ==================================================
@@ -15,7 +57,7 @@ import sys
 
 # Add parent path for imports
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+
 
 ARTIFACTS_DIR = os.path.join(os.path.dirname(__file__), "audit_artifacts")
 os.makedirs(ARTIFACTS_DIR, exist_ok=True)

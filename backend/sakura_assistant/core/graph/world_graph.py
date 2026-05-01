@@ -29,6 +29,8 @@ import threading
 import time
 import tempfile
 
+from .identity import get_event_bus, IdentityManager
+
 # Lazy-loaded numpy (only when embeddings used)
 _np = None
 def _get_numpy():
@@ -558,8 +560,6 @@ class WorldGraph:
 
     def _subscribe_to_identity_changes(self) -> None:
         """V16: Subscribe to EventBus for reactive identity refresh."""
-        from .identity import get_event_bus, IdentityManager
-        
         def on_identity_changed(identity_data):
             """Callback when identity is updated."""
             user = self.get_user_identity()

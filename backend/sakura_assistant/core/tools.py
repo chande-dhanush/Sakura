@@ -39,8 +39,18 @@ from ..utils.note_tools import (
     note_create, note_append, note_overwrite, note_read,
     note_list, note_delete, note_search, note_open
 )
-read_clipboard = clipboard_read
-write_clipboard = clipboard_write
+
+from langchain_core.tools import tool
+
+@tool
+def read_clipboard() -> str:
+    """Read clipboard content."""
+    return clipboard_read.invoke({})
+
+@tool
+def write_clipboard(text: str) -> str:
+    """Write to clipboard."""
+    return clipboard_write.invoke({"text": text})
 
 # Ephemeral RAG tools (re-export for Planner)
 # Assuming they are aliases or wrappers around memory tools
@@ -48,8 +58,6 @@ write_clipboard = clipboard_write
 # In V9 they were mapped to:
 retrieve_document_context = fetch_document_context
 forget_document = delete_document
-
-from langchain_core.tools import tool
 
 @tool
 def execute_actions(actions: List[Dict[str, Any]]) -> str:
@@ -218,4 +226,5 @@ def get_all_tools():
         # Meta / Aliases
         execute_actions, retrieve_document_context, forget_document,
         quick_math, define_word, currency_convert, clear_all_ephemeral_memory
+        # Total registered tools: 56
     ]

@@ -1,3 +1,12 @@
+"""
+Voice engine coordinator for wake-word interaction.
+
+This module owns the always-on voice loop: shared microphone, DTW wake-word
+detection, speech recognition, SmartAssistant dispatch, and response playback.
+Neural synthesis itself lives in sakura_assistant.utils.tts; keep TTS model
+loading/offload policy centralized there.
+"""
+
 from __future__ import annotations
 import time
 import threading
