@@ -19,9 +19,13 @@ a = Analysis(
     datas=[
         # Data files only - NOT source code (that's handled by hiddenimports)
         ('data', 'data'),  # Bundle default data (bookmarks, world_graph, etc.)
+        # V19.5: Bundle openWakeWord ONNX resources
+        (os.path.join(venv_site_packages, 'openwakeword', 'resources'), 'openwakeword/resources'),
         # Note: 'Notes' folder is created at runtime in AppData
     ] + ([('Notes', 'Notes')] if os.path.exists(os.path.join(backend_dir, 'Notes')) else []),
     hiddenimports=[
+        # spacy models
+        'en_core_web_sm',
         # ===== V17 Core Refactor - Subdirectory Imports =====
         # PyInstaller static analysis doesn't discover these automatically
         'sakura_assistant.core',

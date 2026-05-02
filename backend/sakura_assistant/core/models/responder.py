@@ -14,16 +14,8 @@ from dataclasses import dataclass
 from langchain_core.messages import SystemMessage, HumanMessage
 
 
-# V15.2: Responder guardrail - Text-only output rule (Fixed: Removed bad fallback)
-RESPONDER_NO_TOOLS_RULE = """CRITICAL RULES:
-1. You are a TEXT-ONLY responder. You CANNOT call tools or output JSON.
-2. If TOOL RESULTS are provided below, the action was ALREADY COMPLETED SUCCESSFULLY.
-   - You MUST acknowledge the success naturally (e.g., "Done!", "Playing now", "Event created")
-   - NEVER say "I need to use a tool" or "Let me help you differently" - the tool ALREADY RAN
-   - NEVER say "I can't do that" if tool output shows success
-   - If tool_outputs is present and non-empty, you MUST reference the tool result in your response. "I need to use a tool" is NEVER acceptable when tool_outputs exists.
-3. If NO tool results are provided and user asks for an action you can't do, just chat naturally.
-4. TRUST the tool results - if it says "success" or "created", IT HAPPENED. """
+# RESPONDER_NO_TOOLS_RULE is now imported from config.py to maintain centralization
+
 
 
 # V13: Pre-compiled validation patterns (avoid recompiling on every response)
@@ -319,7 +311,7 @@ class ResponseGenerator:
         messages = []
         
         # V18.2: Import missing guardrails from config
-        from ...config import RESPONDER_GUARDRAIL_PROMPT, TOOL_BEHAVIOR_RULES
+        from ...config import RESPONDER_GUARDRAIL_PROMPT, TOOL_BEHAVIOR_RULES, RESPONDER_NO_TOOLS_RULE
         
         # 1. Build system prompt with all context blocks
         system_parts = [

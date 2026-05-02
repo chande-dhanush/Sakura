@@ -64,16 +64,15 @@ TOOL OUTPUTS:
                 logger.warning("[Verifier] Empty response from LLM, skipping validation")
                 return {"verdict": "PASS", "reason": "Empty verifier response - assuming pass to prevent stall."}
             
-            # Clean possible markdown wrap
-            if content.startswith("```json"):
-                content = content[7:-3].strip()
-            elif content.startswith("```"):
-                content = content[3:-3].strip()
-
-            # Bug 5 fix: re-check after stripping — model may reply with just "```json\n```"
+            # Bug 5 fix: more robust JSON extraction
+            import re
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if match:
+                content = match.group(0)
+            
             if not content:
-                logger.warning("[Verifier] Empty content after markdown strip, assuming PASS")
-                return {"verdict": "PASS", "reason": "Empty verifier response after strip — assuming pass"}
+                logger.warning("[Verifier] Empty content after extraction, assuming PASS")
+                return {"verdict": "PASS", "reason": "Empty verifier response after extraction — assuming pass"}
 
             result = json.loads(content)
 

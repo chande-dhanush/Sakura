@@ -352,7 +352,22 @@ class SmartAssistant:
             tool_used = "None"
             exec_result = None
             
-            if route_result.needs_tools or route_result.tool_hint:
+            # V19.5: Direct Memory Recall Bypass
+            if route_result.classification == "MEMORY_RECALL":
+                print(f"   [MEMORY_RECALL] Bypassing Planner, directly querying MemoryCoordinator")
+                try:
+                    from ..memory.memory_coordinator import get_memory_coordinator
+                    coordinator = get_memory_coordinator()
+                    # Perform hybrid search for best results
+                    mem_results = coordinator.recall(user_input, mode="hybrid")
+                    tool_outputs = mem_results.to_context_string() if mem_results and mem_results.has_results() else "No relevant memories found."
+                    tool_used = "MemoryCoordinator (Direct)"
+                except Exception as e:
+                    logger.error(f"[MEMORY_RECALL] Direct retrieval failed: {e}")
+                    tool_outputs = "Error retrieving memories directly."
+                    tool_used = "MemoryCoordinator (Error)"
+            
+            elif route_result.needs_tools or route_result.tool_hint:
                 print(f"   V17 Dispatch Phase: {route_result.classification}")
                 state.record_llm_call("execution")
                 
@@ -536,7 +551,7 @@ class SmartAssistant:
             
         except (RateLimitExceeded, LLMBudgetExceededError):
             recorder.end_trace(success=False, response_preview="budget_exceeded")
-            error_response = "I'm working too hard and hit a rate limit. Please try again in a moment."
+            error_response = "I'm a little overwhelmed right now, could you try again?"
             await emitter.emit(error_response, {"status": "budget_exceeded"})
             mode_val = route_result.classification if 'route_result' in locals() else "unknown"
             return {

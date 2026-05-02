@@ -191,7 +191,7 @@ class ReflectionEngine:
             
             # Determine entity type
             etype = EntityType.PREFERENCE
-            if eid.startswith("user:"):
+            if isinstance(eid, str) and eid.startswith("user:"):
                 etype = EntityType.USER
             elif ent.get("type") == "preference":
                 etype = EntityType.PREFERENCE
@@ -230,8 +230,11 @@ class ReflectionEngine:
                 # Auto-generate from summary
                 slug = re.sub(r'[^a-z0-9]+', '_', summary.lower())[:30]
                 constraint_id = f"constraint:{slug}"
-            elif not constraint_id.startswith("constraint:"):
+            elif isinstance(constraint_id, str) and not constraint_id.startswith("constraint:"):
                 constraint_id = f"constraint:{constraint_id}"
+            elif not isinstance(constraint_id, str):
+                # Fallback for malformed ID (dict/list)
+                constraint_id = f"constraint:{hash(str(constraint_id))}"
             
             # Build attributes
             attrs = constraint.get("attributes", {})
@@ -280,6 +283,12 @@ class ReflectionEngine:
                 continue
             
             # Normalize ID
+            if isinstance(retire_id, dict):
+                retire_id = retire_id.get("id") or str(retire_id)
+            
+            if not isinstance(retire_id, str):
+                retire_id = str(retire_id)
+
             if not retire_id.startswith("constraint:"):
                 retire_id = f"constraint:{retire_id}"
             

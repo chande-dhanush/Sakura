@@ -130,8 +130,8 @@ def get_pipeline():
                 _pipeline = KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M')
             except SystemExit as e:
                 # spacy.cli.download() raises SystemExit(2) when it can't write to
-                # site-packages inside a frozen binary.  Catch it so the app survives.
-                print(f"[TTS] spaCy model download failed (SystemExit {e.code}) — TTS disabled")
+                # site-packages inside a frozen binary. Catch it so the app survives.
+                logger.warning(f"[TTS] spaCy model unavailable (SystemExit {e.code}) — TTS disabled")
                 _pipeline = None
             except Exception as e:
                 print(f"[TTS] Kokoro pipeline failed: {e}")

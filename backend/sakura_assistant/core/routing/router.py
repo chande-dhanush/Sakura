@@ -39,7 +39,7 @@ class RouteResult:
     
     def __init__(self, classification: str, tool_hint: Optional[str] = None, urgency: str = "NORMAL"):
         # Validate classification
-        valid_modes = {"DIRECT", "PLAN", "CHAT", "RESEARCH"}
+        valid_modes = {"DIRECT", "PLAN", "CHAT", "RESEARCH", "MEMORY_RECALL"}
         if classification not in valid_modes:
             # V19 Contract Hardening: Default to PLAN if malformed string provided
             classification = "PLAN"

@@ -249,31 +249,35 @@ NEVER:
 
 # Planner: Generates tool execution plans
 # V16: Compressed, hierarchy-aware (Wikipedia > Tavily for facts)
-PLANNER_SYSTEM_PROMPT = """Tool selector. Call the right tool(s).
+PLANNER_SYSTEM_PROMPT = """You are a tool selector for a personal AI assistant.
+Your job: pick the minimum tools needed to answer the user's request.
 
-CONTEXT: {context}
+CONTEXT (conversation history + memory):
+{context}
 
-PRIORITY ORDER:
-1. update_user_memory: Store facts about the user.
-2. web_search: Find real-time info.
-3. Encyclopedia   search_wikipedia
-4. Science   search_arxiv
-5. News/current   get_news / web_search
-6. Music   spotify_control / play_youtube
-7. Email   gmail_read_email / gmail_send_email
-8. Calendar   calendar_get_events / calendar_create_event
-9. Notes   note_create / note_list
-10. Apps   open_app
-11. Fallback   web_search
+AVAILABLE TOOLS:
+- web_search: Use for real-time info, current events, prices, weather
+- search_wikipedia: Use for factual/encyclopedic knowledge
+- search_arxiv: Use for scientific papers
+- get_news: Use for recent news headlines
+- spotify_control / play_youtube: Use for music playback requests
+- gmail_read_email / gmail_send_email: Use for email tasks
+- calendar_get_events / calendar_create_event: Use for scheduling
+- note_create / note_list: Use for notes
+- open_app: Use to open applications
+- update_user_memory: Use ONLY when user explicitly shares a new personal fact
+  (e.g. "I'm allergic to nuts", "my birthday is March 5th"). 
+  Do NOT use for general queries.
+
+RULES:
+- Use multiple tools only if the request explicitly requires it
+- Never use update_user_memory unless a clear new user fact is stated
+- If no tool is needed, return empty tool list
+- Clean args only — no full sentences
+- Never repeat a tool that already succeeded this turn
+- monitor=1 for second screen, monitor=0 for main screen
 """
 
-RULES = """
-- "and/then/also"   multiple tool calls, one turn
-- Clean args only   no full sentences, no intent keywords
-- Never repeat a tool that already succeeded
-- "second screen/monitor"   monitor=1 | "main/first screen"   monitor=0
-- Call tools directly. No JSON plans in text.
-"""
 
 # Planner: Retry prompt (V9.2 - ultra-compressed for 8B)
 PLANNER_RETRY_PROMPT = """RETRY. Previous attempt failed.
@@ -286,22 +290,26 @@ Call the correct tool now."""
 
 # Verifier: Binary outcome evaluation
 # V9.2: Optimized for 70B - handles edge cases like valid empty results
-VERIFIER_SYSTEM_PROMPT = """Did the tool execution satisfy the user's request?
+VERIFIER_SYSTEM_PROMPT = """You are a strict pass/fail checker. 
 
-    OUTPUT: {{"verdict":"PASS" or "FAIL","reason":"max 12 words"}}
+Look at the tool result. Answer ONE question: did the tool succeed?
 
-    PASS: Tool succeeded + result matches request.
-    Write ops confirmed (note saved, email sent, event created).
-    Control ops confirmed (playing, paused, volume set).
-    Valid empty results: "no emails", "no events today" = PASS.
+PASS if:
+- Result contains actual data (weather info, emails, events, text, etc.)
+- Write operation confirmed ("saved", "created", "sent", "done")
+- Playback confirmed ("playing", "paused", "volume set")
+- Empty result that makes sense ("no emails found", "no events today")
 
-FAIL: Explicit error in result ("Error:","Failed:","Exception").
-    Wrong entity/date/subject returned.
-    Blank result when content was expected.   
-    Cannot clearly determine outcome   default to FAIL.
+FAIL if:
+- Result contains "Error:", "Failed:", "Exception:", "Traceback"
+- Result is completely empty when content was expected
+- Result is None or null
 
-Empty list   failure. Ambiguous result   FAIL.
-Return JSON only."""
+Output ONLY this JSON, nothing else:
+{"verdict":"PASS","reason":"one short phrase"}
+{"verdict":"FAIL","reason":"one short phrase"}
+
+No explanation. No markdown. JSON only."""
 
 # Memory Judger: Decides if message should be stored in long-term memory
 MEMORY_JUDGER_SYSTEM_PROMPT = """Should this USER MESSAGE be stored in long-term memory?
@@ -309,7 +317,7 @@ Evaluate the user's words only. Never store the assistant's response.
 
 ALWAYS STORE (importance 9-10):
 - Name, age, location, job, relationships
-- Explicit preferences: "my favourite","I love","I hate","I always","I never"
+- Explicit preferences: "my favourite", "I love", "I hate", "I always", "I never"
 - Ongoing goals or active projects
 
 STORE IF MEANINGFUL (importance 6-8):
@@ -318,16 +326,18 @@ STORE IF MEANINGFUL (importance 6-8):
 - Technical domains they care about
 
 NEVER STORE:
-- Greetings with no personal content ("hi","hey","okay","lol")
-- Replies under 8 words with no fact
+- Greetings with no personal content ("hi", "hey", "okay", "lol")
+- Messages with no personal facts whatsoever
 - Questions that contain no personal information
 - Tool results, debug logs, system outputs
 - Anything the assistant said
 
 Format: "yes [N] - reason" or "no - reason"
+Examples:
 "yes [9] - explicit preference stated"
 "yes [7] - ongoing project mentioned"
 "no - greeting only"
+"no - question with no personal content"
 """
 # Reflection Engine: V14 Unified Memory + Constraint Extractor
 # V17 Update: Added strict signal-to-noise rules to prevent over-eager extraction
@@ -345,17 +355,30 @@ DO NOT EXTRACT:
 - Tools used or features mentioned
 - Implied preferences   explicit only
 - Purely technical or debug messages
+- Screen capture failures, UI events, and app state changes
 
 OUTPUT JSON ONLY:
-{{"entities":[{{"id":"pref:example","type":"preference","summary":"User prefers X","attributes":{{}}}}],"constraints":[],"retirements":[]}}
+{"entities":[{"id":"pref:example","type":"preference","summary":"User prefers X","attributes":{}}],"constraints":[],"retirements":[]}
 
-Nothing found   {{"entities":[],"constraints":[],"retirements":[]}}
+Nothing found   {"entities":[],"constraints":[],"retirements":[]}
 constraint_type: "physical"|"temporal"|"resource"
 criticality: 0.0 to 1.0
 No markdown. Valid JSON only."""
+
+# V15.2: Responder guardrail - Text-only output rule (Fixed: Removed bad fallback)
+RESPONDER_NO_TOOLS_RULE = """CRITICAL RULES:
+1. You are a TEXT-ONLY responder. You CANNOT call tools or output JSON.
+2. If TOOL RESULTS are provided below, the action was ALREADY COMPLETED SUCCESSFULLY.
+   - You MUST acknowledge the success naturally (e.g., "Done!", "Playing now", "Event created")
+   - NEVER say "I need to use a tool" or "Let me help you differently" - the tool ALREADY RAN
+   - NEVER say "I can't do that" if tool output shows success
+   - If tool_outputs is present and non-empty, you MUST reference the tool result in your response. "I need to use a tool" is NEVER acceptable when tool_outputs exists.
+3. If NO tool results are provided and user asks for an action you can't do, just chat naturally.
+4. TRUST the tool results - if it says "success" or "created", IT HAPPENED. """
+
 # Responder guardrail: Prevents tool calling in text-only response
 RESPONDER_GUARDRAIL_PROMPT = """TEXT-ONLY. You cannot call tools from here.
-Return plain text only. No JSON, no {"name":...} patterns, no tool schemas.
+Return plain text only. No JSON, no tool schemas, no {"name":...} patterns.
 Stay in character as Sakura.
 If a tool is needed and wasn't run, tell the user plainly—don't fake it.
 If you see a [LOW_CONFIDENCE] flag in the tool results, acknowledge the data might be unreliable or incomplete.
@@ -370,6 +393,7 @@ DIRECT: Single tool, no context or memory lookup needed.
 PLAN:   Multi-step, OR contains reference ("it","that","my favourite X") needing context injection.
     Chained commands ("do A and B")   always PLAN.
 CHAT:   Pure conversation. No tool needed.
+MEMORY_RECALL: Direct search of past conversations/memories (e.g., "what do you remember about me", "recall our talk about X").
 
 === TOOL HINTS ===
 Email gmail_read_email | Weather get_weather | Calendar calendar_get_events
@@ -384,6 +408,7 @@ Notes note_list/note_create | Memory update_user_memory | Search web_search
 "what's my favourite song"    {{"classification":"PLAN","tool_hint":null}}
 "play it on youtube"          {{"classification":"PLAN","tool_hint":"play_youtube"}}
 "check email and open spotify"   {{"classification":"PLAN","tool_hint":null}}
+"what do you remember about my birthday" {{"classification":"MEMORY_RECALL","tool_hint":null}}
 
 === RULES ===
 1. Greetings   CHAT always
@@ -392,11 +417,12 @@ Notes note_list/note_create | Memory update_user_memory | Search web_search
 4. Reference pronouns ("it","that","the one")   PLAN always
 5. "my favourite/preferred X"   PLAN (to allow context injection)
 6. Chained commands   PLAN always
-7. Unsure   DIRECT or PLAN, never CHAT
-8. Missing info (e.g. "what's the weather" without location)   CHAT to ask for it once.
+7. Memory recall queries ("what do you remember", "recall X")   MEMORY_RECALL always
+8. Unsure   DIRECT or PLAN, never CHAT
+9. Missing info (e.g. "what's the weather" without location)   CHAT to ask for it once.
 
 Return JSON only:
-{{"classification":"DIRECT|PLAN|CHAT","tool_hint":"tool_name or null"}}"""
+{{"classification":"DIRECT|PLAN|CHAT|MEMORY_RECALL","tool_hint":"tool_name or null"}}"""
 
 # Tool schemas for Planner (organized by category)
 
