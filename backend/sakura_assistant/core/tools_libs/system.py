@@ -131,14 +131,54 @@ def read_screen(prompt: str = "Describe what is on the screen in detail.", monit
 
 @tool
 def open_app(app_name: str) -> str:
-    """Open a desktop application."""
-    if not app_open:
-        return os.system(f"start {app_name}") and f"Launched {app_name}"
+    """Open a desktop application by name or path."""
+    import shutil
+    import subprocess
+    
+    # FIX 1: App Resolution Layer
+    # 1. Normalize input
+    name = app_name.lower().strip()
+    
+    # 2. Known common app mappings (name -> executable)
+    APP_MAP = {
+        "vscode": "code",
+        "visual studio code": "code",
+        "chrome": "chrome",
+        "brave": "brave",
+        "edge": "msedge",
+        "whatsapp": "whatsapp",
+        "spotify": "spotify",
+        "notepad": "notepad",
+        "calculator": "calc",
+        "terminal": "wt"
+    }
+    
+    target = APP_MAP.get(name, name)
+    
+    # 3. Resolve path via shutil.which
+    resolved_path = shutil.which(target)
+    if not resolved_path and target != name:
+        resolved_path = shutil.which(name)
+    
     try:
-        app_open(app_name, match_closest=True, output=False)
-        return f" Opened '{app_name}'."
+        if resolved_path:
+            # FIX 2: Safe Execution
+            # subprocess.Popen is preferred for background exes to avoid blocking
+            if resolved_path.lower().endswith(".exe"):
+                subprocess.Popen([resolved_path], shell=False, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008) # DETACHED_PROCESS
+                return f" Launched '{app_name}' (resolved to: {resolved_path})."
+            else:
+                os.startfile(resolved_path)
+                return f" Opened '{app_name}' (resolved to: {resolved_path})."
+        
+        # 4. Fallback to OS (os.startfile)
+        # This handles UWP apps, shell protocols (e.g. 'whatsapp:'), and registered apps
+        os.startfile(app_name)
+        return f" Launched '{app_name}' via OS shell fallback."
+        
     except Exception as e:
-        return f" Error: {e}"
+        # FIX 3: Validation (Catching launch failures)
+        return f" Failed to resolve or launch '{app_name}': {e}"
 
 @tool
 def clipboard_read() -> str:

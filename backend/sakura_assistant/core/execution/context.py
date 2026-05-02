@@ -162,6 +162,7 @@ class ExecutionContext:
     reference_context: str = ""           # V19-FIX: Resolved reference for Planner
     llm_call_count: int = 0
     max_llm_calls: int = 6  # V18 FIX-08
+    tool_call_cache: Dict[str, Any] = field(default_factory=dict)
     
     # Budgets by mode (class constants)
     BUDGET_CHAT_MS: int = _get_int_env("EXEC_BUDGET_CHAT_MS", 1000, 500, 10000)

@@ -11,6 +11,7 @@
 **V19.2 "Execution Stability & Hardening":** Resolved critical regressions in clipboard routing and planning loops. Implemented tool alias normalization and terminal action enforcement for system-level tasks. Hardened metadata preservation during budget failures to eliminate `mode="unknown"` issues.
 **V19.5 "Reliability Audit & Restoration":** Full-stack forensic audit. Eliminated CHAT "Planner" leakage by relabeling compression stages. Fixed orphaned background telemetry through explicit `trace_id` propagation. Restored Voice/TTS performance via a "keep-warm" strategy and fixed dev-mode asset protocol access errors in Tauri.
 **V19.6 "Abstention & Confidence Gating":** Implemented surgical reliability fixes to reduce hallucinations. Added `LOW_CONFIDENCE` propagation flow, one-shot nonsense retries in `ToolRunner`, and conditional tone softening in the `Responder` for factual queries without tool verification.
+**V20.0 "Deterministic Execution & Model Isolation":** Finalized execution pipeline hardening. Implemented deterministic tool call deduplication via request-scoped caching and argument normalization. Refactored rate limiting into a model-specific registry to prevent cross-throttling. Enhanced `open_app` with natural language resolution and PATH integration.
 
 
 **Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
@@ -131,6 +132,10 @@ Sakura's tone adapts based on execution certainty:
 | **TTS Keep-Warm** | **V19.5** | Removed aggressive offloading to eliminate 10s latency on speaker button |
 | **Tauri Audio Access** | **V19.5** | Fixed asset protocol permissions for `temp_audio` in dev mode |
 | **Voice Production Flag** | **V19.5** | Ensured `--voice` is passed to the sidecar in production builds |
+| **Tool Call Deduplication**| **V20.0** | Request-scoped cache with recursive argument normalization prevents redundant tool runs |
+| **Model Isolation RL** | **V20.0** | Per-model Token Buckets prevent Groq/Gemini cross-throttling |
+| **Natural App Resolution**| **V20.0** | `open_app` supports names (vscode, brave) via APP_MAP and PATH resolution |
+| **Safe Async Limiting** | **V20.0** | Refactored lock management in rate limiter for async cancellation safety |
 
 ---
 
@@ -434,6 +439,7 @@ V10 introduces a 4-layer routing funnel for optimal latency.
 | 1 | Smart Router (8B) | Classify → DIRECT, PLAN, or CHAT |
 | 2 | DIRECT path | Cache check → Single tool → Skip Planner/Verifier |
 | 3 | PLAN path | Full ReAct loop with Planner (70B) |
+| 4 | Deduplication Layer| Normalized args → Deterministic Cache (eph) → 0ms retry avoidance |
 
 ### Route Classifications
 
@@ -442,6 +448,7 @@ V10 introduces a 4-layer routing funnel for optimal latency.
 | CHAT | Pure conversation | 1 (Router) + 1 (Responder) |
 | DIRECT | Single obvious tool | 1 (Router) + 1 (Tool) + 1 (Responder) |
 | PLAN | Multi-step or research | 1 (Router) + N (Planner) + 1 (Verifier) + 1 (Responder) |
+| DEDUPE | Repeated tool call | 0 (Result served from cache) |
 
 ### Cache TTLs
 
@@ -1211,6 +1218,11 @@ python tools/system_reset.py
 | **V16.2** | Dependency Injection, Stable Soul Architecture |
 | **V17.0** | **Execution V17 (Dispatcher, Budgets), Core Refactor (6 subdirs), Guaranteed Emission** |
 | **V17.4** | **Observability Fix: Token Tracking, Cost Calculation, Groq XML Recovery Logging** |
+| **V17.5** | **Precise Token Counting, SSE Tool Streaming** |
+| **V18.1** | **Ironclad Reliability Sprint (8 surgical fixes)** |
+| **V19.0** | **DeepSeek Integration, Model Abstraction, Stage Overrides** |
+| **V19.6** | **Abstention & Confidence Gating, nonsense retries** |
+| **V20.0** | **Pipeline Hardening: Deterministic Deduplication & Model Isolation** |
 | **V17.5** | **Precise Token Counting (tiktoken), SSE Tool Streaming (ProgressEmitter)** |
 | **V18.0** | **Ironclad Reliability Phase: Vision Layer (Llama 4 Scout), Hard LLM Core Budgets (6 Calls), High Fidelity Regeneration, Hallucination Gateways, Async/Sync Search Parity** |
 

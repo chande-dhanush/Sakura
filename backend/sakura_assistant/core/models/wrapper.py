@@ -191,107 +191,70 @@ class ReliableLLM:
         self.primary = primary
         self.backup = backup
         self.name = name
+
+    def _get_model_name(self, model) -> str:
+        """Extract model name from LangChain model object."""
+        return getattr(model, 'model_name', None) or \
+               getattr(model, 'model', 'unknown')
+
+    def _acquire_limit_sync(self, model_name: str):
+        """Blocking rate limit acquisition for sync context."""
+        from ..infrastructure.rate_limiter import get_rate_limiter
+        bucket = get_rate_limiter().get_bucket(model_name)
+        
+        import time
+        while bucket.tokens < 1:
+            bucket._refill()
+            if bucket.tokens < 1:
+                sleep_time = (1 - bucket.tokens) / bucket.rate
+                print(f" [RL] model={model_name} wait={sleep_time:.2f}s (Sync)")
+                time.sleep(min(sleep_time, 2.0))
+        bucket.tokens -= 1
+        bucket.total_requests += 1
     
     def invoke(self, messages, timeout=LLM_TIMEOUT, trace_id=None, **kwargs):
-        """
-        Synchronous LLM invocation with rate limiting.
-        
-        V10.4: All models (Router, Planner, Responder) are rate limited.
-        """
+        """Synchronous LLM invocation with model-specific rate limiting."""
         try:
             from ..execution.context import execution_context_var, LLMBudgetExceededError
             ctx = execution_context_var.get()
-            if ctx:
-                if not ctx.record_and_check_llm_call():
-                    raise LLMBudgetExceededError(f"LLM Budget limit ({ctx.max_llm_calls}) exceeded for this request in {self.name}.")
-        except ImportError:
-            pass
+            if ctx and not ctx.record_and_check_llm_call():
+                raise LLMBudgetExceededError(f"Budget exceeded in {self.name}.")
+        except (ImportError, LookupError): pass
 
-        from ..infrastructure.rate_limiter import get_rate_limiter
-        import asyncio
+        # 1. Rate limit primary
+        primary_model = self._get_model_name(self.primary)
+        self._acquire_limit_sync(primary_model)
         
-        # Get model name for rate limiting
-        model_name = getattr(self.primary, 'model_name', None) or \
-                     getattr(self.primary, 'model', 'unknown')
-        
-        # Acquire rate limit (blocking for sync context)
-        limiter = get_rate_limiter()
-        bucket = limiter.get_bucket(model_name)
-        
-        # Use event loop if available, otherwise skip async acquire
-        try:
-            loop = asyncio.get_running_loop()
-            # Can't await in sync context, just proceed
-        except RuntimeError:
-            # No event loop, do blocking check
-            while bucket.tokens < 1:
-                bucket._refill()
-                if bucket.tokens < 1:
-                    sleep_time = (1 - bucket.tokens) / bucket.rate
-                    print(f"  [{self.name}] Rate limited: waiting {sleep_time:.2f}s")
-                    time.sleep(min(sleep_time, 2.0))  # Cap at 2s per iteration
-            bucket.tokens -= 1
-            bucket.total_requests += 1
-        
-        print(f" [{self.name}] Invoking LLM... path=sync model={model_name}")
+        print(f" [{self.name}] Invoking Primary model={primary_model}")
         start_time = time.time()
         try:
             result = invoke_with_timeout(self.primary, messages, timeout=timeout, **kwargs)
-            duration_ms = (time.time() - start_time) * 1000
-            print(f" [{self.name}] LLM call succeeded")
-            
-            # V17.5: Log token usage to FlightRecorder with precise counting
-            _log_llm_tokens(self.name, model_name, result, messages, duration_ms, success=True, trace_id=trace_id)
-            
+            _log_llm_tokens(self.name, primary_model, result, messages, (time.time()-start_time)*1000, trace_id=trace_id)
             return result
-        except (TimeoutError, Exception) as e:
+        except Exception as e:
             # FIX: Recover from Groq "tool_use_failed" error with <function=...>
-            # Llama 3 sometimes leaks XML tool calls that Groq API rejects.
-            # We catch this rejection and parse the intent manually.
             err_str = str(e)
             duration_ms = (time.time() - start_time) * 1000
             if "failed_generation" in err_str and "<function=" in err_str:
                 print(f" [{self.name}] Recovering from Groq XML tool call...")
                 try:
-                    # Parse kwargs like: query="git change origin"
                     match_tools = self._recover_groq_xml(err_str)
                     if match_tools:
-                        # V17.4: Log estimated tokens for recovered call
-                        try:
-                            from ...utils.flight_recorder import get_recorder
-                            recorder = get_recorder()
-                            estimated_tokens = {"prompt": 400, "completion": 100, "total": 500}
-                            recorder.log_llm_call(
-                                stage=f"{self.name} (Recovered)",
-                                model=model_name,
-                                tokens=estimated_tokens,
-                                duration_ms=duration_ms,
-                                success=True
-                            )
-                            print(f"  [{self.name}] Logged ~500 estimated tokens (recovered from XML)")
-                        except:
-                            pass
+                        _log_llm_tokens(f"{self.name} (Recovered)", primary_model, match_tools, messages, duration_ms, trace_id=trace_id)
                         return match_tools
                 except Exception as parse_err:
                     print(f" Recovery failed: {parse_err}")
 
             if self.backup:
-                print(f"   {self.name} Primary failed: {e}. fallback_activated=true path=sync")
-                try:
-                    backup_start = time.time()
-                    backup_model = getattr(self.backup, 'model_name', None) or \
-                                   getattr(self.backup, 'model', 'backup-unknown')
-                    result = invoke_with_timeout(self.backup, messages, timeout=timeout, **kwargs)
-                    backup_duration = (time.time() - backup_start) * 1000
-                    
-                    # V17.5: Log backup model tokens
-                    _log_llm_tokens(f"{self.name} (Backup)", backup_model, result, messages, backup_duration, success=True)
-                    
-                    return result
-                except Exception as backup_err:
-                    print(f" {self.name} Backup also failed: {backup_err}")
-                    raise backup_err
-            print(f" {self.name} Failed (No Backup Available): {e}")
+                # 2. Rate limit backup on fallback
+                backup_model = self._get_model_name(self.backup)
+                print(f" [RL] Primary failed, switching to backup={backup_model}")
+                self._acquire_limit_sync(backup_model)
+                
+                backup_start = time.time()
+                result = invoke_with_timeout(self.backup, messages, timeout=timeout, **kwargs)
+                _log_llm_tokens(f"{self.name} (Backup)", backup_model, result, messages, (time.time()-backup_start)*1000)
+                return result
             raise e
 
     def _recover_groq_xml(self, err_str: str):
@@ -351,37 +314,22 @@ class ReliableLLM:
         )
     
     async def ainvoke(self, messages, timeout=LLM_TIMEOUT, trace_id=None, **kwargs):
-        """
-        True async invocation with backpressure rate limiting.
-        
-        V10.4: 
-        - Uses native LangChain ainvoke() for true async
-        - Rate limits via token bucket (induces latency, not 429 crashes)
-        - Enables parallel tool execution via asyncio.gather()
-        """
+        """True async invocation with model-specific backpressure."""
         try:
             from ..execution.context import execution_context_var, LLMBudgetExceededError
             ctx = execution_context_var.get()
-            if ctx:
-                if not ctx.record_and_check_llm_call():
-                    raise LLMBudgetExceededError(f"LLM Budget limit ({ctx.max_llm_calls}) exceeded for this request in {self.name}.")
-        except ImportError:
-            pass
+            if ctx and not ctx.record_and_check_llm_call():
+                raise LLMBudgetExceededError(f"Budget exceeded in {self.name}.")
+        except (ImportError, LookupError): pass
 
         from ..infrastructure.rate_limiter import get_rate_limiter
-        
-        # Get model name for rate limiting
-        model_name = getattr(self.primary, 'model_name', None) or \
-                     getattr(self.primary, 'model', 'unknown')
-        
-        # Acquire rate limit (will sleep if bucket empty)
         limiter = get_rate_limiter()
-        wait_time = await limiter.acquire(model_name)
+
+        # 1. Rate limit primary
+        primary_model = self._get_model_name(self.primary)
+        await limiter.acquire(primary_model)
         
-        if wait_time > 0:
-            print(f"  [{self.name}] Rate limited: waited {wait_time:.2f}s")
-        
-        print(f" [{self.name}] Async invoking LLM... path=async model={model_name}")
+        print(f" [{self.name}] Async invoking Primary model={primary_model}")
         start_time = time.time()
         
         try:
@@ -394,66 +342,37 @@ class ReliableLLM:
                 result = await asyncio.to_thread(self.primary.invoke, messages, **kwargs)
             
             duration_ms = (time.time() - start_time) * 1000
-            print(f" [{self.name}] Async LLM call succeeded")
-            
-            # V17.5: Log token usage to FlightRecorder with precise counting
-            _log_llm_tokens(self.name, model_name, result, messages, duration_ms, success=True, trace_id=trace_id)
-            
+            _log_llm_tokens(self.name, primary_model, result, messages, duration_ms, success=True, trace_id=trace_id)
             return result
-            
         except Exception as e:
+            # Try XML recovery for Groq errors
             err_str = str(e)
             duration_ms = (time.time() - start_time) * 1000
-            
-            # Try XML recovery for Groq errors
             if "failed_generation" in err_str and "<function=" in err_str:
                 print(f" [{self.name}] Recovering from Groq XML tool call...")
                 try:
                     match_tools = self._recover_groq_xml(err_str)
                     if match_tools:
-                        # V17.4: Log estimated tokens for recovered call
-                        # Groq doesn't provide usage in error responses, estimate ~500 tokens
-                        try:
-                            from ...utils.flight_recorder import get_recorder
-                            recorder = get_recorder()
-                            estimated_tokens = {"prompt": 400, "completion": 100, "total": 500}
-                            recorder.log_llm_call(
-                                stage=f"{self.name} (Recovered)",
-                                model=model_name,
-                                tokens=estimated_tokens,
-                                duration_ms=duration_ms,
-                                success=True
-                            )
-                            print(f"  [{self.name}] Logged ~500 estimated tokens (recovered from XML)")
-                        except:
-                            pass
+                        _log_llm_tokens(f"{self.name} (Recovered)", primary_model, match_tools, messages, duration_ms, trace_id=trace_id)
                         return match_tools
                 except Exception as parse_err:
                     print(f" Recovery failed: {parse_err}")
-            
-            # Try backup
+
             if self.backup:
-                print(f"   {self.name} Primary async failed: {e}. fallback_activated=true path=async")
-                try:
-                    backup_start = time.time()
-                    backup_model = getattr(self.backup, 'model_name', None) or \
-                                   getattr(self.backup, 'model', 'backup-unknown')
-                    
-                    if hasattr(self.backup, 'ainvoke'):
-                        result = await self.backup.ainvoke(messages, **kwargs)
-                    else:
-                        import asyncio
-                        result = await asyncio.to_thread(self.backup.invoke, messages, **kwargs)
-                    
-                    backup_duration = (time.time() - backup_start) * 1000
-                    
-                    # V17.5: Log backup model tokens
-                    _log_llm_tokens(f"{self.name} (Backup)", backup_model, result, messages, backup_duration, success=True)
-                    
-                    return result
-                except Exception as backup_err:
-                    print(f" {self.name} Backup async also failed: {backup_err}")
-                    raise backup_err
+                # 2. Rate limit backup on fallback
+                backup_model = self._get_model_name(self.backup)
+                print(f" [RL] Primary async failed, switching to backup={backup_model}")
+                await limiter.acquire(backup_model)
+                
+                backup_start = time.time()
+                if hasattr(self.backup, 'ainvoke'):
+                    result = await self.backup.ainvoke(messages, **kwargs)
+                else:
+                    import asyncio
+                    result = await asyncio.to_thread(self.backup.invoke, messages, **kwargs)
+                
+                _log_llm_tokens(f"{self.name} (Backup)", backup_model, result, messages, (time.time()-backup_start)*1000, success=True)
+                return result
             
             print(f" {self.name} Async Failed (No Backup): {e}")
             raise e

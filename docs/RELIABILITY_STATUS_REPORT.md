@@ -1,17 +1,18 @@
-# Sakura V19.6 Reliability Status Report
+# Sakura V20.0 Reliability Status Report
 
-**Session Date**: 2026-04-18
-**Project Stage**: V19.2 Prototype (Reliability Hardened)
+**Session Date**: 2026-05-02
+**Project Stage**: V20.0 Production Hardened (Execution Pipeline Certified)
 
 ## 1. What was Identified (Audit Findings)
 We performed an exhaustive reliability audit to find "Ghost Components" and silent failure points.
 
 ### **Critical Risks Found**
-- **Cancellation Leaks**: The `/stop` command only stopped the UI stream; backend LLM/tool calls were finishing to completion, wasting hundreds of tokens per cancellation.
-- **Silent Storage Errors**: Bare `except: pass` blocks in the FAISS memory store were swallowing filesystem locks and write failures during memory wipes.
-- **Reference Resolution Failure**: The Router was classifying queries like "play it" as `DIRECT`, causing tools to fail because they couldn't resolve "it" to a previously mentioned song.
-- **Redundant Tool Calls**: The Planner was re-running `read_screen` multiple times in a single loop, wasting time and tokens.
-- **Hallucination Baseline**: Audit recorded ~32% hallucination rate on factual queries without tool support.
+- [CLOSED] **Redundant Tool Calls**: The Planner was re-running tools multiple times. **Fix:** Deterministic request-scoped cache + argument normalization (V20.0).
+- [CLOSED] **Cross-Model Bottlenecks**: Global rate limiting was causing unrelated models to throttle. **Fix:** Model-specific registry with isolated token buckets (V20.0).
+- **Cancellation Leaks**: The `/stop` command only stopped the UI stream; backend LLM/tool calls were finishing to completion, wasting tokens.
+- **Silent Storage Errors**: Bare `except: pass` blocks in the FAISS memory store were swallowing locks.
+- **Reference Resolution Failure**: Router misclassifying pronouns (Fixed in V19.2).
+- **Hallucination Baseline**: Audit recorded ~32% hallucination rate on factual queries.
 - **Corruption Detection**: 0% detection of nonsensical/garbled tool outputs.
 
 ### **Post-Fix Expected Improvements**

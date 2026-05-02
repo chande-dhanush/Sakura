@@ -4,14 +4,14 @@ Infrastructure and system services.
 Exports:
 - get_container
 - broadcast
-- get_rate_limiter, GlobalRateLimiter
+- get_rate_limiter, ModelRateLimiter
 - TaskScheduler
 - VoiceEngine, _run_loop
 """
 
 from .container import get_container
 from .broadcaster import broadcast
-from .rate_limiter import get_rate_limiter, GlobalRateLimiter
+from .rate_limiter import get_rate_limiter, ModelRateLimiter
 from .scheduler import Scheduler
 try:
     from .voice import VoiceEngine
@@ -27,7 +27,7 @@ __all__ = [
     "get_container",
     "broadcast",
     "get_rate_limiter",
-    "GlobalRateLimiter",
+    "ModelRateLimiter",
     "Scheduler",
     "VoiceEngine",
     "get_voice_engine",

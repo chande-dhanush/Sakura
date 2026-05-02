@@ -327,6 +327,27 @@ class ToolRunner:
         self.tool_map = tool_map
         self.policy = policy
 
+    def _normalize_args(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize string keys and values: lowercase and strip."""
+        normalized = {}
+        for k, v in args.items():
+            # Normalize key
+            norm_k = k.lower() if isinstance(k, str) else k
+            
+            if isinstance(v, str):
+                normalized[norm_k] = v.strip().lower()
+            elif isinstance(v, dict):
+                normalized[norm_k] = self._normalize_args(v)
+            elif isinstance(v, list):
+                normalized[norm_k] = [
+                    self._normalize_args(item) if isinstance(item, dict) 
+                    else (item.strip().lower() if isinstance(item, str) else item) 
+                    for item in v
+                ]
+            else:
+                normalized[norm_k] = v
+        return normalized
+
     def _is_nonsense_output(self, output: str) -> bool:
         """Detect obvious nonsense or malformed structure."""
         if not output or not output.strip():
@@ -349,23 +370,37 @@ class ToolRunner:
                 original_tool=tool_name
             )
         
+        # V19.6: Argument Normalization
+        normalized_args = self._normalize_args(args)
+        
+        # V19.6: Duplicate Call Prevention (Cache Check)
+        from .context import execution_context_var
+        ctx = execution_context_var.get()
+        cache_key = None
+        
+        if ctx:
+            cache_key = f"{tool_name}:{json.dumps(normalized_args, sort_keys=True)}"
+            if cache_key in ctx.tool_call_cache:
+                print(f"   [CACHE HIT] {tool_name}({normalized_args})")
+                return ctx.tool_call_cache[cache_key]
+
         try:
             # V19.5: Hallucination Gateway
-            _validate_tool_input(tool_name, args)
+            _validate_tool_input(tool_name, normalized_args)
             
             # V15.2.2: Path Traversal Defense
             if tool_name in ["file_read", "file_write", "open_app"]:
-                path_key = "path" if "path" in args else ("app_name" if "app_name" in args else "filename")
-                if path_key in args:
-                    args[path_key] = _sanitize_path(args[path_key])
+                path_key = "path" if "path" in normalized_args else ("app_name" if "app_name" in normalized_args else "filename")
+                if path_key in normalized_args:
+                    normalized_args[path_key] = _sanitize_path(normalized_args[path_key])
             
-            result = self.tool_map[tool_name].invoke(args)
+            result = self.tool_map[tool_name].invoke(normalized_args)
             result_str = str(result)
             
             # V19.6: Sanity Check & Retry ONCE
             if self._is_nonsense_output(result_str):
                 print(f"   [Sanity] Nonsense detected from {tool_name}, retrying once...")
-                result = self.tool_map[tool_name].invoke(args)
+                result = self.tool_map[tool_name].invoke(normalized_args)
                 result_str = str(result)
                 if self._is_nonsense_output(result_str):
                     print(f"   [Sanity] Still nonsense. Flagging LOW_CONFIDENCE.")
@@ -373,16 +408,25 @@ class ToolRunner:
             
             # Check for soft failure
             if self.policy.is_soft_failure(result_str, tool_name):
-                fallback_result = self._try_fallback(tool_name, args, user_input)
+                fallback_result = self._try_fallback(tool_name, normalized_args, user_input)
                 if fallback_result:
+                    # V19.6: Cache fallback if successful
+                    if ctx and cache_key and not _is_empty_or_failed(fallback_result.output):
+                         ctx.tool_call_cache[cache_key] = fallback_result
                     return fallback_result
             
-            return ToolRunResult(
+            run_result = ToolRunResult(
                 output=result_str,
                 success=True,
                 tool_name=tool_name,
                 original_tool=tool_name
             )
+
+            # V19.6: Update Cache (Success ONLY, skip empty/failed)
+            if ctx and cache_key and not _is_empty_or_failed(result_str):
+                ctx.tool_call_cache[cache_key] = run_result
+                
+            return run_result
             
         except Exception as e:
             import traceback
@@ -409,23 +453,37 @@ class ToolRunner:
                 original_tool=tool_name
             )
         
+        # V19.6: Argument Normalization
+        normalized_args = self._normalize_args(args)
+        
+        # V19.6: Duplicate Call Prevention (Cache Check)
+        from .context import execution_context_var
+        ctx = execution_context_var.get()
+        cache_key = None
+        
+        if ctx:
+            cache_key = f"{tool_name}:{json.dumps(normalized_args, sort_keys=True)}"
+            if cache_key in ctx.tool_call_cache:
+                print(f"   [CACHE HIT] {tool_name}({normalized_args})")
+                return ctx.tool_call_cache[cache_key]
+
         try:
             # V19.5: Hallucination Gateway
-            _validate_tool_input(tool_name, args)
+            _validate_tool_input(tool_name, normalized_args)
             
             # V15.2.2: Path Traversal Defense
             if tool_name in ["file_read", "file_write", "open_app"]:
-                path_key = "path" if "path" in args else ("app_name" if "app_name" in args else "filename")
-                if path_key in args:
-                    args[path_key] = _sanitize_path(args[path_key])
+                path_key = "path" if "path" in normalized_args else ("app_name" if "app_name" in normalized_args else "filename")
+                if path_key in normalized_args:
+                    normalized_args[path_key] = _sanitize_path(normalized_args[path_key])
             
             tool_instance = self.tool_map[tool_name]
             
             # Use ainvoke if available, otherwise run sync in thread
             if hasattr(tool_instance, 'ainvoke'):
-                result = await tool_instance.ainvoke(args)
+                result = await tool_instance.ainvoke(normalized_args)
             else:
-                result = await asyncio.to_thread(tool_instance.invoke, args)
+                result = await asyncio.to_thread(tool_instance.invoke, normalized_args)
             
             result_str = str(result)
             
@@ -433,9 +491,9 @@ class ToolRunner:
             if self._is_nonsense_output(result_str):
                 print(f"   [Sanity] Async nonsense from {tool_name}, retrying once...")
                 if hasattr(tool_instance, 'ainvoke'):
-                    result = await tool_instance.ainvoke(args)
+                    result = await tool_instance.ainvoke(normalized_args)
                 else:
-                    result = await asyncio.to_thread(tool_instance.invoke, args)
+                    result = await asyncio.to_thread(tool_instance.invoke, normalized_args)
                 result_str = str(result)
                 if self._is_nonsense_output(result_str):
                     print(f"   [Sanity] Still nonsense. Flagging LOW_CONFIDENCE.")
@@ -443,16 +501,25 @@ class ToolRunner:
             
             # Check for soft failure
             if self.policy.is_soft_failure(result_str, tool_name):
-                fallback_result = await self._atry_fallback(tool_name, args, user_input)
+                fallback_result = await self._atry_fallback(tool_name, normalized_args, user_input)
                 if fallback_result:
+                    # V19.6: Cache fallback if successful
+                    if ctx and cache_key and not _is_empty_or_failed(fallback_result.output):
+                         ctx.tool_call_cache[cache_key] = fallback_result
                     return fallback_result
             
-            return ToolRunResult(
+            run_result = ToolRunResult(
                 output=result_str,
                 success=True,
                 tool_name=tool_name,
                 original_tool=tool_name
             )
+
+            # V19.6: Update Cache (Success ONLY, skip empty/failed)
+            if ctx and cache_key and not _is_empty_or_failed(result_str):
+                ctx.tool_call_cache[cache_key] = run_result
+                
+            return run_result
             
         except Exception as e:
             import traceback

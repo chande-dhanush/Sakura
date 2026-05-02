@@ -235,3 +235,47 @@ Perform a full-stack forensic audit to eliminate execution-path regressions (Pla
 
 ### Outcome
 Sakura V19.5 is now architecturally stable with high-fidelity telemetry and responsive Voice/TTS capabilities.
+
+## Phase 7: Execution Pipeline Hardening & Model Isolation
+**Date:** 2026-05-02
+**Operator:** Antigravity (Principal Engineer Mode)
+
+### Phase Goal
+Finalize the execution pipeline for production readiness through deterministic tool call deduplication, model-isolated rate limiting, and natural language app resolution.
+
+---
+
+### Issues Fixed
+
+#### 1. Redundant Tool Execution (Budget Drainage)
+- **Root Cause:** LLMs occasionally generated duplicate tool calls with minor argument variations (e.g., "Bangalore" vs "bangalore"), or repeated the same call across planning iterations when the loop failed to terminate.
+- **Fix Applied:** 
+    - Implemented a request-scoped `tool_call_cache` within `ExecutionContext`.
+    - Added recursive argument normalization (lowercase + whitespace strip) for both keys and values.
+    - Ensured deterministic cache keys using `json.dumps(sort_keys=True)`.
+- **Verified:** ✅ `verify_dedupe.py` confirms that identical/casing-variant calls are served from cache (0ms) rather than re-executed.
+
+#### 2. Global Rate Limiter Bottleneck (Cross-Throttling)
+- **Root Cause:** A single global token bucket was used for all LLM providers. If one model (e.g., Groq Llama) hit a rate limit, it would wait and block all other models (e.g., Gemini or DeepSeek), even if they had remaining quota.
+- **Fix Applied:** 
+    - Refactored `GlobalRateLimiter` into `ModelRateLimiter`.
+    - Implemented isolated token buckets for every unique model identifier.
+    - Updated `ReliableLLM` to enforce individual limits for both primary and backup models.
+    - Hardened async lock management to prevent `RuntimeError` during task cancellation.
+- **Verified:** ✅ `verify_rl_isolation.py` confirms that draining one model's quota does not affect the throughput of other models.
+
+#### 3. Brittle 'open_app' Resolution
+- **Root Cause:** The `open_app` tool required explicit paths, leading to failures when the LLM guessed common names (e.g., "vscode") without the full executable path.
+- **Fix Applied:** 
+    - Added a resolution layer with `APP_MAP` for common aliases.
+    - Integrated `shutil.which` for PATH-based binary discovery.
+    - Implemented safe background execution for `.exe` files and OS-shell fallback for registered protocols.
+- **Verified:** ✅ `verify_open_app.py` confirms "vscode", "brave", and "whatsapp" launch successfully via natural language.
+
+#### 4. Groq XML Recovery Regression
+- **Root Cause:** During the rate limiter refactor, the specialized logic to recover from Llama-3 XML tool call leaks on Groq was accidentally omitted or orphaned.
+- **Fix Applied:** Restored and integrated the `_recover_groq_xml` helper into both sync and async paths of `ReliableLLM`.
+- **Verified:** ✅ Recovered calls are properly rate-limited and logged to `FlightRecorder`.
+
+### Outcome
+Sakura V20.0 features a hardened execution pipeline with deterministic deduplication and true model-level isolation, significantly reducing unnecessary budget consumption and improving system-level responsiveness.
