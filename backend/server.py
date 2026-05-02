@@ -88,6 +88,40 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
     global assistant, SETUP_REQUIRED, INIT_ERROR
     print("[START] Sakura Backend starting...")
+
+    # --- First Run Setup & Model Verification ---
+    try:
+        from pathlib import Path
+        setup_flag = Path("../.setup_complete")
+        if not setup_flag.exists():
+            print("[Setup] First run detected, ensuring models...")
+            
+            # 1. Wake Word Models
+            try:
+                import openwakeword
+                model_path = Path(openwakeword.__file__).parent / "resources/models/hey_jarvis_v0.1.onnx"
+                if not model_path.exists():
+                    print("[WAKE] Downloading wake word models (~8MB)...")
+                    # Use a blocking call in a thread to avoid stalling the loop too much if it's large,
+                    # but since it's lifespan it's okay to wait.
+                    openwakeword.utils.download_models(['hey_jarvis'])
+                    print("[WAKE] Wake word models ready ✅")
+            except Exception as e:
+                print(f"[WAKE] Model download failed: {e}")
+
+            # 2. Kokoro TTS Models
+            try:
+                from sakura_assistant.utils.tts import get_pipeline
+                print("[TTS] Verifying Kokoro model (~300MB)...")
+                get_pipeline() # Lazy download trigger
+                print("[TTS] Kokoro model ready ✅")
+            except Exception as e:
+                print(f"[TTS] Model verification failed: {e}")
+
+            setup_flag.touch()
+            print("[Setup] First run setup complete ✅")
+    except Exception as e:
+        print(f"[Setup] Critical setup error: {e}")
     
     # Import here to delay model loading until server starts
     from sakura_assistant.core.llm import SmartAssistant
@@ -131,7 +165,8 @@ async def lifespan(app: FastAPI):
                 try:
                     await asyncio.sleep(60)
                     if assistant and assistant.summary_memory:
-                        history = assistant.summary_memory.conversation_history
+                        history = getattr(assistant.summary_memory, 'recent_messages', 
+                                          getattr(assistant.summary_memory, 'conversation_history', []))
                         if history:
                             # analyze_delta is wrapped by observe_background
                             await re.observe_background(history)
@@ -231,7 +266,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Sakura Backend",
     version=__version__,
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None,      # V19.5: Disable docs for desktop-only
+    redoc_url=None,
+    openapi_url=None
 )
 
 # V19.5: Rate Limiting Middleware (Security & Performance)
@@ -906,12 +944,24 @@ async def voice_speak(request: Request):
 async def voice_generate(request: Request):
     """Generate TTS audio file."""
     try:
-        data = await request.json(); text = data.get("text", "").strip()
-        if not text: return {"status": "error"}
+        data = await request.json()
+        text = data.get("text", "").strip()
+        if not text:
+            return JSONResponse({"status": "error", "message": "No text provided"}, status_code=400)
+        
+        log.info(f"[TTS] /voice/generate called: '{text[:60]}'")
         from sakura_assistant.utils.tts import generate_audio
-        path = generate_audio(text)
-        return {"status": "success", "audio_path": path} if path else {"status": "error"}
-    except: return {"status": "error"}
+        path = await generate_audio(text)
+        
+        if path:
+            log.info(f"[TTS] /voice/generate success: {path}")
+            return {"status": "success", "audio_path": path}
+        else:
+            log.error("[TTS] /voice/generate returned None")
+            return JSONResponse({"status": "error", "message": "TTS synthesis failed"}, status_code=500)
+    except Exception as e:
+        log.error(f"[TTS] /voice/generate error: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 @app.post("/voice/trigger")
@@ -978,7 +1028,9 @@ async def send_proactive_message(message: str):
 async def speak_proactive(message: str):
     try:
         import psutil
-        if psutil.cpu_percent(interval=0.1) > 80: return
+        if psutil.cpu_percent(interval=0.1) > 98:
+            log.warning("[TTS] Proactive speech skipped: CPU critical")
+            return
         from sakura_assistant.utils.tts import speak
         await asyncio.to_thread(speak, message)
     except: pass

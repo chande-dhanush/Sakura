@@ -9,19 +9,26 @@ import gc
 import numpy as np
 import soundfile as sf
 from pathlib import Path
+import logging
+
+logger = logging.getLogger("sakura.tts")
+import sys
+
+# V19.5: Ensure Kokoro models are stored project-relative for portability
+MODELS_DIR = Path(__file__).parent.parent.parent / "models" / "kokoro"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+os.environ["HF_HOME"] = str(MODELS_DIR)
+
 
 try:
     from kokoro import KPipeline
     KOKORO_AVAILABLE = True
-    print("SUCCESS: Kokoro TTS loaded!", file=sys.stderr)
+    logger.info("Kokoro TTS engine loaded")
 except Exception as e:
     KOKORO_AVAILABLE = False
-    print("=" * 60, file=sys.stderr)
-    print("KOKORO IMPORT FAILED - FULL TRACEBACK:", file=sys.stderr)
-    print("=" * 60, file=sys.stderr)
+    logger.error(f"Kokoro import failed: {e}")
     import traceback
-    traceback.print_exc(file=sys.stderr)
-    print("=" * 60, file=sys.stderr)
+    logger.debug(traceback.format_exc())
 
 # Fallback Imports
 try:
@@ -241,7 +248,7 @@ def kokoro_tts(text, voice='af_heart'):
                 audio = np.concatenate([audio, chunk])
         
         if audio is None:
-             print("[TTS]   Kokoro produced no audio.", file=sys.stderr)
+             logger.error("[TTS] Kokoro produced no audio")
              _is_speaking = False
              return False
 
@@ -284,32 +291,28 @@ def kokoro_tts(text, voice='af_heart'):
         return False
 
 
-def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
+async def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
     """
     Generate audio file and return path (NO playback).
     Used by frontend for HTML5 Audio API playback.
-    
-    Returns:
-        str: Absolute path to the generated WAV file, or None on failure.
     """
     global _pipeline, _last_used_time
     
+    logger.info(f"[TTS] Synthesizing: '{text[:60]}...'")
+    
     if not KOKORO_AVAILABLE:
-        print("[TTS]   Kokoro not available for generation", file=sys.stderr)
+        logger.error("[TTS] Kokoro not available — check model load at startup")
         return None
 
     pipe = get_pipeline()
     if not pipe:
-        print("[TTS]   Failed to get Kokoro pipeline", file=sys.stderr)
+        logger.error("[TTS] Failed to get Kokoro pipeline")
         return None
     
     # V18: Use proper writable directory for audio files
     audio_dir = get_audio_output_dir()
     temp_file = audio_dir / f"kokoro_{uuid.uuid4().hex}.wav"
     
-    print(f"[TTS] Generating audio for frontend: '{text[:50]}...'", file=sys.stderr)
-    print(f"[TTS] Output: {temp_file}", file=sys.stderr)
-
     try:
         # Generate audio chunks
         gen = pipe(text, voice=voice, speed=1)
@@ -322,7 +325,7 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
                 audio = np.concatenate([audio, chunk])
         
         if audio is None:
-            print("[TTS]   Kokoro produced no audio.", file=sys.stderr)
+            logger.error("[TTS] Generation returned None — synthesis failed")
             return None
 
         # Save to file
@@ -330,27 +333,20 @@ def generate_audio(text: str, voice: str = 'af_heart') -> str | None:
         
         # Verify file creation
         if not temp_file.exists():
-            print(f"[TTS]   ERROR: File NOT created at {temp_file}", file=sys.stderr)
+            logger.error(f"[TTS] ERROR: File NOT created at {temp_file}")
             return None
         
-        size = temp_file.stat().st_size
-        print(f"[TTS]   Audio file created: {size} bytes", file=sys.stderr)
-        
-        # V19 FIX: Remove aggressive offloading. 
-        # Let the background _background_idle_checker handle cleanup after 5 mins of inactivity.
-        # This fixes the ~10s delay on every speaker button click.
+        logger.info(f"[TTS] Done → {temp_file}")
         
         _last_used_time = time.time()
-        
         return str(temp_file)
         
     except Exception as e:
-        print(f"[TTS]   Generation Failed: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+        logger.error(f"[TTS] Failed: {e}", exc_info=True)
         if temp_file.exists():
             try: os.remove(temp_file)
-            except Exception as e: print(f"[TTS] Could not cleanup temp file: {e}", file=sys.stderr)
+            except Exception as cleanup_err: 
+                logger.warning(f"[TTS] Could not cleanup temp file: {cleanup_err}")
         return None
 
 

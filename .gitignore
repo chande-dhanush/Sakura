@@ -71,3 +71,8 @@ frontend/src-tauri/binaries/
 
 # ============ Artifacts ============
 .gemini/
+# ============ Models & Scratch ============
+backend/models/
+models/
+scratch/
+.setup_complete

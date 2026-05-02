@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Sakura",
-  "version": "18.0.0",
+  "version": "19.5.0",
   "identifier": "com.sakura.assistant",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -75,12 +75,34 @@
     "externalBin": [
       "binaries/sakura-backend"
     ],
+    "resources": [
+      "../../backend/data/**/*",
+      "../../backend/models/**/*",
+      "../../.setup_complete"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "Sakura AI Team",
+    "copyright": "Copyright © 2026 Sakura AI",
+    "category": "Utility",
+    "shortDescription": "Hardened AI Personal Assistant",
+    "longDescription": "Sakura V19.5 is a privacy-first, context-aware AI personal assistant built for local execution and enterprise reliability.",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "nsis": {
+        "installMode": "perMachine",
+        "languages": ["English"]
+      },
+      "wix": {
+        "language": ["en-US"]
+      }
+    }
   }
 }

@@ -13,10 +13,27 @@ import threading
 import queue
 import speech_recognition as sr
 from typing import Optional, Callable, List, Any, TYPE_CHECKING
+import sounddevice as sd
+import numpy as np
+import httpx
+import io
+import scipy.io.wavfile as wav
+import os
+import logging
+import asyncio
 
 from ...utils.wake_word import init_wake_detector, WakeState
-from ...utils.shared_mic import start_shared_mic, stop_shared_mic, register_mic_consumer, activate_mic_consumer, deactivate_mic_consumer
+from ...utils.shared_mic import (
+    start_shared_mic, 
+    stop_shared_mic, 
+    register_mic_consumer, 
+    activate_mic_consumer, 
+    deactivate_mic_consumer,
+    get_shared_mic_lock
+)
 from ...utils.tts import speak_async
+
+logger = logging.getLogger("sakura.voice")
 
 if TYPE_CHECKING:
     from ..llm import SmartAssistant
@@ -94,60 +111,106 @@ class VoiceEngine:
             self.listening = True
 
 
-    def _listen_for_command(self) -> Optional[str]:
-        """
-        Record audio and perform Speech-to-Text.
-        Uses SpeechRecognition library with Google Speech API (Free tier).
-        """
+    async def _listen_for_command(self) -> str:
+        """Record via sounddevice → transcribe via Groq Whisper"""
+        logger.info("[STT] Listening...")
+        
+        SAMPLE_RATE = 16000
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        
         try:
-            print(" Listening...")
-            
-            # P0: Stop shared mic to release audio device for SpeechRecognition
+            # P0: Stop shared mic to release audio device
             stop_shared_mic()
-            time.sleep(0.2)
+            await asyncio.sleep(0.2)
             
-            try:
-                with sr.Microphone() as source:
-                    # Adjust for noise briefly
-                    self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
-                    
-                    # Tuning for natural speech (prevent cutoff)
-                    self.recognizer.pause_threshold = 1.2      # Wait 1.2s of silence before ending (was 0.8)
-                    self.recognizer.non_speaking_duration = 0.8 # Min silence length
-                    
-                    # Listen (blocking, with timeout)
-                    try:
-                        audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=15)
-                    except sr.WaitTimeoutError:
-                        print("TIMEOUT: No speech detected.")
-                        return None
-            finally:
-                # P0: ALWAYS restart shared mic for Wake Detector
-                start_shared_mic()
+            audio = await asyncio.to_thread(self._record_until_silence)
+            
+            # P0: ALWAYS restart shared mic
+            start_shared_mic()
 
-            print(" Transcribing...")
-            try:
-                # Use Google Speech Recognition (free, reliable)
-                text = self.recognizer.recognize_google(audio)
-                print(f"  User said: '{text}'")
-                return text
-            except sr.UnknownValueError:
-                print(" STT: Could not understand audio")
-                return None
-            except sr.RequestError as e:
-                print(f"   STT Error: {e}")
-                return None
-                
+            if audio is None or len(audio) < SAMPLE_RATE * 0.3:
+                logger.warning("[STT] Audio too short, ignoring")
+                return ""
+            
+            logger.info(f"[STT] Recorded {len(audio)/SAMPLE_RATE:.1f}s, transcribing...")
+            text = await self._transcribe_groq(audio)
+            logger.info(f"[STT] Transcribed: '{text}'")
+            return text
+            
         except Exception as e:
-            print(f" Listening Error: {e}")
+            logger.error(f"[STT] Failed: {e}", exc_info=True)
+            # Ensure mic is back on
+            start_shared_mic()
+            return ""
+
+    def _record_until_silence(self) -> np.ndarray | None:
+        SAMPLE_RATE = 16000
+        SILENCE_THRESHOLD = 0.02
+        SILENCE_SECONDS = 1.2
+        chunks = []
+        silence_chunks = 0
+        speaking = False
+        max_duration = 30  # 30s max recording
+        
+        logger.info("[STT] Waiting for speech...")
+        
+        try:
+            with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype='float32') as stream:
+                for _ in range(int(max_duration * 10)):  # 100ms chunks
+                    chunk, _ = stream.read(SAMPLE_RATE // 10)
+                    rms = float(np.sqrt(np.mean(chunk**2)))
+                    
+                    if rms > SILENCE_THRESHOLD:
+                        if not speaking:
+                            logger.info("[STT] Speech detected")
+                        speaking = True
+                        silence_chunks = 0
+                        chunks.append(chunk.copy())
+                    elif speaking:
+                        silence_chunks += 1
+                        chunks.append(chunk.copy())
+                        if silence_chunks >= int(SILENCE_SECONDS * 10):
+                            logger.info("[STT] Silence detected, stopping")
+                            break
+        except Exception as e:
+            logger.error(f"[STT] Recording device error: {e}")
             return None
+    
+        return np.concatenate(chunks) if chunks else None
+
+    async def _transcribe_groq(self, audio: np.ndarray) -> str:
+        SAMPLE_RATE = 16000
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        
+        if not GROQ_API_KEY:
+            logger.error("[STT] GROQ_API_KEY missing")
+            return "Error: Groq API key missing"
+
+        buf = io.BytesIO()
+        wav.write(buf, SAMPLE_RATE, (audio * 32767).astype(np.int16))
+        buf.seek(0)
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            try:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                    files={"file": ("audio.wav", buf, "audio/wav")},
+                    data={"model": "whisper-large-v3-turbo"}
+                )
+                response.raise_for_status()
+                return response.json().get("text", "").strip()
+            except Exception as e:
+                logger.error(f"[STT] Groq API error: {e}")
+                return ""
 
     def _run_loop(self):
         """Main Voice Event Loop."""
         while not self.should_stop:
             if self.listening:
                 # --- LISTENING PHASE ---
-                command = self._listen_for_command()
+                # V19.5: Handle async listen in sync thread
+                command = asyncio.run(self._listen_for_command())
                 self.listening = False
                 
                 if command:

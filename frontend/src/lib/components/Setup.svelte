@@ -29,7 +29,11 @@
         // Sakura Personalization (NEW FIX-C)
         SAKURA_NAME: "Sakura",
         RESPONSE_STYLE: "balanced",
-        SYSTEM_PROMPT_OVERRIDE: ""
+        SYSTEM_PROMPT_OVERRIDE: "",
+        
+        // V19.5: Wake Word Settings
+        WAKE_WORD_ENABLED: "true",
+        WAKE_WORD_SENSITIVITY: 0.5,
         ,
         ROUTER_PROVIDER: "auto",
         PLANNER_PROVIDER: "auto",
@@ -115,6 +119,8 @@
                         SAKURA_NAME: data.SAKURA_NAME || "Sakura",
                         RESPONSE_STYLE: data.RESPONSE_STYLE || "balanced",
                         SYSTEM_PROMPT_OVERRIDE: data.SYSTEM_PROMPT_OVERRIDE || "",
+                        WAKE_WORD_ENABLED: data.WAKE_WORD_ENABLED || "true",
+                        WAKE_WORD_SENSITIVITY: data.WAKE_WORD_SENSITIVITY || 0.5,
                         ROUTER_PROVIDER: data.ROUTER_PROVIDER || "auto",
                         PLANNER_PROVIDER: data.PLANNER_PROVIDER || "auto",
                         RESPONDER_PROVIDER: data.RESPONDER_PROVIDER || "auto",
@@ -312,6 +318,39 @@
                                     rows="10"
                                 ></textarea>
                                 <small>This overrides Sakura's base personality instructions. Keep it descriptive.</small>
+                            </div>
+
+                            <div class="form-group voice-settings">
+                                <label>Hands-Free Activation (Wake Word)</label>
+                                <div class="toggle-group">
+                                    <label class="toggle-label">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={config.WAKE_WORD_ENABLED === 'true'} 
+                                            on:change={(e) => handleInput('WAKE_WORD_ENABLED', e.target.checked ? 'true' : 'false')}
+                                        />
+                                        <span>Enable "Hey Sakura"</span>
+                                    </label>
+                                </div>
+                                {#if config.WAKE_WORD_ENABLED === 'true'}
+                                    <div class="sensitivity-control" in:fade>
+                                        <label for="sensitivity">Detection Sensitivity: {config.WAKE_WORD_SENSITIVITY}</label>
+                                        <input 
+                                            id="sensitivity" 
+                                            type="range" 
+                                            min="0.1" 
+                                            max="0.9" 
+                                            step="0.05" 
+                                            value={config.WAKE_WORD_SENSITIVITY} 
+                                            on:input={(e) => handleInput('WAKE_WORD_SENSITIVITY', parseFloat(e.target.value))}
+                                        />
+                                        <div class="range-labels">
+                                            <span>Strict (Quiet)</span>
+                                            <span>Lenient (Noisy)</span>
+                                        </div>
+                                    </div>
+                                {/if}
+                                <small>Uses local ONNX inference. Privacy-safe.</small>
                             </div>
 
                             <div class="danger-zone">
@@ -729,6 +768,45 @@
     .stat-card label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
     .about-section { text-align: center; }
     .big-logo { font-size: 64px; margin-bottom: 20px; display: block; }
+
+    /* Voice Toggle Styling */
+    .voice-settings {
+        background: rgba(255, 182, 193, 0.03);
+        padding: 20px;
+        border-radius: 16px;
+        border: 1px dashed rgba(255, 182, 193, 0.2);
+    }
+    .toggle-group { margin: 10px 0; }
+    .toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        font-weight: 500;
+        color: #fff;
+    }
+    .toggle-label input { width: 20px; height: 20px; accent-color: #ffb6c1; }
+    
+    .sensitivity-control {
+        margin-top: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .sensitivity-control input[type="range"] {
+        width: 100%;
+        accent-color: #ffb6c1;
+        background: #333;
+        height: 6px;
+        border-radius: 3px;
+        padding: 0;
+    }
+    .range-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: #666;
+    }
 
     .error-toast {
         position: fixed;

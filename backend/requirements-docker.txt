@@ -34,11 +34,12 @@ requests
 beautifulsoup4
 tavily-python
 
-# --- Voice & Audio (Optional in Docker) ---
-# pydub/pyaudio
-pyaudio
-SpeechRecognition
+# --- Voice & Audio ---
+sounddevice>=0.4.6
+openwakeword>=0.6.0
+httpx>=0.27.0
 kokoro>=0.4.1
+onnxruntime>=1.17.0
 soundfile
 
 # --- Tools ---
@@ -59,7 +60,7 @@ structlog
 
 # --- Utils ---
 numpy
-scipy
+scipy>=1.11.0
 tiktoken
 colorama
 sympy

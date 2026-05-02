@@ -17,8 +17,8 @@ async function shouldSkipForCpu(): Promise<boolean> {
     if (!response.ok) return false;
     const data = await response.json();
     const cpu = Number(data.cpu_percent);
-    if (Number.isFinite(cpu) && cpu > 80) {
-      console.warn(`[TTS] Skipped: high CPU (${cpu.toFixed(0)}%)`);
+    if (Number.isFinite(cpu) && cpu > 98) {
+      console.warn(`[TTS] Skipped: CPU critical (>98%) (${cpu.toFixed(0)}%)`);
       return true;
     }
   } catch (e) {

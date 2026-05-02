@@ -18,6 +18,7 @@ USAGE:
 
 import threading
 import time
+import asyncio
 import numpy as np
 from typing import Callable, Optional, List
 from collections import deque
@@ -251,6 +252,24 @@ def activate_mic_consumer(consumer_id: str, exclusive: bool = False):
     """Activate a mic consumer."""
     MicStreamManager.activate_consumer(consumer_id, exclusive)
 
-def deactivate_mic_consumer(consumer_id: str):
-    """Deactivate a mic consumer."""
-    MicStreamManager.deactivate_consumer(consumer_id)
+# V19.5: Async wrapper for coordination
+class SharedMic:
+    _lock = asyncio.Lock()
+    
+    @classmethod
+    async def acquire(cls):
+        """Exclusive access for recording"""
+        await cls._lock.acquire()
+        print("[MIC] Acquired for recording")
+    
+    @classmethod
+    def release(cls):
+        """Release back to wake word detector"""
+        try:
+            cls._lock.release()
+            print("[MIC] Released")
+        except RuntimeError:
+            pass
+
+def get_shared_mic_lock():
+    return SharedMic

@@ -9,7 +9,7 @@
 **V18.1 "Ironclad Reliability":** 8-point surgical fix sprint eliminating production bugs: Fixed Token Tracking (BUG-04), Tool Result Propagation (BUG-05), Memory Recall Routing (BUG-08), Personal Fact Persistence (BUG-03), Tool Hint Alignment (BUG-01), Weather Hallucination Guard (BUG-02), Cleaner Arg Extraction (BUG-06), and Executor Success Guard (BUG-07).
 **V19.0 "DeepSeek Integration":** Added DeepSeek as a first-class provider. Implemented request-time LLM overrides for stage-specific model hot-swapping. Enforced request-scoped safety rails (MAX_LLM_CALLS) across the full request lifecycle (Router -> Planner -> Verifier -> Responder).
 **V19.2 "Execution Stability & Hardening":** Resolved critical regressions in clipboard routing and planning loops. Implemented tool alias normalization and terminal action enforcement for system-level tasks. Hardened metadata preservation during budget failures to eliminate `mode="unknown"` issues.
-**V19.5 "Reliability Audit & Restoration":** Full-stack forensic audit. Eliminated CHAT "Planner" leakage by relabeling compression stages. Fixed orphaned background telemetry through explicit `trace_id` propagation. Restored Voice/TTS performance via a "keep-warm" strategy and fixed dev-mode asset protocol access errors in Tauri.
+**V19.5 "Voice I/O Hardening":** Full-stack forensic audit and production readiness overhaul. Replaced legacy voice stack with Groq Whisper (STT), Kokoro (TTS), and openWakeWord. Implemented "zero-setup" first-run model downloads and project-relative storage. Optimized Tauri MSI bundling for seamless distribution.
 **V19.6 "Abstention & Confidence Gating":** Implemented surgical reliability fixes to reduce hallucinations. Added `LOW_CONFIDENCE` propagation flow, one-shot nonsense retries in `ToolRunner`, and conditional tone softening in the `Responder` for factual queries without tool verification.
 **V20.0 "Deterministic Execution & Model Isolation":** Finalized execution pipeline hardening. Implemented deterministic tool call deduplication via request-scoped caching and argument normalization. Refactored rate limiting into a model-specific registry to prevent cross-throttling. Enhanced `open_app` with natural language resolution and PATH integration.
 
@@ -56,8 +56,9 @@ Sakura's tone adapts based on execution certainty:
 | Multi-LLM Failover | V5+ | Groq → Gemini cascade with timeout protection |
 | Memory Judger | V4+ | LLM-based importance filtering |
 | 54 Tools | V13 | Gmail, Calendar, Spotify, Notes, Vision, RAG, Code, Audio |
-| Kokoro TTS | V10+ | Neural voice synthesis with idle unload |
-| Wake Word Detection | V10+ | Custom DTW-based voice activation |
+| Kokoro TTS | V19.5 | Neural voice synthesis with Keep-Warm (sub-2s) |
+| openWakeWord | V19.5 | ONNX-accelerated "Sakura" voice activation |
+| Auto-Setup | V19.5 | Zero-manual download first-run model staging |
 | Smart Router | V10+ | DIRECT/PLAN/CHAT classification with tool hints |
 | DIRECT Fast Lane | V10+ | Skip Planner+Verifier for single-tool actions |
 | Tool Cache | V10+ | TTL-based cache for weather, search, etc. |

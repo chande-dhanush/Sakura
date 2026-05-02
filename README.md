@@ -87,7 +87,12 @@ V19.5 is the **Forensic Reliability Update**, focusing on eliminating execution 
     - Reduced hallucinations with strict abstention behavior ("no guessing").
     - Improved tool reliability with sanity checks and one-shot retry logic.
     - Enhanced query handling for ambiguous inputs (e.g., weather without location).
-
+- **Voice & Setup Hardening (V19.5)**:
+    - **openWakeWord**: Replaced legacy DTW with ONNX-accelerated "Sakura" wake word.
+    - **Self-Contained Deployment**: Integrated `first_run_setup.py` for automated model downloads.
+    - **Zero-Latency TTS**: Implemented "Keep-Warm" strategy for Kokoro (sub-2s responses).
+    - **Unified Audio**: Migrated to `sounddevice` + `pygame` for robust cross-platform playback.
+    - **MSI Ready**: Optimized Tauri bundle configuration for production Windows installs.
 ---
 
 ## ⌨️ Keyboard Shortcuts

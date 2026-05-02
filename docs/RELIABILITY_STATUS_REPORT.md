@@ -7,6 +7,8 @@
 We performed an exhaustive reliability audit to find "Ghost Components" and silent failure points.
 
 ### **Critical Risks Found**
+- [CLOSED] **Voice Pipeline Fragility**: Replaced legacy STT/TTS stack with Groq Whisper and Kokoro. **Fix:** 7x latency reduction and robust audio I/O (V19.5).
+- [CLOSED] **Manual Setup Requirement**: Auto-download models on first launch. **Fix:** `first_run_setup.py` + lifespan integration (V19.5).
 - [CLOSED] **Redundant Tool Calls**: The Planner was re-running tools multiple times. **Fix:** Deterministic request-scoped cache + argument normalization (V20.0).
 - [CLOSED] **Cross-Model Bottlenecks**: Global rate limiting was causing unrelated models to throttle. **Fix:** Model-specific registry with isolated token buckets (V20.0).
 - **Cancellation Leaks**: The `/stop` command only stopped the UI stream; backend LLM/tool calls were finishing to completion, wasting tokens.
@@ -19,8 +21,10 @@ We performed an exhaustive reliability audit to find "Ghost Components" and sile
 - **Reduced Hallucination**: Significant drop expected via strict abstention policy and confidence gating.
 - **Partial Corruption Detection**: Basic nonsensical outputs are now caught via tool sanity checks.
 - **Improved Ambiguity Handling**: One-shot clarification for underspecified queries reduces planner loop fatigue.
+- **Zero-Setup UX**: Users no longer need to manually download models or install ffmpeg.
 
 ### **Known Trade-offs**
+- **First Launch Delay**: The very first startup will be slow due to ~300MB model download.
 - **Increased Cautiousness**: Sakura may sound slightly more "insecure" when factual tools are skipped.
 - **Early Termination**: ReActLoop may stop early in low-confidence scenarios to prioritize safety over completeness.
 
