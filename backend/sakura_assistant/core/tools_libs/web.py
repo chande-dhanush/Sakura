@@ -212,6 +212,8 @@ def web_search(query: str, max_results: int = 5) -> str:
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
         return " TAVILY_API_KEY missing."
+    if not query or not query.strip():
+        return " Error: Search query is empty. Please provide a specific topic to search for."
     try:
         from tavily import TavilyClient
         print(f"Called Search: {query}")

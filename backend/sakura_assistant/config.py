@@ -275,6 +275,7 @@ RULES:
 - If no tool is needed, return empty tool list
 - Clean args only — no full sentences
 - Never repeat a tool that already succeeded this turn
+- If a tool returns 'not installed' or 'unavailable', immediately switch to an alternative (e.g. use web_search instead of wikipedia) — NEVER retry the same tool.
 - monitor=1 for second screen, monitor=0 for main screen
 """
 

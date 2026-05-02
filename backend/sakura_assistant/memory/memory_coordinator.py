@@ -36,7 +36,10 @@ class RecallResult:
         
         # Priority 1: Semantic (most relevant)
         if self.semantic:
-            semantic_block = f"[PAST CONVERSATIONS]\n{self.semantic}"
+            # V19.5: Ensure strict 5-result cap even if max_chars is large
+            semantic_lines = self.semantic.splitlines()[:10] # Header + 5-9 results + recent conv
+            semantic_text = "\n".join(semantic_lines)
+            semantic_block = f"[PAST CONVERSATIONS]\n{semantic_text}"
             if chars_used + len(semantic_block) <= max_chars:
                 parts.append(semantic_block)
                 chars_used += len(semantic_block)
@@ -145,8 +148,9 @@ class MemoryCoordinator:
             # 1. Semantic search (FAISS)
             if mode in ["semantic", "hybrid"] and self.faiss_store:
                 try:
+                    # V19.5: Explicitly cap at 5 results (k=5) to prevent context bloat
                     result.semantic = self.faiss_store.get_context_for_query(
-                        query, max_chars=max_chars
+                        query, k=5, max_chars=max_chars
                     )
                 except Exception as e:
                     logger.warning(f"FAISS search failed: {e}")
@@ -161,8 +165,8 @@ class MemoryCoordinator:
             # 3. WorldGraph entities and actions
             if self.world_graph:
                 try:
-                    # Get recent actions
-                    actions = self.world_graph.get_recent_actions(10)
+                    # Get recent actions (cap at 5 for direct recall)
+                    actions = self.world_graph.get_recent_actions(5)
                     result.actions = [
                         {"turn": a.turn, "summary": a.summary, "tool": a.tool}
                         for a in actions if a.summary

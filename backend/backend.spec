@@ -9,8 +9,15 @@ block_cipher = None
 
 # Get the backend directory
 backend_dir = os.path.dirname(os.path.abspath(SPEC))
-# V17: Get venv site-packages (PA folder is sibling to backend)
-venv_site_packages = os.path.join(os.path.dirname(backend_dir), 'PA', 'Lib', 'site-packages')
+# V19.5: Dynamically resolve openwakeword resources path
+import openwakeword
+oww_resources = os.path.join(os.path.dirname(openwakeword.__file__), 'resources')
+print(f"   [BUILD] openWakeWord resources found at: {oww_resources}")
+
+# V19.5: Dynamically resolve spaCy model path
+import en_core_web_sm
+spacy_model_path = os.path.dirname(en_core_web_sm.__file__)
+print(f"   [BUILD] spaCy model found at: {spacy_model_path}")
 
 a = Analysis(
     ['server.py'],
@@ -20,11 +27,15 @@ a = Analysis(
         # Data files only - NOT source code (that's handled by hiddenimports)
         ('data', 'data'),  # Bundle default data (bookmarks, world_graph, etc.)
         # V19.5: Bundle openWakeWord ONNX resources
-        (os.path.join(venv_site_packages, 'openwakeword', 'resources'), 'openwakeword/resources'),
+        (oww_resources, 'openwakeword/resources'),
+        # V19.5: Bundle spaCy model data
+        (spacy_model_path, 'en_core_web_sm'),
         # Note: 'Notes' folder is created at runtime in AppData
     ] + ([('Notes', 'Notes')] if os.path.exists(os.path.join(backend_dir, 'Notes')) else []),
     hiddenimports=[
-        # spacy models
+        # openwakeword & spacy
+        'openwakeword',
+        'openwakeword.model',
         'en_core_web_sm',
         # ===== V17 Core Refactor - Subdirectory Imports =====
         # PyInstaller static analysis doesn't discover these automatically
@@ -113,6 +124,7 @@ a = Analysis(
         # Google APIs
         'google.auth',
         'google.oauth2',
+        'google_auth_oauthlib',
         'googleapiclient',
         # Kokoro TTS chain
         'kokoro',
@@ -125,6 +137,9 @@ a = Analysis(
         'spotipy',
         'requests',
         'bs4',
+        'wikipedia',
+        'arxiv',
+        'tavily',
         'sympy',
         'tiktoken',
         'structlog',

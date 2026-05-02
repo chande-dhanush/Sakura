@@ -9,7 +9,7 @@
     import WorldGraphPill from '$lib/components/WorldGraphPill.svelte';
     import VoiceSetup from '$lib/components/VoiceSetup.svelte';
     import Setup from '$lib/components/Setup.svelte'; // V10: New Onboarding
-    import { messages, moodColors, refreshState, connectionError, clearChat, startPolling, backendStatus, voiceStatus, checkBackendReady, checkVoiceStatus, loadHistory } from '$lib/stores/chat.js';
+    import { messages, moodColors, refreshState, connectionError, clearChat, startPolling, backendStatus, voiceStatus, checkBackendReady, checkVoiceStatus, loadHistory, isListening } from '$lib/stores/chat.js';
     
     let showMenu = false;
     let historyLoading = false;
@@ -128,6 +128,43 @@
                 };
                 
                 ws.onerror = (e) => console.error('[Proactive] WebSocket error:', e);
+
+                // V19.5: Connect to Status WebSocket (for Wake Word & Tool Progress)
+                const statusWs = new WebSocket('ws://localhost:3210/ws/status');
+                let listenTimeout = null;
+
+                statusWs.onopen = () => {
+                    console.log('📡 [Status] Connected to backend');
+                };
+
+                statusWs.onmessage = async (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        // Handle Wake Word Detection
+                        if (data.event === 'wake-detected') {
+                            console.log('🎤 [Wake] Word detected!');
+                            isListening.set(true);
+                            
+                            // Safety Reset (4s)
+                            if (listenTimeout) clearTimeout(listenTimeout);
+                            listenTimeout = setTimeout(() => {
+                                isListening.set(false);
+                            }, 4000);
+                        }
+                        
+                        // Handle STT Finished
+                        if (data.event === 'stt-finished') {
+                            console.log('🎤 [Wake] STT finished');
+                            isListening.set(false);
+                            if (listenTimeout) clearTimeout(listenTimeout);
+                        }
+                    } catch (e) {
+                        console.error('[Status] Error handling message:', e);
+                    }
+                };
+
+                statusWs.onerror = (e) => console.error('[Status] WebSocket error:', e);
                 
                 // Listen for Quick Search Trigger (Shift+S global)
                 await listen('quick_search_trigger', async () => {

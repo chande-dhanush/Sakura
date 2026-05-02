@@ -22,6 +22,7 @@ export const currentTools = writable(/** @type {ToolUse[]} */ ([]));
 export const focusEntity = writable(null);
 export const connectionError = writable(/** @type {string | null} */ (null));
 export const traceLogs = writable(/** @type {TraceLog[]} */ ([])); // V10.4: Flight Recorder Traces
+export const isListening = writable(false); // V19.5: Mic Recording Feedback
 
 // Backend status: 'starting' | 'ready' | 'error'
 export const backendStatus = writable(/** @type {BackendStatus} */ ('starting'));

@@ -127,7 +127,17 @@ def get_pipeline():
             if not KOKORO_AVAILABLE:
                 return None
             try:
-                _pipeline = KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M')
+                # V19.5: Option B1 - Patch spacy to prevent download attempt in frozen binary
+                import spacy.util
+                _original_is_package = spacy.util.is_package
+                def _patched_is_package(name):
+                    if 'en_core_web' in name:
+                        return True
+                    return _original_is_package(name)
+                spacy.util.is_package = _patched_is_package
+                
+                # Use 'a' (American) which matches Sakura's af_heart voice
+                _pipeline = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
             except SystemExit as e:
                 # spacy.cli.download() raises SystemExit(2) when it can't write to
                 # site-packages inside a frozen binary. Catch it so the app survives.
@@ -156,7 +166,7 @@ threading.Thread(target=_background_idle_checker, daemon=True).start()
 
 
 # --- Playback Helper ---
-def play_audio_file(file_path):
+def play_audio_file(file_path, auto_delete=True):
     """Robust Pygame Playback with interrupt support."""
     global _stop_flag, _is_speaking
     
@@ -201,7 +211,7 @@ def play_audio_file(file_path):
         return False
     finally:
         _is_speaking = False
-        if os.path.exists(file_path):
+        if auto_delete and os.path.exists(file_path):
             try: os.remove(file_path)
             except Exception as e:
                 import logging
@@ -293,7 +303,7 @@ def kokoro_tts(text, voice='af_heart'):
         
         # Play (has its own interrupt handling)
         print(f"[TTS] Attempting to play: {temp_file}", file=sys.stderr)
-        return play_audio_file(str(temp_file))
+        return play_audio_file(str(temp_file), auto_delete=True)
         
     except Exception as e:
         print(f"[TTS]   Kokoro Generation Failed: {e}", file=sys.stderr)

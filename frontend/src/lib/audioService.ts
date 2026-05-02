@@ -6,7 +6,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { remove } from '@tauri-apps/plugin-fs';
+import { remove, readFile } from '@tauri-apps/plugin-fs';
 
 let currentAudio: HTMLAudioElement | null = null;
 const BACKEND_URL = 'http://localhost:3210';
@@ -55,35 +55,58 @@ export async function speak(text: string): Promise<void> {
     const audioPath = await invoke<string>('generate_speech', { text });
     console.log('[TTS] Audio generated:', audioPath);
     
-    // Convert to asset URL for Tauri webview
-    const assetUrl = convertFileSrc(audioPath);
-    console.log('[TTS] Asset URL:', assetUrl);
-    
-    // Play with HTML5 Audio API
+    // V19.5: Audio Playback with Blob Fallback
+    // This is the most robust method for Tauri v2 on Windows
+    let assetUrl = convertFileSrc(audioPath);
+    console.log('[TTS] Primary Asset URL:', assetUrl);
+
     currentAudio = new Audio(assetUrl);
     
-    currentAudio.onended = async () => {
-      console.log('[TTS] Playback complete, cleaning up...');
+    // Add Blob fallback for 'no supported source' or protocol errors
+    const playWithFallback = async () => {
       try {
-        await remove(audioPath);
+        console.log('[TTS] Attempting playback...');
+        currentAudio!.volume = 1.0; // Ensure volume is 100%
+        await currentAudio!.play();
+        console.log('[TTS] ✓ Playing audio');
+      } catch (err) {
+        console.warn('[TTS] Playback error:', err);
+        console.log('[TTS] Trying Blob fallback...');
+        try {
+          const data = await readFile(audioPath);
+          const blob = new Blob([data], { type: 'audio/wav' });
+          const blobUrl = URL.createObjectURL(blob);
+          
+          currentAudio = new Audio(blobUrl);
+          currentAudio.volume = 1.0; // Ensure volume is 100%
+          currentAudio.onended = () => {
+            URL.revokeObjectURL(blobUrl);
+            cleanup(audioPath);
+          };
+          await currentAudio.play();
+          console.log('[TTS] ✓ Playing audio via Blob');
+        } catch (fallbackErr) {
+          console.error('[TTS] Both play methods failed:', fallbackErr);
+        }
+      }
+    };
+
+    const cleanup = async (path: string) => {
+      console.log('[TTS] Cleaning up...');
+      try {
+        await remove(path);
         console.log('[TTS] ✓ Audio file deleted');
       } catch (e) {
         console.warn('[TTS] Cleanup failed:', e);
       }
       currentAudio = null;
     };
-    
-    currentAudio.onerror = (e) => {
-      console.error('[TTS] Playback error:', e);
-      currentAudio = null;
-    };
-    
-    await currentAudio.play();
-    console.log('[TTS] ✓ Playing audio');
+
+    currentAudio.onended = () => cleanup(audioPath);
+    await playWithFallback();
     
   } catch (error) {
     console.error('[TTS] Failed:', error);
-    // Let caller handle UI feedback
     throw error;
   }
 }

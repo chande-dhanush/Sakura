@@ -30,7 +30,9 @@ from ...utils.shared_mic import (
     deactivate_mic_consumer,
     get_shared_mic_lock
 )
-from ...utils.tts import speak_async
+from ...utils.tts import speak_async, play_audio_file
+from ...utils.pathing import get_bundled_path
+from ...core.infrastructure.broadcaster import get_broadcaster
 
 logger = logging.getLogger("sakura.voice")
 
@@ -90,6 +92,19 @@ class VoiceEngine:
             return
             
         print(" WAKE WORD DETECTED! Listening for command...")
+        
+        # V19.5: Emit Tauri-style event via Broadcaster
+        try:
+            get_broadcaster().broadcast("wake-detected", {"timestamp": time.time()})
+        except Exception as e:
+            logger.warning(f"Failed to broadcast wake-detected: {e}")
+
+        # V19.5: Play acknowledgment sound
+        ack_path = get_bundled_path("data/audio/wake_ack.wav")
+        if os.path.exists(ack_path):
+            # Play in thread to avoid blocking the trigger flow if needed, 
+            # but usually we want it to finish before STT starts to avoid self-listening.
+            play_audio_file(ack_path, auto_delete=False)
         
         # 1. Pause Wake Detection
         self.wake_detector.pause()
@@ -207,6 +222,12 @@ class VoiceEngine:
                 # V19.5: Handle async listen in sync thread
                 command = asyncio.run(self._listen_for_command())
                 self.listening = False
+                
+                # V19.5: Signal STT finished
+                try:
+                    get_broadcaster().broadcast("stt-finished", {})
+                except Exception:
+                    pass
                 
                 if command:
                     # --- PROCESSING PHASE ---

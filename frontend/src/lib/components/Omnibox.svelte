@@ -1,7 +1,7 @@
 <!-- Sakura V10 Omnibox Component -->
 <script>
     import { onDestroy } from 'svelte';
-    import { sendMessage, isStreaming, stopGeneration, moodColors } from '$lib/stores/chat.js';
+    import { sendMessage, isStreaming, stopGeneration, moodColors, isListening } from '$lib/stores/chat.js';
     
     export let isQuickSearch = false;
 
@@ -170,7 +170,8 @@
         <!-- Actions: Mic, Send, Stop -->
         <div class="actions">
             <!-- Mic Button -->
-             <button type="button" class="mic-btn" on:click={triggerVoice} title="Voice Input">
+             <button type="button" class="mic-btn" class:listening={$isListening} on:click={triggerVoice} title="Voice Input">
+                <div class="mic-pulse"></div>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -418,5 +419,29 @@
     .mic-btn:hover {
         background: rgba(255, 255, 255, 0.1);
         color: #fff;
+    }
+
+    .mic-btn.listening {
+        color: var(--primary);
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .mic-pulse {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        border: 2px solid var(--primary);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .mic-btn.listening .mic-pulse {
+        animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    @keyframes pulse-ring {
+        0% { transform: scale(0.8); opacity: 0.5; }
+        100% { transform: scale(1.5); opacity: 0; }
     }
 </style>

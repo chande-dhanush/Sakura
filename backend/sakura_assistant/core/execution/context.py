@@ -169,7 +169,7 @@ class ExecutionContext:
         "router": 0, "planner": 0, "executor": 0, "responder": 0, "verifier": 0
     })
     stage_budgets: Dict[str, int] = field(default_factory=lambda: {
-        "router": 2, "planner": 4, "executor": 3, "responder": 1, "verifier": 1
+        "router": 2, "planner": 8, "executor": 3, "responder": 1, "verifier": 2
     })
     
     # Budgets by mode (class constants)
