@@ -66,7 +66,8 @@ def _check_sandbox_image() -> bool:
             return True
         
         # Image doesn't exist, try to build it
-        dockerfile_path = Path(__file__).parent.parent.parent.parent / "docker" / "python-sandbox.Dockerfile"
+        from sakura_assistant.utils.pathing import get_bundled_path
+        dockerfile_path = Path(get_bundled_path("docker/python-sandbox.Dockerfile"))
         if not dockerfile_path.exists():
             return False
         

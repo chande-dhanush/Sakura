@@ -14,10 +14,20 @@ import logging
 logger = logging.getLogger("sakura.tts")
 import sys
 
-# V19.5: Ensure Kokoro models are stored project-relative for portability
-MODELS_DIR = Path(__file__).parent.parent.parent / "models" / "kokoro"
-MODELS_DIR.mkdir(parents=True, exist_ok=True)
-os.environ["HF_HOME"] = str(MODELS_DIR)
+# V19.5: Ensure Kokoro and FAISS models persist across launches.
+# In frozen (PyInstaller) mode __file__ is inside _MEIPASS which is wiped on exit,
+# so models would re-download every run. Use a stable AppData path instead.
+try:
+    from sakura_assistant.utils.pathing import get_project_root
+    _models_base = Path(get_project_root()) / 'models' / 'huggingface'
+except ImportError:
+    if getattr(sys, 'frozen', False):
+        _models_base = Path(os.getenv('APPDATA', '')) / 'SakuraV10' / 'models' / 'huggingface'
+    else:
+        _models_base = Path(__file__).parent.parent.parent / 'models' / 'huggingface'
+
+_models_base.mkdir(parents=True, exist_ok=True)
+os.environ['HF_HOME'] = str(_models_base)
 
 
 try:
@@ -117,9 +127,14 @@ def get_pipeline():
             if not KOKORO_AVAILABLE:
                 return None
             try:
-                _pipeline = KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M') 
+                _pipeline = KPipeline(lang_code='b', repo_id='hexgrad/Kokoro-82M')
+            except SystemExit as e:
+                # spacy.cli.download() raises SystemExit(2) when it can't write to
+                # site-packages inside a frozen binary.  Catch it so the app survives.
+                print(f"[TTS] spaCy model download failed (SystemExit {e.code}) — TTS disabled")
+                _pipeline = None
             except Exception as e:
-                print(f" Kokoro TTS failed: {e}")
+                print(f"[TTS] Kokoro pipeline failed: {e}")
                 _pipeline = None
         
         _last_used_time = time.time()

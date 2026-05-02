@@ -66,8 +66,8 @@ def _sanitize_path(path: str) -> str:
     V19.5 Security Sandbox.
     Prevents path traversal and normalizes unicode.
     """
-    # 1. Normalize Unicode (NFC) to prevent homograph attacks
-    path = unicodedata.normalize('NFC', path)
+    # 1. Normalize Unicode (NFKC) to prevent homograph attacks (V15.2.2)
+    path = unicodedata.normalize('NFKC', path)
     
     # 2. Block dangerous patterns
     import re

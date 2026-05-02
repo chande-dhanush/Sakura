@@ -16,7 +16,7 @@ from contextlib import contextmanager
 
 # Get project root
 try:
-    from ..config import get_project_root
+    from sakura_assistant.utils.pathing import get_project_root
     DATA_DIR = Path(get_project_root()) / "data"
 except ImportError:
     DATA_DIR = Path(__file__).parent.parent.parent / "data"

@@ -4,7 +4,8 @@ import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
+from sakura_assistant.utils.pathing import get_project_root
+DATA_DIR = Path(get_project_root()) / "data"
 EPISODES_FILE = DATA_DIR / "user_episodes.json"
 
 class EpisodicMemoryStore:

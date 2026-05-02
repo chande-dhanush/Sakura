@@ -12,8 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
-# Log file path
-LOG_DIR = Path(__file__).parent.parent / "data" / "logs"
+from sakura_assistant.utils.pathing import get_project_root
+LOG_DIR = Path(get_project_root()) / "data" / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 TODAY = datetime.now().strftime("%Y-%m-%d")

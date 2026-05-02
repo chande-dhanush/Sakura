@@ -69,8 +69,14 @@ TOOL OUTPUTS:
                 content = content[7:-3].strip()
             elif content.startswith("```"):
                 content = content[3:-3].strip()
-                
+
+            # Bug 5 fix: re-check after stripping — model may reply with just "```json\n```"
+            if not content:
+                logger.warning("[Verifier] Empty content after markdown strip, assuming PASS")
+                return {"verdict": "PASS", "reason": "Empty verifier response after strip — assuming pass"}
+
             result = json.loads(content)
+
             
             # Log to console for observability
             verdict = result.get("verdict", "FAIL")

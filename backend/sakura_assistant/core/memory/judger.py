@@ -48,7 +48,15 @@ class MemoryJudger:
             # 2. Call LLM (Cheap model)
             # max_tokens=128 is enough for "yes [N] - reason"
             # We use ainvoke for non-blocking execution
-            response = await self.llm.ainvoke(messages, trace_id=trace_id)
+            # Bug 6 fix: judger runs after the main pipeline has consumed its LLM budget.
+            # LLMBudgetExceededError is non-fatal here — just skip memory judging.
+            from sakura_assistant.core.execution.context import LLMBudgetExceededError
+            try:
+                response = await self.llm.ainvoke(messages, trace_id=trace_id)
+            except LLMBudgetExceededError:
+                logger.debug("[MemoryJudger] Skipped — LLM budget exhausted for this request")
+                return
+
             
             # 3. Parse result
             should_store, importance, fact = self._parse_judgement(response.content)

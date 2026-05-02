@@ -17,6 +17,7 @@ import io
 import json
 import asyncio
 import time
+from datetime import datetime
 from typing import Optional
 from contextlib import asynccontextmanager
 
@@ -92,32 +93,11 @@ async def lifespan(app: FastAPI):
     # --- First Run Setup & Model Verification ---
     try:
         from pathlib import Path
-        setup_flag = Path("../.setup_complete")
+        from sakura_assistant.utils.pathing import get_project_root
+        
+        setup_flag = Path(get_project_root()) / ".setup_complete"
         if not setup_flag.exists():
             print("[Setup] First run detected, ensuring models...")
-            
-            # 1. Wake Word Models
-            try:
-                import openwakeword
-                model_path = Path(openwakeword.__file__).parent / "resources/models/hey_jarvis_v0.1.onnx"
-                if not model_path.exists():
-                    print("[WAKE] Downloading wake word models (~8MB)...")
-                    # Use a blocking call in a thread to avoid stalling the loop too much if it's large,
-                    # but since it's lifespan it's okay to wait.
-                    openwakeword.utils.download_models(['hey_jarvis'])
-                    print("[WAKE] Wake word models ready ✅")
-            except Exception as e:
-                print(f"[WAKE] Model download failed: {e}")
-
-            # 2. Kokoro TTS Models
-            try:
-                from sakura_assistant.utils.tts import get_pipeline
-                print("[TTS] Verifying Kokoro model (~300MB)...")
-                get_pipeline() # Lazy download trigger
-                print("[TTS] Kokoro model ready ✅")
-            except Exception as e:
-                print(f"[TTS] Model verification failed: {e}")
-
             setup_flag.touch()
             print("[Setup] First run setup complete ✅")
     except Exception as e:
@@ -164,18 +144,16 @@ async def lifespan(app: FastAPI):
             while True:
                 try:
                     await asyncio.sleep(60)
-                    if assistant and assistant.summary_memory:
-                        # V19.5 FIX: Robust attribute check for SummaryMemory
-                        history = []
-                        for attr in ['recent_messages', 'conversation_history']:
-                            val = getattr(assistant.summary_memory, attr, None)
-                            if val is not None:
-                                history = val
-                                break
-                        
+                    if assistant:
+                        # Bug 4 fix: conversation_history lives on FaissMemoryStore,
+                        # NOT on SummaryMemory (which only has recent_messages).
+                        try:
+                            from sakura_assistant.memory.faiss_store import get_memory_store
+                            history = getattr(get_memory_store(), 'conversation_history', [])
+                        except Exception:
+                            history = []
                         if history:
-                            # analyze_delta is wrapped by observe_background
-                            await re.observe_background(history)
+                            await re.observe_background(history[-20:])
                 except asyncio.CancelledError:
                     break
                 except Exception as e:
@@ -206,16 +184,6 @@ async def lifespan(app: FastAPI):
         except:
             pass
     
-    # Start Voice Engine if enabled via flag AND assistant is ready
-    if os.getenv("SAKURA_ENABLE_VOICE") == "true" and assistant:
-        try:
-            from sakura_assistant.core.infrastructure.voice import VoiceEngine
-            global voice_engine
-            voice_engine = VoiceEngine(assistant)
-            voice_engine.start()
-        except Exception as e:
-            print(f"[ERROR] Failed to start Voice Engine: {e}")
-    
     # V13: Start Memory Maintenance Scheduler (Temporal Decay)
     if assistant:
         try:
@@ -235,7 +203,53 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[WARN] Scheduler init warning: {e}")
     
+    # Bug 3 fix: Warm up models AFTER server is live so /health responds immediately.
+    async def _background_warmup_task():
+        try:
+            import asyncio as _asyncio
+            from pathlib import Path
+            from sakura_assistant.utils.pathing import get_project_root
+            await _asyncio.sleep(3)  # Let the server settle first
+            
+            # 1. Wake Word Models (Phase 2 Pathing fix)
+            try:
+                import openwakeword
+                ww_dir = Path(get_project_root()) / "models" / "openwakeword"
+                ww_dir.mkdir(parents=True, exist_ok=True)
+                model_path = ww_dir / "hey_jarvis_v0.1.onnx"
+                if not model_path.exists():
+                    print(f"[WAKE] Background warmup: downloading models to {ww_dir}...")
+                    await _asyncio.to_thread(openwakeword.utils.download_models, ['hey_jarvis'], target_directory=str(ww_dir))
+                    print("[WAKE] Background warmup complete ✅")
+            except Exception as e:
+                print(f"[WAKE] Background warmup error (non-fatal): {e}")
+
+            # 2. Kokoro TTS Pipeline
+            try:
+                from sakura_assistant.utils.tts import get_pipeline
+                print("[TTS] Background warmup: loading Kokoro pipeline...")
+                await _asyncio.to_thread(get_pipeline)
+                print("[TTS] Background warmup complete ✅")
+            except Exception as e:
+                print(f"[TTS] Background warmup error (non-fatal): {e}")
+                
+            # 3. Start Voice Engine if enabled (Wait until wake models are ready)
+            if os.getenv("SAKURA_ENABLE_VOICE") == "true" and assistant:
+                try:
+                    from sakura_assistant.core.infrastructure.voice import VoiceEngine
+                    global voice_engine
+                    voice_engine = VoiceEngine(assistant)
+                    voice_engine.start()
+                except Exception as e:
+                    print(f"[ERROR] Failed to start Voice Engine: {e}")
+
+        except Exception as e:
+            print(f"[WARMUP] Background task error: {e}")
+
+    asyncio.create_task(_background_warmup_task())
+
     yield
+
     
     # Cleanup on shutdown
     print("[STOP] Shutting down Sakura Backend...")
@@ -296,9 +310,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "version": "19.5.0"}
+# /health defined below with full structured response (V15.2.1)
 
 
 @app.websocket("/ws/status")
@@ -637,15 +649,19 @@ async def upload_google_auth(file: UploadFile = File(...)):
 
 @app.get("/health")
 async def health_check():
-    """Health check for Tauri startup"""
-    # V19.5: Enhanced health check with status code 200 marker for audits
-    return {
-        "status": "healthy", 
-        "cpu_percent": psutil.cpu_percent(0.1),
-        "memory_percent": psutil.virtual_memory().percent,
-        "port": 3210,
-        "code": 200
-    }
+    """V15.2.1: Backend health endpoint for Tauri startup polling."""
+    try:
+        cpu = psutil.cpu_percent(interval=0.1)
+        memory = psutil.virtual_memory().percent
+        return {
+            "status": "healthy",
+            "cpu_percent": cpu,
+            "memory_percent": memory,
+            "port": 3210,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception:
+        return {"status": "degraded", "error": "system_checks_failed"}
 
 
 @app.get("/system/cpu")
@@ -738,7 +754,8 @@ async def upload_file(file: UploadFile = File(...)):
 async def voice_status():
     """Check voice engine status."""
     import os
-    templates_dir = os.path.join(os.path.dirname(__file__), "data", "voice", "wake_templates")
+    from sakura_assistant.utils.pathing import get_project_root
+    templates_dir = os.path.join(get_project_root(), "data", "voice", "wake_templates")
     template_count = 0
     if os.path.exists(templates_dir):
         template_count = len([f for f in os.listdir(templates_dir) if f.endswith('.wav')])
@@ -759,8 +776,9 @@ async def record_voice_template():
     import wave
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
+    from sakura_assistant.utils.pathing import get_project_root
     
-    templates_dir = os.path.join(os.path.dirname(__file__), "data", "voice", "wake_templates")
+    templates_dir = os.path.join(get_project_root(), "data", "voice", "wake_templates")
     os.makedirs(templates_dir, exist_ok=True)
     existing = len([f for f in os.listdir(templates_dir) if f.endswith('.wav')])
     

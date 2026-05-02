@@ -1,7 +1,7 @@
 {
   "version": "v7.1",
   "current_turn": 104,
-  "current_session": "2f6d7829-7427-4863-be56-573ecfd05122",
+  "current_session": "51decc0f-c017-41e7-bfd6-3b70f37d7c0c",
   "entities": {
     "user:self": {
       "id": "user:self",
@@ -13,13 +13,14 @@
         "age": null,
         "birthday": "",
         "location": "Test Lab",
-        "interests": []
+        "interests": [],
+        "bio": "I'm an experimental dev who loves building cool, weird AI projects.I love Riding, and watching anime"
       },
       "lifecycle": "promoted",
       "source": "user_stated",
       "mutable_by": [
-        "user_stated",
-        "user_confirmed"
+        "user_confirmed",
+        "user_stated"
       ],
       "created_at": "2026-03-31T16:06:51.935861",
       "last_referenced": "2026-03-31T16:06:51.935861",
@@ -40,8 +41,8 @@
       "lifecycle": "promoted",
       "source": "system",
       "mutable_by": [
-        "user_stated",
-        "user_confirmed"
+        "user_confirmed",
+        "user_stated"
       ],
       "created_at": "2026-03-31T18:41:37.565106",
       "last_referenced": "2026-03-31T18:41:37.565106",
@@ -49,6 +50,250 @@
       "confidence": 1.0,
       "not_claims": [],
       "summary": "Prefers practical, direct replies. Enjoys being teased."
+    },
+    "entity:topic:the_capital_of_france_is_unknown.": {
+      "id": "entity:topic:the_capital_of_france_is_unknown.",
+      "type": "topic",
+      "name": "The capital of France is unknown.",
+      "attributes": {
+        "category": "geography",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The capital of France is unknown. (topic)"
+    },
+    "entity:topic:bangalore's_weather_is_unknown.": {
+      "id": "entity:topic:bangalore's_weather_is_unknown.",
+      "type": "topic",
+      "name": "Bangalore's weather is unknown.",
+      "attributes": {
+        "category": "geography",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "Bangalore's weather is unknown. (topic)"
+    },
+    "entity:topic:125_multiplied_by_8_equals_1000.": {
+      "id": "entity:topic:125_multiplied_by_8_equals_1000.",
+      "type": "topic",
+      "name": "125 multiplied by 8 equals 1000.",
+      "attributes": {
+        "category": "math",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "125 multiplied by 8 equals 1000. (topic)"
+    },
+    "entity:topic:the_world_cup_in_1922_winner_is_unknown.": {
+      "id": "entity:topic:the_world_cup_in_1922_winner_is_unknown.",
+      "type": "topic",
+      "name": "The World Cup in 1922 winner is unknown.",
+      "attributes": {
+        "category": "history",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The World Cup in 1922 winner is unknown. (topic)"
+    },
+    "entity:topic:the_current_prime_minister_of_india_is_unknown.": {
+      "id": "entity:topic:the_current_prime_minister_of_india_is_unknown.",
+      "type": "topic",
+      "name": "The current Prime Minister of India is unknown.",
+      "attributes": {
+        "category": "politics",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The current Prime Minister of India is unknown. (topic)"
+    },
+    "entity:topic:the_first_iphone_release_date_is_unknown.": {
+      "id": "entity:topic:the_first_iphone_release_date_is_unknown.",
+      "type": "topic",
+      "name": "The first iPhone release date is unknown.",
+      "attributes": {
+        "category": "politics",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The first iPhone release date is unknown. (topic)"
+    },
+    "entity:topic:the_us_nuclear_arsenal_secret_launch_codes_are_unknown.": {
+      "id": "entity:topic:the_us_nuclear_arsenal_secret_launch_codes_are_unknown.",
+      "type": "topic",
+      "name": "The US nuclear arsenal secret launch codes are unknown.",
+      "attributes": {
+        "category": "politics",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The US nuclear arsenal secret launch codes are unknown. (topic)"
+    },
+    "entity:topic:the_current_date_is_friday,_may_1,_2026.": {
+      "id": "entity:topic:the_current_date_is_friday,_may_1,_2026.",
+      "type": "topic",
+      "name": "The current date is Friday, May 1, 2026.",
+      "attributes": {
+        "category": "date",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The current date is Friday, May 1, 2026. (topic)"
+    },
+    "entity:topic:the_current_time_is_10:32_pm.": {
+      "id": "entity:topic:the_current_time_is_10:32_pm.",
+      "type": "topic",
+      "name": "The current time is 10:32 PM.",
+      "attributes": {
+        "category": "time",
+        "crystallized": true,
+        "confidence": 0.7
+      },
+      "lifecycle": "promoted",
+      "source": "memory_recalled",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.3,
+      "not_claims": [],
+      "summary": "The current time is 10:32 PM. (topic)"
+    },
+    "constraint:crystallized_friday_may_1_2026": {
+      "id": "constraint:crystallized_friday_may_1_2026",
+      "type": "topic",
+      "name": "Friday, May 1, 2026",
+      "attributes": {
+        "constraint_type": "temporal",
+        "implications": [],
+        "criticality": 0.8,
+        "crystallized": true
+      },
+      "lifecycle": "promoted",
+      "source": "user_stated",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.9,
+      "not_claims": [],
+      "summary": "Friday, May 1, 2026 (topic)"
+    },
+    "constraint:crystallized_10_32_pm": {
+      "id": "constraint:crystallized_10_32_pm",
+      "type": "topic",
+      "name": "10:32 PM",
+      "attributes": {
+        "constraint_type": "temporal",
+        "implications": [],
+        "criticality": 0.8,
+        "crystallized": true
+      },
+      "lifecycle": "promoted",
+      "source": "user_stated",
+      "mutable_by": [
+        "user_confirmed",
+        "user_stated"
+      ],
+      "created_at": "2026-05-02T13:35:19.018062",
+      "last_referenced": "2026-05-02T13:35:19.018062",
+      "reference_count": 0,
+      "confidence": 0.9,
+      "not_claims": [],
+      "summary": "10:32 PM (topic)"
     }
   },
   "actions": [

@@ -36,13 +36,19 @@ class WakeWordDetector:
         self._consumer_id = None
         
         # Initialize openWakeWord Model
-        # This will download models to ~/.openwakeword/models on first run
         try:
+            from sakura_assistant.utils.pathing import get_project_root
+            from pathlib import Path
+            model_path = Path(get_project_root()) / "models" / "openwakeword" / "hey_jarvis_v0.1.onnx"
+            
+            # Use absolute path if it exists, otherwise fall back to name-based loading
+            models_to_load = [str(model_path)] if model_path.exists() else ["hey_jarvis"]
+            
             self.model = Model(
-                wakeword_models=["hey_jarvis"],
+                wakeword_models=models_to_load,
                 inference_framework="onnx"
             )
-            logger.info("[WAKE] openWakeWord initialized with 'Sakura' model")
+            logger.info("[WAKE] openWakeWord initialized with 'hey_jarvis' model")
         except Exception as e:
             logger.error(f"[WAKE] Failed to initialize openWakeWord: {e}")
             self.model = None
