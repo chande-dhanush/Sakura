@@ -289,7 +289,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Response Style (Auto-Constraint)</label>
+                                <div class="label-text">Response Style (Auto-Constraint)</div>
                                 <div class="style-selector">
                                     {#each ['concise', 'balanced', 'detailed'] as style}
                                         <label class="style-option" class:selected={config.RESPONSE_STYLE === style}>
@@ -320,7 +320,7 @@
                             </div>
 
                             <div class="form-group voice-settings">
-                                <label>Hands-Free Activation (Wake Word)</label>
+                                <div class="label-text">Hands-Free Activation (Wake Word)</div>
                                 <div class="toggle-group">
                                     <label class="toggle-label">
                                         <input 
@@ -432,8 +432,8 @@
                                 <h3>Model Stage Configuration</h3>
                                 <div class="form-grid">
                                     <div class="form-group">
-                                        <label>Router Provider</label>
-                                        <select value={config.ROUTER_PROVIDER} on:change={(e) => handleInput('ROUTER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('ROUTER')}>
+                                        <label for="router-provider">Router Provider</label>
+                                        <select id="router-provider" value={config.ROUTER_PROVIDER} on:change={(e) => handleInput('ROUTER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('ROUTER')}>
                                             <option value="auto">Auto (Smart)</option>
                                             <option value="groq" disabled={isProviderDisabled('groq')}>Groq {!config.GROQ_API_KEY ? '(No Key)' : ''}</option>
                                             <option value="google" disabled={isProviderDisabled('google')}>Google Gemini {!config.GOOGLE_API_KEY ? '(No Key)' : ''}</option>
@@ -446,12 +446,12 @@
                                         {/if}
                                     </div>
                                     <div class="form-group">
-                                        <label>Router Model</label>
-                                        <input type="text" value={config.ROUTER_MODEL} on:input={(e) => handleInput('ROUTER_MODEL', e.target.value)} placeholder="e.g. llama-3.1-8b-instant" />
+                                        <label for="router-model">Router Model</label>
+                                        <input id="router-model" type="text" value={config.ROUTER_MODEL} on:input={(e) => handleInput('ROUTER_MODEL', e.target.value)} placeholder="e.g. llama-3.1-8b-instant" />
                                     </div>
                                     <div class="form-group">
-                                        <label>Planner Provider</label>
-                                        <select value={config.PLANNER_PROVIDER} on:change={(e) => handleInput('PLANNER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('PLANNER')}>
+                                        <label for="planner-provider">Planner Provider</label>
+                                        <select id="planner-provider" value={config.PLANNER_PROVIDER} on:change={(e) => handleInput('PLANNER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('PLANNER')}>
                                             <option value="auto">Auto (Smart)</option>
                                             <option value="deepseek" disabled={isProviderDisabled('deepseek')}>DeepSeek (Recommended) {!config.DEEPSEEK_API_KEY ? '(No Key)' : ''}</option>
                                             <option value="openai" disabled={isProviderDisabled('openai')}>OpenAI {!config.OPENAI_API_KEY ? '(No Key)' : ''}</option>
@@ -464,8 +464,8 @@
                                         {/if}
                                     </div>
                                     <div class="form-group">
-                                        <label>Planner Model</label>
-                                        <input type="text" value={config.PLANNER_MODEL} on:input={(e) => handleInput('PLANNER_MODEL', e.target.value)} placeholder="Required for DeepSeek (e.g. deepseek-v4-flash)" class:error={deepseekWarning} />
+                                        <label for="planner-model">Planner Model</label>
+                                        <input id="planner-model" type="text" value={config.PLANNER_MODEL} on:input={(e) => handleInput('PLANNER_MODEL', e.target.value)} placeholder="Required for DeepSeek (e.g. deepseek-v4-flash)" class:error={deepseekWarning} />
                                         {#if deepseekWarning}
                                             <small class="error-text">DeepSeek requires an explicit Model ID!</small>
                                         {:else}
@@ -473,8 +473,8 @@
                                         {/if}
                                     </div>
                                     <div class="form-group">
-                                        <label>Responder Provider</label>
-                                        <select value={config.RESPONDER_PROVIDER} on:change={(e) => handleInput('RESPONDER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('RESPONDER')}>
+                                        <label for="responder-provider">Responder Provider</label>
+                                        <select id="responder-provider" value={config.RESPONDER_PROVIDER} on:change={(e) => handleInput('RESPONDER_PROVIDER', e.target.value)} class:warning={providerKeyWarning('RESPONDER')}>
                                             <option value="auto">Auto (Smart)</option>
                                             <option value="openai" disabled={isProviderDisabled('openai')}>OpenAI {!config.OPENAI_API_KEY ? '(No Key)' : ''}</option>
                                             <option value="google" disabled={isProviderDisabled('google')}>Google Gemini {!config.GOOGLE_API_KEY ? '(No Key)' : ''}</option>
@@ -487,12 +487,12 @@
                                         {/if}
                                     </div>
                                     <div class="form-group">
-                                        <label>Responder Model</label>
-                                        <input type="text" value={config.RESPONDER_MODEL} on:input={(e) => handleInput('RESPONDER_MODEL', e.target.value)} />
+                                        <label for="responder-model">Responder Model</label>
+                                        <input id="responder-model" type="text" value={config.RESPONDER_MODEL} on:input={(e) => handleInput('RESPONDER_MODEL', e.target.value)} />
                                     </div>
                                     <div class="form-group">
-                                        <label>Verifier Provider</label>
-                                        <select value={config.VERIFIER_PROVIDER} on:change={(e) => handleInput('VERIFIER_PROVIDER', e.target.value)}>
+                                        <label for="verifier-provider">Verifier Provider</label>
+                                        <select id="verifier-provider" value={config.VERIFIER_PROVIDER} on:change={(e) => handleInput('VERIFIER_PROVIDER', e.target.value)}>
                                             <option value="auto">Auto (Smart)</option>
                                             <option value="groq">Groq</option>
                                             <option value="google">Google Gemini</option>
@@ -501,8 +501,8 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label>Verifier Model</label>
-                                        <input type="text" value={config.VERIFIER_MODEL} on:input={(e) => handleInput('VERIFIER_MODEL', e.target.value)} />
+                                        <label for="verifier-model">Verifier Model</label>
+                                        <input id="verifier-model" type="text" value={config.VERIFIER_MODEL} on:input={(e) => handleInput('VERIFIER_MODEL', e.target.value)} />
                                     </div>
                                 </div>
                             </div>
@@ -518,15 +518,15 @@
                             </div>
                             <div class="stats">
                                 <div class="stat-card">
-                                    <label>Memory Mode</label>
+                                    <span class="stat-label">Memory Mode</span>
                                     <span>FAISS (Persistent)</span>
                                 </div>
                                 <div class="stat-card">
-                                    <label>Vision Engine</label>
+                                    <span class="stat-label">Vision Engine</span>
                                     <span>Active (MSS + LLaVA)</span>
                                 </div>
                                 <div class="stat-card">
-                                    <label>Architecture</label>
+                                    <span class="stat-label">Architecture</span>
                                     <span>V17 Iterative</span>
                                 </div>
                             </div>
@@ -671,7 +671,7 @@
         flex-direction: column;
         gap: 8px;
     }
-    label { font-size: 13px; font-weight: 600; color: #888; }
+    label, .label-text { font-size: 13px; font-weight: 600; color: #888; }
     input, textarea {
         background: #1a1a1a;
         border: 1px solid #333;
@@ -764,7 +764,7 @@
         flex-direction: column;
         gap: 5px;
     }
-    .stat-card label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; }
+    .stat-card .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; font-weight: 600; }
     .about-section { text-align: center; }
     .big-logo { font-size: 64px; margin-bottom: 20px; display: block; }
 

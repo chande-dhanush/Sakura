@@ -321,3 +321,35 @@ Remediate the Sakura V19.5 Voice I/O system to ensure production-grade reliabili
 
 ### Outcome
 Sakura V19.5 (Hardened) is now fully self-contained and ready for enterprise-grade deployment. The voice pipeline is robust, low-latency, and requires zero manual configuration after installation.
+
+ # #   P h a s e   9 :   P r o d u c t i o n   E n v i r o n m e n t   H a r d e n i n g   &   U I   P o l i s h 
+ * * D a t e : * *   2 0 2 6 - 0 5 - 0 2 
+ * * O p e r a t o r : * *   A n t i g r a v i t y   ( P r i n c i p a l   E n g i n e e r   M o d e ) 
+ 
+ # # #   P h a s e   G o a l 
+ R e s o l v e   P y I n s t a l l e r   f r o z e n - b i n a r y   p a t h i n g   f a i l u r e s ,   p r e v e n t   s t a r t u p   r a c e   c o n d i t i o n s ,   a n d   e l i m i n a t e   f r o n t e n d   c o m p i l e r   w a r n i n g s   f o r   a   s e a m l e s s   p r o d u c t i o n   b u i l d . 
+ 
+ - - - 
+ 
+ # # #   I s s u e s   F i x e d 
+ 
+ # # # #   1 .   E p h e m e r a l   D a t a   P e r s i s t e n c e   ( P y I n s t a l l e r   M E I P A S S ) 
+ -   * * R o o t   C a u s e : * *   C o r e   m o d u l e s   ( ` s e r v e r . p y ` ,   ` e p i s o d i c _ m e m o r y . p y ` ,   ` s t a b i l i t y _ l o g g e r . p y ` ,   ` t t s . p y ` ,   ` w a k e _ w o r d . p y ` )   u s e d   ` _ _ f i l e _ _ ` - r e l a t i v e   p a t h s .   W h e n   d e p l o y e d   a s   a   P y I n s t a l l e r   f r o z e n   b i n a r y ,   t h e s e   e v a l u a t e d   t o   t h e   e p h e m e r a l   ` _ M E I P A S S `   t e m p   f o l d e r ,   c a u s i n g   m o d e l s   t o   r e d o w n l o a d   a n d   u s e r   d a t a   t o   b e   w i p e d   o n   e x i t . 
+ -   * * F i x   A p p l i e d : * *   S t a n d a r d i z e d   a l l   r e s o u r c e   r e s o l u t i o n   t o   u s e   ` % A P P D A T A % \ S a k u r a V 1 0 `   v i a   t h e   u n i f i e d   ` g e t _ p r o j e c t _ r o o t ( ) `   u t i l i t y . 
+ 
+ # # # #   2 .   H u g g i n g F a c e   C a c h e   C o l l i s i o n 
+ -   * * R o o t   C a u s e : * *   ` H F _ H O M E `   w a s   m a p p e d   s p e c i f i c a l l y   t o   ` m o d e l s / k o k o r o ` ,   c a u s i n g   S e n t e n c e T r a n s f o r m e r s   ( F A I S S )   t o   d o w n l o a d   i t s   e m b e d d i n g   m o d e l s   i n t o   t h e   K o k o r o   f o l d e r . 
+ -   * * F i x   A p p l i e d : * *   R e n a m e d   t h e   p a t h   t o   ` m o d e l s / h u g g i n g f a c e `   t o   s e r v e   a s   a   s h a r e d   m o d e l   c a c h e . 
+ 
+ # # # #   3 .   S t a r t u p   R a c e   C o n d i t i o n   &   T a u r i   T i m e o u t 
+ -   * * R o o t   C a u s e : * *   T h e   8 M B   ` o p e n w a k e w o r d `   m o d e l   d o w n l o a d   r a n   s y n c h r o n o u s l y   i n   t h e   F a s t A P I   l i f e s p a n .   O n   s l o w   c o n n e c t i o n s ,   t h i s   b l o c k e d   t h e   s e r v e r   b o o t ,   c a u s i n g   t h e   T a u r i   f r o n t e n d   t o   t i m e o u t   w a i t i n g   f o r   ` / h e a l t h `   a n d   c r a s h . 
+ -   * * F i x   A p p l i e d : * *   D e f e r r e d   t h e   w a k e   w o r d   d o w n l o a d   a n d   ` V o i c e E n g i n e `   m i c r o p h o n e   a c t i v a t i o n   t o   a   b a c k g r o u n d   ` a s y n c i o . t o _ t h r e a d `   w o r k e r   p o o l .   T h e   F a s t A P I   s e r v e r   n o w   y i e l d s   i m m e d i a t e l y   t o   s a t i s f y   T a u r i . 
+ 
+ # # # #   4 .   F r o n t e n d   U I   C o m p i l e r   W a r n i n g s 
+ -   * * R o o t   C a u s e : * *   S v e l t e   c o m p i l e r   f l a g g e d   m u l t i p l e   a c c e s s i b i l i t y   ( a 1 1 y )   i s s u e s   r e g a r d i n g   f o r m   l a b e l s   l a c k i n g   a s s o c i a t e d   c o n t r o l s ,   m i s s i n g   A R I A   r o l e s   o n   i n t e r a c t i v e   d i v s ,   a n d   u n u s e d   C S S   s e l e c t o r s . 
+ -   * * F i x   A p p l i e d : * *   A d d e d   ` i d `   a t t r i b u t e s   t o   i n p u t s ,   m a p p e d   ` f o r `   l a b e l s ,   a d d e d   ` r o l e = " a r t i c l e " `   t o   t h e   t i m e l i n e   c o n t a i n e r ,   a n d   p r u n e d   u n u s e d   C S S   c l a s s e s ,   r e s u l t i n g   i n   a   z e r o - w a r n i n g   V i t e   b u i l d . 
+ 
+ # # #   O u t c o m e 
+ S a k u r a   V 1 9 . 5   i s   s t r u c t u r a l l y   s o u n d   f o r   W i n d o w s   P y I n s t a l l e r   c o m p i l a t i o n .   T h e   b i n a r y   r e t a i n s   u s e r   d a t a   a c r o s s   s e s s i o n s ,   b o o t s   i n s t a n t l y   w i t h o u t   b l o c k i n g ,   a n d   c o m p i l e s   c l e a n l y . 
+  
+ 

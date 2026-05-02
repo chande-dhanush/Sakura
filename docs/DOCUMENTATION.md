@@ -703,7 +703,7 @@ graph TD
 | Main | 480x640 | Hidden by default, shows on interaction |
 
 ### Voice Integration
-- **Wake Word:** "Sakura" (DTW detection via `wake_word.py`)
+- **Wake Word:** "Sakura" (openWakeWord ONNX inference via wake_word.py)
 - **TTS:** Kokoro neural synthesis with idle unload
 - **Manual Trigger:** Speaker button in chat → `/voice/speak`
 
@@ -716,10 +716,11 @@ graph TD
 
 ## 🛡️ Security
 
-### Path Sandboxing
-- Blocks: `C:/Windows`, `Program Files`, `AppData`
+### Path Sandboxing & Persistence
+- Blocks: `C:/Windows`, `Program Files`, `AppData` (for execution context)
 - Prevents parent traversal (`../`)
 - Restricts to project root + Documents/Desktop/Downloads
+- **PyInstaller Persistence:** All internal storage (models, logs, memory) is dynamically resolved to `%APPDATA%\SakuraV10` to prevent data loss when running as a frozen `_MEIPASS` binary.
 
 ### Safe Math
 - Replaced `eval()` with `sympy.sympify()` + whitelist

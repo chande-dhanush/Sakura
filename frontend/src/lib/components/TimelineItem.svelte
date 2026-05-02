@@ -38,6 +38,7 @@
 <div 
     class="item" 
     class:user={isUser}
+    role="article"
     on:mouseenter={() => showActions = true}
     on:mouseleave={() => showActions = false}
 >

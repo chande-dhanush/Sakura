@@ -317,7 +317,7 @@
         color: var(--primary);
     }
     
-    .attach-btn:disabled, .attach-btn.disabled {
+    .attach-btn:disabled {
         opacity: 0.3;
         cursor: not-allowed;
     }
