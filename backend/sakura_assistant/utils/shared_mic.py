@@ -252,6 +252,10 @@ def activate_mic_consumer(consumer_id: str, exclusive: bool = False):
     """Activate a mic consumer."""
     MicStreamManager.activate_consumer(consumer_id, exclusive)
 
+def deactivate_mic_consumer(consumer_id: str):
+    """Deactivate a mic consumer."""
+    MicStreamManager.deactivate_consumer(consumer_id)
+
 # V19.5: Async wrapper for coordination
 class SharedMic:
     _lock = asyncio.Lock()

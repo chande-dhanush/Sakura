@@ -11,6 +11,7 @@ Usage:
 """
 import sys
 import os
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -72,7 +73,6 @@ def configure_logging(json_output: bool = False, level: str = "INFO"):
     
     if not STRUCTLOG_AVAILABLE:
         # Configure basic file logging
-        import logging
         log_dir = get_log_dir()
         log_file = os.path.join(log_dir, f"sakura_{datetime.now().strftime('%Y-%m-%d')}.log")
         
@@ -118,7 +118,6 @@ def configure_logging(json_output: bool = False, level: str = "INFO"):
     )
     
     # Also configure file logging for structlog
-    import logging
     log_dir = get_log_dir()
     log_file = os.path.join(log_dir, f"sakura_{datetime.now().strftime('%Y-%m-%d')}.log")
     

@@ -296,6 +296,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+async def health():
+    return {"status": "ok", "version": "19.5.0"}
+
+
 @app.websocket("/ws/status")
 async def websocket_status(websocket: WebSocket):
     """

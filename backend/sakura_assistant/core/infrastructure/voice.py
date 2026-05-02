@@ -11,7 +11,6 @@ from __future__ import annotations
 import time
 import threading
 import queue
-import speech_recognition as sr
 from typing import Optional, Callable, List, Any, TYPE_CHECKING
 import sounddevice as sd
 import numpy as np
@@ -46,13 +45,9 @@ class VoiceEngine:
     
     def __init__(self, assistant: SmartAssistant):
         self.assistant = assistant
-        self.recognizer = sr.Recognizer()
         self.listening = False
         self.processing = False
         self.should_stop = False
-        
-        # Queue for passing audio from shared mic to SR
-        self.audio_queue = queue.Queue()
         
         # Initialize Wake Detector (running on shared_mic)
         self.wake_detector = init_wake_detector(
