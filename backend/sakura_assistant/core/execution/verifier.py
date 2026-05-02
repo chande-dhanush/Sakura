@@ -58,7 +58,11 @@ TOOL OUTPUTS:
             ]
             
             response = await active_llm.ainvoke(messages)
-            content = response.content.strip()
+            content = response.content.strip() if hasattr(response, 'content') else str(response).strip()
+            
+            if not content:
+                logger.warning("[Verifier] Empty response from LLM, skipping validation")
+                return {"verdict": "PASS", "reason": "Empty verifier response - assuming pass to prevent stall."}
             
             # Clean possible markdown wrap
             if content.startswith("```json"):

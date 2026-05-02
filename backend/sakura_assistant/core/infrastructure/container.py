@@ -206,6 +206,21 @@ class Container:
             )
         return self._llms[key]
     
+    def get_executor_llm(self):
+        """
+        V20.0: Get LLM for background/executor tasks.
+        Uses the same model as router but identifies as 'Executor' for budget tracking.
+        """
+        key = "executor"
+        if key not in self._llms:
+            self._llms[key] = self._create_reliable_llm(
+                stage="executor",
+                model=self.config.router_model,
+                temperature=0.0,
+                name="Executor",
+            )
+        return self._llms[key]
+    
     def get_backup_llm(self):
         """Get backup LLM for vision/failover."""
         if "backup" not in self._llms:

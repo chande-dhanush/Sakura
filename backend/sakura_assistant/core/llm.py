@@ -114,7 +114,8 @@ class SmartAssistant:
         )
         
         # V18.2: Memory Judger (BUG-03 FIX)
-        self.memory_judger = MemoryJudger(router_llm)
+        # V20.0: Use dedicated executor LLM for budget tracking
+        self.memory_judger = MemoryJudger(self.container.get_executor_llm())
         
         # V17: Create Executor (unified entry point)
         self.executor_layer = Executor(

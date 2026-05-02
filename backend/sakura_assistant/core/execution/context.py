@@ -161,8 +161,16 @@ class ExecutionContext:
     history: Optional[List[Dict]] = None  # V17.1: Conversation history for Planner
     reference_context: str = ""           # V19-FIX: Resolved reference for Planner
     llm_call_count: int = 0
-    max_llm_calls: int = 6  # V18 FIX-08
+    max_llm_calls: int = 15  # V20.0: Increased global limit for complex multi-stage flows
     tool_call_cache: Dict[str, Any] = field(default_factory=dict)
+    
+    # V20.0: Stage-aware budgets
+    stage_counts: Dict[str, int] = field(default_factory=lambda: {
+        "router": 0, "planner": 0, "executor": 0, "responder": 0, "verifier": 0
+    })
+    stage_budgets: Dict[str, int] = field(default_factory=lambda: {
+        "router": 2, "planner": 4, "executor": 3, "responder": 1, "verifier": 1
+    })
     
     # Budgets by mode (class constants)
     BUDGET_CHAT_MS: int = _get_int_env("EXEC_BUDGET_CHAT_MS", 1000, 500, 10000)
@@ -202,7 +210,7 @@ class ExecutionContext:
             history=history,
             reference_context=reference_context
         )
-        ctx.max_llm_calls = _get_int_env("MAX_LLM_CALLS", ctx.max_llm_calls, 3, 20)
+        ctx.max_llm_calls = _get_int_env("MAX_LLM_CALLS", ctx.max_llm_calls, 3, 30)
         execution_context_var.set(ctx)
         return ctx
     
@@ -219,12 +227,27 @@ class ExecutionContext:
         """Returns True if budget has expired."""
         return self.remaining_budget_ms() == 0
 
-    def record_and_check_llm_call(self) -> bool:
-        """Returns True if budget is OK, False if limit exceeded."""
+    def record_and_check_llm_call(self, stage: str = "unknown") -> bool:
+        """
+        V20.0: Stage-aware budget check.
+        Returns True if budget is OK, False if limit exceeded.
+        """
         self.llm_call_count += 1
+        
+        # 1. Global limit check
         if self.llm_call_count > self.max_llm_calls:
-            print(f"  [Budget] LLM call limit ({self.max_llm_calls}) exceeded")
+            print(f"  [Budget] Global LLM call limit ({self.max_llm_calls}) exceeded")
             return False
+            
+        # 2. Stage-specific limit check
+        stage = stage.lower().split('-')[0] # Normalize "Planner-Override" -> "planner"
+        if stage in self.stage_budgets:
+            self.stage_counts[stage] += 1
+            limit = self.stage_budgets[stage]
+            if self.stage_counts[stage] > limit:
+                print(f"  [Budget] Stage '{stage}' limit ({limit}) exceeded")
+                return False
+                
         return True
     
     def is_one_shot(self) -> bool:

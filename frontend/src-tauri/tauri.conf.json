@@ -77,7 +77,6 @@
     ],
     "resources": [
       "../../backend/data/**/*",
-      "../../backend/models/**/*",
       "../../.setup_complete"
     ],
     "icon": [

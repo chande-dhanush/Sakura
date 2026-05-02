@@ -38,7 +38,7 @@ class ReflectionEngine:
     def _get_llm(self):
         if not self._llm:
             from ..infrastructure.container import get_container
-            self._llm = get_container().get_router_llm()  # Use fast 8B model
+            self._llm = get_container().get_executor_llm()  # V20.0: Use Executor identity for budget tracking
         return self._llm
 
     async def observe_background(self, history: List[Dict[str, Any]]):

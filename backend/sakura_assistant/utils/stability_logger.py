@@ -32,6 +32,7 @@ _health = {
 # Configure stability logger
 stability_logger = logging.getLogger("yuki.stability")
 stability_logger.setLevel(logging.DEBUG)
+stability_logger.propagate = False  # V19.5 FIX: Prevent double-logging to root logger
 
 # File handler
 file_handler = logging.FileHandler(STABILITY_LOG_FILE, encoding='utf-8')

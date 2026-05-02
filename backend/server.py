@@ -165,8 +165,14 @@ async def lifespan(app: FastAPI):
                 try:
                     await asyncio.sleep(60)
                     if assistant and assistant.summary_memory:
-                        history = getattr(assistant.summary_memory, 'recent_messages', 
-                                          getattr(assistant.summary_memory, 'conversation_history', []))
+                        # V19.5 FIX: Robust attribute check for SummaryMemory
+                        history = []
+                        for attr in ['recent_messages', 'conversation_history']:
+                            val = getattr(assistant.summary_memory, attr, None)
+                            if val is not None:
+                                history = val
+                                break
+                        
                         if history:
                             # analyze_delta is wrapped by observe_background
                             await re.observe_background(history)

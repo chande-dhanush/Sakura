@@ -842,13 +842,8 @@ class ReActLoop:
             
             # 1. PLAN (with timeout if we have budget)
             try:
-                # V18: Record planner call in context and check limit
-                if ctx and not ctx.record_and_check_llm_call():
-                    print(f"  [ReActLoop] LLM call limit ({ctx.max_llm_calls}) reached during iteration {iteration + 1}")
-                    return ExecutionResult.timeout(
-                        outputs="\n".join(all_outputs) if all_outputs else "",
-                        tool_messages=all_tool_messages
-                    )
+                # V20.0: Budget is now checked inside ReliableLLM.ainvoke(stage='Planner')
+                # to prevent double-counting.
                 
                 # V19: Resolve planner LLM with overrides
                 from ..infrastructure import get_container

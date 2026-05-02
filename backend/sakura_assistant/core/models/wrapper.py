@@ -217,7 +217,7 @@ class ReliableLLM:
         try:
             from ..execution.context import execution_context_var, LLMBudgetExceededError
             ctx = execution_context_var.get()
-            if ctx and not ctx.record_and_check_llm_call():
+            if ctx and not ctx.record_and_check_llm_call(stage=self.name):
                 raise LLMBudgetExceededError(f"Budget exceeded in {self.name}.")
         except (ImportError, LookupError): pass
 
@@ -318,7 +318,7 @@ class ReliableLLM:
         try:
             from ..execution.context import execution_context_var, LLMBudgetExceededError
             ctx = execution_context_var.get()
-            if ctx and not ctx.record_and_check_llm_call():
+            if ctx and not ctx.record_and_check_llm_call(stage=self.name):
                 raise LLMBudgetExceededError(f"Budget exceeded in {self.name}.")
         except (ImportError, LookupError): pass
 

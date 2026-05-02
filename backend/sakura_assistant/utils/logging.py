@@ -60,11 +60,13 @@ def cleanup_old_logs(max_days: int = 3):
 def configure_logging(json_output: bool = False, level: str = "INFO"):
     """
     Configure structured logging for the application.
-    
-    Args:
-        json_output: If True, output JSON (for production). If False, console format.
-        level: Logging level (DEBUG, INFO, WARNING, ERROR)
     """
+    # 1. Root Logger Protection
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        # Already configured
+        return
+
     # Cleanup old logs on startup
     cleanup_old_logs(max_days=3)
     
@@ -175,6 +177,6 @@ class BasicLogger:
         traceback.print_exc()
 
 
-# Initialize logging on import
-configure_logging()
+# Removed top-level configure_logging() to prevent duplicate handlers on multiple imports.
+# server.py handles explicit configuration.
 
