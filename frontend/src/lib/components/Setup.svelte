@@ -34,7 +34,6 @@
         // V19.5: Wake Word Settings
         WAKE_WORD_ENABLED: "true",
         WAKE_WORD_SENSITIVITY: 0.5,
-        ,
         ROUTER_PROVIDER: "auto",
         PLANNER_PROVIDER: "auto",
         RESPONDER_PROVIDER: "auto",
