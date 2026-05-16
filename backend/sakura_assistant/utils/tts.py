@@ -186,6 +186,7 @@ def play_audio_file(file_path, auto_delete=True):
         _pause_wake_word("playback")
 
         pygame.mixer.music.load(file_path)
+        pygame.mixer.music.set_volume(1.0) # Ensure 100% volume
         pygame.mixer.music.play()
         
         # Poll with interrupt check

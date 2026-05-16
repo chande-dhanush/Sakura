@@ -2,6 +2,7 @@ import os
 import time
 import re
 import json
+import logging
 from typing import List, Dict, Any, Optional
 
 # V17: Reorganized imports
@@ -57,6 +58,7 @@ class SmartAssistant:
 
     def __init__(self):
         print("Initializing SmartAssistant Facade (V17)...")
+        self.logger = logging.getLogger("SmartAssistant")
         self.container = get_container()
         self.tools = get_all_tools()
         self.tool_map = {t.name: t for t in self.tools}
@@ -149,6 +151,11 @@ class SmartAssistant:
         
         # V18 FIX-05: Plan Verifier
         self.plan_verifier = PlanVerifier(verifier_llm)
+        
+        # V10 Pivot: Behavioral Trace
+        from .infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
+        self.trace = get_behavioral_trace()
+        self.InfluenceType = InfluenceType  # Store for instance use
         
         # Store last response for async reflection (picked up by server.py BackgroundTask)
         self._last_turn_data = {"user_msg": "", "assistant_response": ""}
@@ -270,8 +277,17 @@ class SmartAssistant:
                 }
             style_constraint = "\n\n" + style_blocks.get(style, style_blocks["balanced"])
             
+            # V15: Desire System (Mood)
+            mood_prompt = self.desire_system.get_mood_prompt()
+            self.trace.record(
+                self.InfluenceType.MOOD,
+                "DesireSystem",
+                f"Sakura is feeling {self.desire_system.get_mood().value}",
+                {"mood_prompt": mood_prompt}
+            )
+            
             # Final Assembly (Layered Order)
-            self.responder.personality = f"{base_personality}{user_context}{identity_instruction}{style_constraint}"
+            self.responder.personality = f"{base_personality}{user_context}{identity_instruction}{style_constraint}\n\n{mood_prompt}"
             
             # 2. Graph & Context (Keep sync for now as it's pure logic + in-memory mostly)
             req_state.study_mode = detect_study_mode(user_input)
@@ -363,7 +379,7 @@ class SmartAssistant:
                     tool_outputs = mem_results.to_context_string() if mem_results and mem_results.has_results() else "No relevant memories found."
                     tool_used = "MemoryCoordinator (Direct)"
                 except Exception as e:
-                    logger.error(f"[MEMORY_RECALL] Direct retrieval failed: {e}")
+                    self.logger.error(f"[MEMORY_RECALL] Direct retrieval failed: {e}")
                     tool_outputs = "Error retrieving memories directly."
                     tool_used = "MemoryCoordinator (Error)"
             
@@ -380,7 +396,8 @@ class SmartAssistant:
                         request_id=request_id,
                         history=history,
                         reference_context=req_state.reference_context,
-                        llm_overrides=llm_overrides
+                        llm_overrides=llm_overrides,
+                        mood=self.desire_system.get_mood()
                     )
                 
                 # V17: Use ExecutionStatus instead of bool
@@ -443,6 +460,28 @@ class SmartAssistant:
                 user_input,
                 state=req_state
             )
+            context_influences = []
+            summary_context = resp_ctx.get("summary_context", "")
+            responder_context_raw = resp_ctx.get("responder_context", "")
+            if summary_context:
+                context_influences.append("summary memory")
+            if responder_context_raw:
+                lowered_context = responder_context_raw.lower()
+                if "memory" in lowered_context or "remember" in lowered_context:
+                    context_influences.append("retrieved memory")
+            if reference_context:
+                context_influences.append("resolved reference")
+            if context_influences:
+                self.trace.record(
+                    self.InfluenceType.MEMORY,
+                    "ContextManager",
+                    f"Responder context included {', '.join(dict.fromkeys(context_influences))}",
+                    {
+                        "summary_chars": len(summary_context),
+                        "responder_context_chars": len(responder_context_raw),
+                        "had_reference_context": bool(reference_context),
+                    }
+                )
             
             # V15: Inject mood from DesireSystem
             mood_prompt = self.desire_system.get_mood_prompt()
@@ -545,7 +584,8 @@ class SmartAssistant:
                     "latency": f"{time.time()-start_time:.2f}s",
                     "status": "success",
                     "async": True,
-                    "execution_status": exec_result.status.value if exec_result else "skipped"
+                    "execution_status": exec_result.status.value if exec_result else "skipped",
+                    "response_posture": resp_context.response_posture or {}
                 }
             }
             

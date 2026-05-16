@@ -80,6 +80,7 @@ class EntityType(Enum):
     EVENT = "event"
     TASK = "task"
     LOCATION = "location"
+    PROJECT = "project"         # User projects or long-running work
     EXTERNAL = "external"       # Generic external entity from tools
 
 
@@ -95,9 +96,8 @@ class ActionType(Enum):
 
 class EntityLifecycle(Enum):
     """Lifecycle stage of an entity."""
-    EPHEMERAL = "ephemeral"     # Temporary, not trusted, semantic search ignores
-    CANDIDATE = "candidate"     # Referenced multiple times, awaiting promotion
-    PROMOTED = "promoted"       # Trusted, searchable, persistent
+    EPHEMERAL = "ephemeral"     # Temporary, low trust
+    PROMOTED = "promoted"       # Trusted, familiar, persistent
 
 
 class EntitySource(Enum):
@@ -137,8 +137,8 @@ class EntityNode:
     """
     Represents a thing that exists in the world.
     
-    Lifecycle: EPHEMERAL (default)   CANDIDATE   PROMOTED
-    Only PROMOTED entities are trusted and searchable.
+    Lifecycle: EPHEMERAL (default)   PROMOTED
+    Only PROMOTED entities are familiar and persistent.
     """
     id: str                                         # e.g., "entity:song:shape_of_you"
     type: EntityType
@@ -159,22 +159,38 @@ class EntityNode:
     reference_count: int = 0
     recency_bucket: RecencyBucket = RecencyBucket.NOW
     
-    # Uncertainty
-    confidence: float = 0.5                         # 0.0 - 1.0
-    not_claims: List[str] = field(default_factory=list)  # Negative constraints
+    # Relationship Memory (V10 Pivot)
+    familiarity: float = 0.0                        # 0.0 to 1.0 (frequency of mention)
+    sentiment: float = 0.0                          # -1.0 to 1.0 (how user feels about it)
+    
+    # Uncertainty & Negation
+    confidence: float = 0.5                         # 0.0 to 1.0 (how sure we are)
+    not_claims: List[str] = field(default_factory=list) # Negative constraints ("I don't like X")
     
     # Latent state (lazy-loaded)
     summary: str = ""
     _embedding_cached: bool = False
     
-    def touch(self) -> None:
-        """Mark entity as recently referenced and boost confidence."""
+    def touch(self, sentiment_delta: float = 0.0) -> None:
+        """Mark entity as recently referenced and boost familiarity/confidence."""
         self.last_referenced = datetime.now()
         self.reference_count += 1
         self.recency_bucket = RecencyBucket.NOW
-        # V17.1: Reinforce memory on re-reference (Full Reset)
-        # Prevents decay of active topics (Claude's recommendation)
+        
+        # Boost familiarity on each reference
+        self.familiarity = min(1.0, self.familiarity + 0.05)
+        
+        # Update sentiment (moving average)
+        if sentiment_delta != 0:
+            self.sentiment = (self.sentiment * 0.7) + (sentiment_delta * 0.3)
+            
+        # V17.1: Reinforce confidence
         self.confidence = 1.0
+        
+        # Auto-promote if familiar enough
+        if self.lifecycle == EntityLifecycle.EPHEMERAL and self.familiarity > 0.4:
+            self.lifecycle = EntityLifecycle.PROMOTED
+            print(f" [WorldGraph] Auto-promoted {self.name} due to familiarity ({self.familiarity:.2f})")
     
     def get_current_confidence(self) -> float:
         """
@@ -215,8 +231,7 @@ class EntityNode:
         Check and apply lifecycle demotion based on decayed confidence.
         
         V13: Entities get demoted if their confidence drops too low.
-        - PROMOTED   CANDIDATE if confidence < 0.3
-        - CANDIDATE   EPHEMERAL if confidence < 0.15
+        - PROMOTED -> EPHEMERAL if confidence < 0.2
         
         Returns True if entity was demoted.
         """
@@ -226,14 +241,9 @@ class EntityNode:
         
         current_conf = self.get_current_confidence()
         
-        if self.lifecycle == EntityLifecycle.PROMOTED and current_conf < 0.3:
-            self.lifecycle = EntityLifecycle.CANDIDATE
-            print(f" [WorldGraph] Demoted {self.name}: PROMOTED   CANDIDATE (conf={current_conf:.2f})")
-            return True
-        
-        if self.lifecycle == EntityLifecycle.CANDIDATE and current_conf < 0.15:
+        if self.lifecycle == EntityLifecycle.PROMOTED and current_conf < 0.2:
             self.lifecycle = EntityLifecycle.EPHEMERAL
-            print(f" [WorldGraph] Demoted {self.name}: CANDIDATE   EPHEMERAL (conf={current_conf:.2f})")
+            print(f" [WorldGraph] Demoted {self.name}: PROMOTED   EPHEMERAL (conf={current_conf:.2f})")
             return True
         
         return False
@@ -255,6 +265,8 @@ class EntityNode:
             "created_at": self.created_at.isoformat(),
             "last_referenced": self.last_referenced.isoformat(),
             "reference_count": self.reference_count,
+            "familiarity": self.familiarity,
+            "sentiment": self.sentiment,
             "confidence": self.confidence,
             "not_claims": self.not_claims,
             "summary": self.summary,
@@ -274,6 +286,8 @@ class EntityNode:
             created_at=datetime.fromisoformat(data["created_at"]),
             last_referenced=datetime.fromisoformat(data["last_referenced"]),
             reference_count=data.get("reference_count", 0),
+            familiarity=data.get("familiarity", 0.0),
+            sentiment=data.get("sentiment", 0.0),
             confidence=data.get("confidence", 0.5),
             not_claims=data.get("not_claims", []),
             summary=data.get("summary", ""),
@@ -821,7 +835,7 @@ class WorldGraph:
         constraints = [
             e for e in self.entities.values()
             if e.id.startswith("constraint:")
-            and e.lifecycle in (EntityLifecycle.PROMOTED, EntityLifecycle.CANDIDATE)
+            and e.lifecycle == EntityLifecycle.PROMOTED
         ]
         
         if constraints:
@@ -1256,23 +1270,14 @@ class WorldGraph:
             print(f" [WorldGraph] Turn {self.current_turn} (entities={len(self.entities)}, actions={len(self.actions)})")
     
     def _check_promotions(self) -> None:
-        """Promote candidate entities that meet criteria."""
+        """Promote ephemeral entities that show high familiarity."""
         for entity in list(self.entities.values()):
             if entity.lifecycle == EntityLifecycle.EPHEMERAL:
-                # Promote if referenced 3+ times
-                if entity.reference_count >= 3:
-                    entity.lifecycle = EntityLifecycle.CANDIDATE
-                    print(f" [WorldGraph] Promoted to CANDIDATE: {entity.id}")
-            
-            elif entity.lifecycle == EntityLifecycle.CANDIDATE:
-                # Promote to PROMOTED if high confidence or user-sourced
-                if entity.source in [EntitySource.USER_STATED, EntitySource.USER_CONFIRMED]:
+                # Promotion is now handled by familiarity in touch()
+                # This serves as a background safety check
+                if entity.reference_count >= 5 or entity.familiarity > 0.4:
                     entity.lifecycle = EntityLifecycle.PROMOTED
-                    print(f" [WorldGraph] Promoted to PROMOTED: {entity.id}")
-                elif entity.reference_count >= 5 and entity.confidence >= 0.7:
-                    entity.lifecycle = EntityLifecycle.PROMOTED
-                    entity.confidence = min(entity.confidence + 0.1, 0.9)
-                    print(f" [WorldGraph] Promoted to PROMOTED: {entity.id}")
+                    print(f" [WorldGraph] Promoted to PROMOTED: {entity.id} (familiarity={entity.familiarity:.2f})")
     
     def _run_compression(self) -> None:
         """
@@ -1338,7 +1343,7 @@ class WorldGraph:
         
         Steps:
         1. Remove EPHEMERAL entities older than 1 hour with ref_count < 2
-        2. Demote stale CANDIDATES (not referenced in 7 days)   delete
+        2. Remove stale PROMOTED entities (if decay has dropped them too low)
         3. Enforce hard caps per EntityType (oldest promoted first)
         """
         now = datetime.now()
@@ -1352,9 +1357,8 @@ class WorldGraph:
             EntityType.TOPIC: 150,
             EntityType.EXTERNAL: 100,
         }
-        # V17.1: Extended from 7 to 30 days to match decay half-life
-        # Prevents premature entity deletion during bursty conversation patterns
-        STALE_CANDIDATE_DAYS = 30
+        # V17.1: Retention policy
+        STALE_PROMOTED_DAYS = 30
         
         # --- Step 1: Remove old EPHEMERAL ---
         for entity_id, entity in self.entities.items():
@@ -1368,17 +1372,9 @@ class WorldGraph:
                 if age > 3600 and entity.reference_count < 2:  # 1 hour
                     to_remove.append(entity_id)
         
-        # --- Step 2: Demote stale CANDIDATES ---
-        stale_demoted = 0
-        for entity_id, entity in list(self.entities.items()):
-            if entity_id.startswith("user:") or entity_id.startswith("pref:"):
-                continue
-            
-            if entity.lifecycle == EntityLifecycle.CANDIDATE:
-                age_days = (now - entity.last_referenced).total_seconds() / 86400
-                if age_days > STALE_CANDIDATE_DAYS:
-                    to_remove.append(entity_id)
-                    stale_demoted += 1
+        # --- Step 2: Demote stale PROMOTED ---
+        # (Actually handled by check_lifecycle_demotion during maintenance)
+        pass
         
         # --- Step 3: Enforce hard caps per type ---
         caps_deleted = 0
@@ -1407,8 +1403,8 @@ class WorldGraph:
         
         # --- Logging ---
         if to_remove:
-            ephemeral_count = len(to_remove) - stale_demoted - caps_deleted
-            print(f"  [WorldGraph] GC: {ephemeral_count} ephemeral, {stale_demoted} stale candidates, {caps_deleted} caps exceeded")
+            ephemeral_count = len(to_remove) - caps_deleted
+            print(f"  [WorldGraph] GC: {ephemeral_count} ephemeral, {caps_deleted} caps exceeded")
     
     #                                                                            
     # VALIDATION (Graph Veto)
@@ -1455,7 +1451,7 @@ class WorldGraph:
         
         with self._lock:
             # V9.1: Filter out EPHEMERAL entities before save (retention policy)
-            # Only persist: CANDIDATE, PROMOTED, and always user:*/pref:*
+            # Only persist: PROMOTED, and always user:*/pref:*
             entities_to_persist = {
                 eid: e.to_dict() for eid, e in self.entities.items()
                 if e.lifecycle != EntityLifecycle.EPHEMERAL or
@@ -1961,7 +1957,7 @@ def add_semantic_recall_to_graph():
         Returns:
             List of (entity, similarity_score) tuples, sorted by score.
         
-        INVARIANT: Always respects lifecycle (only CANDIDATE or PROMOTED).
+        INVARIANT: Always respects lifecycle (only PROMOTED).
         """
         mgr = get_embedding_manager()
         

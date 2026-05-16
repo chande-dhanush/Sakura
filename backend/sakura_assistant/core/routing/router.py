@@ -15,6 +15,8 @@ import re
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from ..execution.context import LLMBudgetExceededError
+from ..infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
+
 
 
 # V13: Urgency detection pattern (compiled once at module load)
@@ -99,19 +101,37 @@ class IntentRouter:
         
         # 1. Action command check (CPU bound, fast enough to keep sync logic)
         if self._is_action_command(query):
-            print(f"  [Router] Action command detected (Async), forcing DIRECT")
             tool_hint = self._guess_tool_hint(query)
+            get_behavioral_trace().record(
+                InfluenceType.ROUTING,
+                "IntentRouter",
+                f"Forced DIRECT path via action command: {tool_hint}",
+                {"query": query}
+            )
             return RouteResult("DIRECT", tool_hint, urgency)
 
         # Fix 4: Short-input guard
         words = query.lower().split()
         if len(words) <= 2 and not self._is_action_command(query):
             print(f"  [Router] Short input detected (Async), forcing CHAT")
+            get_behavioral_trace().record(
+                InfluenceType.ROUTING,
+                "IntentRouter",
+                "Avoided tool routing for short conversational input",
+                {"query": query, "decision": "CHAT"},
+            )
             return RouteResult("CHAT", None, urgency)
 
         if self._should_force_wh_question(query):
             print(f"  [Router] Wh-question detected (Async), forcing PLAN")
-            return RouteResult("PLAN", self._guess_wh_tool_hint(query), urgency)
+            tool_hint = self._guess_wh_tool_hint(query)
+            get_behavioral_trace().record(
+                InfluenceType.ROUTING,
+                "IntentRouter",
+                f"Allowed tool-capable route for factual question via {tool_hint}",
+                {"query": query, "decision": "PLAN", "tool_hint": tool_hint},
+            )
+            return RouteResult("PLAN", tool_hint, urgency)
             
         # 2. LLM classification
         try:
@@ -144,7 +164,15 @@ class IntentRouter:
 
             # V17.2: Apply safety checks to prevent Tavily Trap
             route_result = RouteResult(classification, tool_hint, urgency)
-            return self._apply_safety_checks(query, route_result)
+            final_result = self._apply_safety_checks(query, route_result)
+            get_behavioral_trace().record(
+                InfluenceType.ROUTING,
+                "IntentRouter",
+                f"Routed to {final_result.classification}",
+                {"query": query}
+            )
+            return final_result
+
             
         except LLMBudgetExceededError:
             raise
@@ -178,11 +206,24 @@ class IntentRouter:
         words = query.lower().split()
         if len(words) <= 2 and not self._is_action_command(query):
             print(f"  [Router] Short input detected, forcing CHAT")
+            get_behavioral_trace().record(
+                InfluenceType.ROUTING,
+                "IntentRouter",
+                "Avoided tool routing for short conversational input",
+                {"query": query, "decision": "CHAT"},
+            )
             return RouteResult("CHAT", None, urgency)
 
         if self._should_force_wh_question(query):
             print(f"  [Router] Wh-question detected, forcing PLAN")
-            return RouteResult("PLAN", self._guess_wh_tool_hint(query), urgency)
+            tool_hint = self._guess_wh_tool_hint(query)
+            get_behavioral_trace().record(
+                InfluenceType.ROUTING,
+                "IntentRouter",
+                f"Allowed tool-capable route for factual question via {tool_hint}",
+                {"query": query, "decision": "PLAN", "tool_hint": tool_hint},
+            )
+            return RouteResult("PLAN", tool_hint, urgency)
         
         # 2. LLM-based classification
         try:

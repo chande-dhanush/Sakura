@@ -11,6 +11,8 @@ Endpoints:
     GET /state   - World Graph state for UI
     GET /health  - Health check
 """
+from sakura_assistant.core.infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
+
 import os
 import sys
 import io
@@ -83,6 +85,21 @@ def atomic_write(file_path: str, content: str):
     with open(temp_path, "w", encoding="utf-8") as f:
         f.write(content)
     os.replace(temp_path, file_path)
+
+
+def choose_micro_voice_response(content: str, posture: dict) -> str:
+    """Pick a tiny spoken response when full TTS would crowd the turn."""
+    text = content.strip().lower().rstrip(".!?")
+    mode = posture.get("mode")
+
+    if "thank" in text or mode == "warm_quiet":
+        return "yeah"
+    if text in {"got it", "ok", "okay", "cool", "nice"}:
+        return "gotcha"
+    if text in {"lol", "haha"}:
+        return "heh"
+    return "mhm"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -213,7 +230,10 @@ async def lifespan(app: FastAPI):
             
             # 1. Wake Word Models (Phase 2 Pathing fix)
             try:
+                # pyrefly: ignore [missing-import]
                 import openwakeword
+                # pyrefly: ignore [missing-import]
+                import openwakeword.utils
                 ww_dir = Path(get_project_root()) / "models" / "openwakeword"
                 ww_dir.mkdir(parents=True, exist_ok=True)
                 model_path = ww_dir / "hey_jarvis_v0.1.onnx"
@@ -697,7 +717,14 @@ async def readiness():
     }
 
 
+@app.get("/behavior/trace")
+async def get_behavior_trace(limit: int = 10):
+    """Return the recent cognitive influence traces."""
+    return {"traces": get_behavioral_trace().get_traces(limit)}
+
+
 @app.get("/api/logs")
+
 async def get_logs(limit: int = 100):
     """Return parsed flight recorder logs."""
     from sakura_assistant.utils.flight_recorder import get_recorder
@@ -824,6 +851,7 @@ async def chat(request: Request):
     """SSE stream for chat responses."""
     global current_task, generation_cancelled
     generation_cancelled = False
+    get_behavioral_trace().clear()
     from sakura_assistant.core.execution.context import clear_cancellation
     clear_cancellation()
     
@@ -872,17 +900,47 @@ async def chat(request: Request):
                 msg_type = event.get("type")
                 if msg_type == "pipeline_result":
                     result = event["data"]; content = result.get("content", ""); mode = result.get("mode", "")
+                    metadata = result.get("metadata", {}) or {}
+                    posture = metadata.get("response_posture", {}) or {}
                     from sakura_assistant.memory.faiss_store import get_memory_store
                     store = get_memory_store(); store.append_to_history({"role": "user", "content": query}); store.append_to_history({"role": "assistant", "content": content})
                     for t in result.get("tools_used", [result.get("tool_used", "None")]):
                         if t != "None": yield f"data: {json.dumps({'type': 'tool_used', 'tool': t})}\n\n"
                     yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
                     if data.get("tts_enabled", False) and content:
-                        from sakura_assistant.utils.tts import generate_audio
-                        audio_path = await asyncio.to_thread(generate_audio, content)
-                        if audio_path:
-                            rel = os.path.relpath(audio_path, start=os.getcwd()).replace('\\', '/')
-                            yield f"data: {json.dumps({'type': 'audio_ready', 'path': f'/{rel}' if not rel.startswith('/') else rel})}\n\n"
+                        tiny_ack = content.strip().lower().rstrip(".!") in {"ok", "okay", "thanks", "thank you", "got it", "cool", "nice"}
+                        voice_mode = posture.get("voice", "normal")
+                        if voice_mode == "silent":
+                            get_behavioral_trace().record(
+                                InfluenceType.VOICE,
+                                "TTS",
+                                "Skipped voice playback because posture requested silence",
+                                {"posture": posture.get("mode"), "chars": len(content), "voice": voice_mode},
+                            )
+                        elif voice_mode in {"micro", "micro_optional"} or posture.get("mode") in {"quiet", "warm_quiet"} or tiny_ack:
+                            from sakura_assistant.utils.tts import generate_audio
+                            spoken_text = choose_micro_voice_response(content, posture)
+                            get_behavioral_trace().record(
+                                InfluenceType.VOICE,
+                                "TTS",
+                                "Used a micro voice response to preserve presence without crowding the turn",
+                                {
+                                    "posture": posture.get("mode"),
+                                    "voice": voice_mode,
+                                    "spoken_text": spoken_text,
+                                    "original_chars": len(content),
+                                },
+                            )
+                            audio_path = await asyncio.to_thread(generate_audio, spoken_text)
+                            if audio_path:
+                                rel = os.path.relpath(audio_path, start=os.getcwd()).replace('\\', '/')
+                                yield f"data: {json.dumps({'type': 'audio_ready', 'path': f'/{rel}' if not rel.startswith('/') else rel})}\n\n"
+                        else:
+                            from sakura_assistant.utils.tts import generate_audio
+                            audio_path = await asyncio.to_thread(generate_audio, content)
+                            if audio_path:
+                                rel = os.path.relpath(audio_path, start=os.getcwd()).replace('\\', '/')
+                                yield f"data: {json.dumps({'type': 'audio_ready', 'path': f'/{rel}' if not rel.startswith('/') else rel})}\n\n"
                     if assistant and hasattr(assistant, 'reflection_engine'):
                         asyncio.create_task(_run_async_reflection(query, content))
                     yield f"data: {json.dumps({'type': 'done', 'mode': mode})}\n\n"; break

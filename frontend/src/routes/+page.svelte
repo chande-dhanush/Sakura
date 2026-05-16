@@ -7,15 +7,17 @@
     import Omnibox from '$lib/components/Omnibox.svelte';
     import Timeline from '$lib/components/Timeline.svelte';
     import WorldGraphPill from '$lib/components/WorldGraphPill.svelte';
+    import BehavioralInspector from '$lib/components/BehavioralInspector.svelte';
     import VoiceSetup from '$lib/components/VoiceSetup.svelte';
     import Setup from '$lib/components/Setup.svelte'; // V10: New Onboarding
-    import { messages, moodColors, refreshState, connectionError, clearChat, startPolling, backendStatus, voiceStatus, checkBackendReady, checkVoiceStatus, loadHistory, isListening } from '$lib/stores/chat.js';
+    import { messages, moodColors, refreshState, connectionError, clearChat, startPolling, backendStatus, voiceStatus, checkBackendReady, checkVoiceStatus, loadHistory, isListening, refreshBehaviorTrace } from '$lib/stores/chat.js';
     
     let showMenu = false;
     let historyLoading = false;
     let isQuickSearch = false; // Spotlight mode
     let showVoiceSetup = false;
     let showSettings = false; // V10: Settings Modal State
+    let showBehaviorInspector = false;
     
     // Reactive Window Resizing for Setup Mode
     let isSetupMode = false;
@@ -215,6 +217,14 @@
         showMenu = false;
         await invoke('open_logs_window');
     }
+
+    async function toggleBehaviorInspector() {
+        showBehaviorInspector = !showBehaviorInspector;
+        showMenu = false;
+        if (showBehaviorInspector) {
+            await refreshBehaviorTrace();
+        }
+    }
     
     // V15.2.1: Report visibility state to backend
     async function reportVisibility(visible) {
@@ -337,6 +347,9 @@
                     <button on:click={() => { showMenu = false; showSettings = true; }}>
                         <span class="menu-icon">⚙️</span> Settings
                     </button>
+                    <button on:click={toggleBehaviorInspector}>
+                        <span class="menu-icon">BI</span> {showBehaviorInspector ? 'Hide Behavior' : 'Behavior Inspector'}
+                    </button>
                     <button on:click={openLogsWindow}>
                         <span class="menu-icon">📊</span> Open Logs
                     </button>
@@ -359,6 +372,10 @@
         
         <!-- World Graph Status Pill -->
         <WorldGraphPill />
+
+        {#if showBehaviorInspector}
+            <BehavioralInspector />
+        {/if}
         
         <!-- Chat Timeline -->
         <div class="timeline-container">

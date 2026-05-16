@@ -775,8 +775,9 @@ async def run_hourly_proactive_check():
     """
     try:
         from ..cognitive.proactive import get_proactive_scheduler
+        from ..graph.world_graph import get_world_graph
         scheduler = get_proactive_scheduler()
-        result = await scheduler.check_and_initiate()
+        result = await scheduler.check_and_initiate(get_world_graph())
         print(f"  [ProactiveScheduler] Hourly check completed (initiated={result})")
     except ImportError as e:
         # V19-FIX-03: NEVER silently swallow import failures

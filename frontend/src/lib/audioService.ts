@@ -1,16 +1,16 @@
 /**
- * Sakura V18 Audio Service
- * Frontend-based TTS playback using HTML5 Audio API
- * Bypasses pygame.mixer issues in Tauri production builds
+ * Sakura V10 Native Audio Service
+ * Frontend wrapper for Rust-based native playback (rodio)
+ * Resolves volume capping and reliability issues in WebView
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { remove, readFile } from '@tauri-apps/plugin-fs';
 
-let currentAudio: HTMLAudioElement | null = null;
 const BACKEND_URL = 'http://localhost:3210';
 
+/**
+ * Check if CPU is too high for TTS generation
+ */
 async function shouldSkipForCpu(): Promise<boolean> {
   try {
     const response = await fetch(`${BACKEND_URL}/system/cpu`);
@@ -28,82 +28,28 @@ async function shouldSkipForCpu(): Promise<boolean> {
 }
 
 /**
- * Generate and play TTS audio
+ * Generate and play TTS audio using native Rust backend
  * @param text - Text to speak
  */
 export async function speak(text: string): Promise<void> {
-  // Guard empty text
-  if (!text?.trim()) {
-    console.warn('[TTS] Empty text, skipping');
-    return;
-  }
+  if (!text?.trim()) return;
   
   try {
     if (await shouldSkipForCpu()) {
       throw new Error('Skipped: high CPU');
     }
 
-    // Stop any current playback
-    stopSpeaking();
+    // Interrupt any current speech
+    await stopSpeaking();
     
-    // Small delay to let stop complete (race condition fix)
-    await new Promise(r => setTimeout(r, 50));
+    // Tiny delay to ensure stop finishes
+    await new Promise(r => setTimeout(r, 20));
     
-    console.log('[TTS] Generating audio for:', text.slice(0, 50) + '...');
-    
-    // Generate audio via backend
+    console.log('[TTS] Generating audio...');
     const audioPath = await invoke<string>('generate_speech', { text });
-    console.log('[TTS] Audio generated:', audioPath);
     
-    // V19.5: Audio Playback with Blob Fallback
-    // This is the most robust method for Tauri v2 on Windows
-    let assetUrl = convertFileSrc(audioPath);
-    console.log('[TTS] Primary Asset URL:', assetUrl);
-
-    currentAudio = new Audio(assetUrl);
-    
-    // Add Blob fallback for 'no supported source' or protocol errors
-    const playWithFallback = async () => {
-      try {
-        console.log('[TTS] Attempting playback...');
-        currentAudio!.volume = 1.0; // Ensure volume is 100%
-        await currentAudio!.play();
-        console.log('[TTS] ✓ Playing audio');
-      } catch (err) {
-        console.warn('[TTS] Playback error:', err);
-        console.log('[TTS] Trying Blob fallback...');
-        try {
-          const data = await readFile(audioPath);
-          const blob = new Blob([data], { type: 'audio/wav' });
-          const blobUrl = URL.createObjectURL(blob);
-          
-          currentAudio = new Audio(blobUrl);
-          currentAudio.volume = 1.0; // Ensure volume is 100%
-          currentAudio.onended = () => {
-            URL.revokeObjectURL(blobUrl);
-            cleanup(audioPath);
-          };
-          await currentAudio.play();
-          console.log('[TTS] ✓ Playing audio via Blob');
-        } catch (fallbackErr) {
-          console.error('[TTS] Both play methods failed:', fallbackErr);
-        }
-      }
-    };
-
-    const cleanup = async (path: string) => {
-      console.log('[TTS] Cleaning up...');
-      try {
-        await remove(path);
-        console.log('[TTS] ✓ Audio file deleted');
-      } catch (e) {
-        console.warn('[TTS] Cleanup failed:', e);
-      }
-      currentAudio = null;
-    };
-
-    currentAudio.onended = () => cleanup(audioPath);
-    await playWithFallback();
+    console.log('[TTS] Playing via Native Rust...');
+    await invoke('play_audio', { path: audioPath });
     
   } catch (error) {
     console.error('[TTS] Failed:', error);
@@ -112,20 +58,36 @@ export async function speak(text: string): Promise<void> {
 }
 
 /**
- * Stop current TTS playback
+ * Interrupt current playback
  */
-export function stopSpeaking(): void {
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.currentTime = 0;
-    currentAudio = null;
-    console.log('[TTS] Stopped');
+export async function stopSpeaking(): Promise<void> {
+  try {
+    await invoke('stop_audio');
+    console.log('[TTS] Native playback stopped');
+  } catch (e) {
+    console.error('[TTS] Failed to stop native playback:', e);
   }
 }
 
 /**
- * Check if TTS is currently playing
+ * Check if currently speaking (polled from Rust sink)
  */
-export function isSpeaking(): boolean {
-  return currentAudio !== null && !currentAudio.paused;
+export async function isSpeaking(): Promise<boolean> {
+  try {
+    return await invoke<boolean>('is_audio_playing');
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Set global output volume (Native WASAPI session)
+ * @param volume - 0.0 to 1.0
+ */
+export async function setVolume(volume: number): Promise<void> {
+  try {
+    await invoke('set_audio_volume', { volume });
+  } catch (e) {
+    console.error('[TTS] Failed to set volume:', e);
+  }
 }

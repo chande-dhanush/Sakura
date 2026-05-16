@@ -9,6 +9,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tauri::{Manager, WebviewWindow, PhysicalPosition, Emitter, Listener};
 
+mod audio;
+use audio::{AudioState, play_audio, stop_audio, set_audio_volume, is_audio_playing};
+
+
+
 // Global sidecar process handle
 static BACKEND: Mutex<Option<Child>> = Mutex::new(None);
 
@@ -350,6 +355,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec![])))
         .plugin(tauri_plugin_fs::init())
+        .manage(AudioState::new())
+
         .invoke_handler(tauri::generate_handler![
             get_backend_status,
             toggle_main_window,
@@ -357,7 +364,13 @@ pub fn run() {
             hide_main_window,
             open_logs_window,
             force_quit,
-            generate_speech
+            generate_speech,
+            play_audio,
+            stop_audio,
+            set_audio_volume,
+            is_audio_playing
+
+
         ])
         .setup(|app| {
             // Start Python backend (sidecar in prod, python in dev)

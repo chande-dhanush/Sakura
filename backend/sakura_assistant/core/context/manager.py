@@ -11,6 +11,20 @@ from dataclasses import dataclass
 from ...utils.episodic_memory import episodic_memory
 
 
+def _trace_memory_non_action(impact: str, details: Dict[str, Any]) -> None:
+    """Record memory restraint without making context assembly depend on tracing."""
+    try:
+        from ..infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
+        get_behavioral_trace().record(
+            InfluenceType.MEMORY,
+            "ContextManager",
+            impact,
+            details,
+        )
+    except Exception:
+        pass
+
+
 @dataclass
 class ContextSignals:
     """Internal representation of detected data needs."""
@@ -142,6 +156,15 @@ class ContextManager:
             should_recall = False
             
         if not should_recall:
+            _trace_memory_non_action(
+                "Skipped memory recall to keep this turn lightweight",
+                {
+                    "mode": mode,
+                    "explicit_recall": is_explicit,
+                    "has_reference": has_reference,
+                    "study_mode": study_mode,
+                },
+            )
             return ""
         
         # V17/V19: Unified memory search with capped bounds
@@ -149,6 +172,15 @@ class ContextManager:
         
         if result.has_results():
             return result.to_context_string(max_chars=max_chars)
+
+        _trace_memory_non_action(
+            "Memory recall ran but found no relevant results",
+            {
+                "mode": mode,
+                "explicit_recall": is_explicit,
+                "max_chars": max_chars,
+            },
+        )
         
         # Fallback to recent episodes if explicit memory request but no hits
         if signals.episodes:
@@ -197,7 +229,7 @@ class ContextManager:
             parts = [self._build_identity_block(is_compact=False)]
             
             # Add episodic if relevant to plan or asked (V19 tiered)
-            mem = self._build_episodic_block(user_input, signals, state, force=(mode == "CHAT"))
+            mem = self._build_episodic_block(user_input, signals, state)
             if mem: parts.append(mem)
             
             # V17.1: Always include recent actions (removed PLAN-only gating)

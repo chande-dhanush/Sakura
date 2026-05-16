@@ -149,5 +149,64 @@ class TestContextBuilding(unittest.TestCase):
         self.assertIn("assistant: Hi there!", result)
 
 
+class TestConversationalRestraint(unittest.TestCase):
+    """Test deterministic responder posture selection."""
+
+    def test_short_acknowledgement_goes_quiet(self):
+        from sakura_assistant.core.models.responder import ResponseGenerator, ResponseContext
+
+        generator = ResponseGenerator(llm=None, personality="")
+        posture = generator._infer_response_posture(ResponseContext(user_input="ok"))
+
+        self.assertEqual(posture["mode"], "quiet")
+        self.assertEqual(posture["max_sentences"], 1)
+        self.assertEqual(posture["voice"], "micro_optional")
+
+    def test_gratitude_stays_warm_without_expanding(self):
+        from sakura_assistant.core.models.responder import ResponseGenerator, ResponseContext
+
+        generator = ResponseGenerator(llm=None, personality="")
+        posture = generator._infer_response_posture(ResponseContext(user_input="thank you"))
+
+        self.assertEqual(posture["mode"], "warm_quiet")
+        self.assertEqual(posture["max_sentences"], 1)
+        self.assertEqual(posture["warmth"], "warm")
+        self.assertEqual(posture["voice"], "micro")
+
+    def test_emotional_friction_gets_grounded(self):
+        from sakura_assistant.core.models.responder import ResponseGenerator, ResponseContext
+
+        generator = ResponseGenerator(llm=None, personality="")
+        posture = generator._infer_response_posture(
+            ResponseContext(user_input="I'm stuck and this is not working")
+        )
+
+        self.assertEqual(posture["mode"], "grounded")
+        self.assertEqual(posture["max_sentences"], 2)
+        self.assertEqual(posture["warmth"], "steady")
+
+    def test_analysis_request_allows_more_room(self):
+        from sakura_assistant.core.models.responder import ResponseGenerator, ResponseContext
+
+        generator = ResponseGenerator(llm=None, personality="")
+        posture = generator._infer_response_posture(
+            ResponseContext(user_input="Can you explain why this architecture keeps failing?")
+        )
+
+        self.assertEqual(posture["mode"], "expanded")
+        self.assertGreaterEqual(posture["max_sentences"], 5)
+
+    def test_tool_delivery_stays_brief(self):
+        from sakura_assistant.core.models.responder import ResponseGenerator, ResponseContext
+
+        generator = ResponseGenerator(llm=None, personality="")
+        posture = generator._infer_response_posture(
+            ResponseContext(user_input="weather?", tool_outputs="Weather: 28 C and cloudy")
+        )
+
+        self.assertEqual(posture["mode"], "delivery")
+        self.assertEqual(posture["max_sentences"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

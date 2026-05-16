@@ -766,7 +766,8 @@ class ReActLoop:
         state=None,
         tool_hint: Optional[str] = None,
         llm_overrides: Optional[Dict[str, Any]] = None,
-        timeout: int = 60 # Added for audit compliance
+        timeout: int = 60,
+        mood: Optional[Any] = None # V10 Pivot: Mood-aware planning
     ) -> ExecutionResult:
         """
         Run the ReAct loop asynchronously.
@@ -811,7 +812,21 @@ class ReActLoop:
         
         print(f" [ReActLoop] Starting async for: {user_input[:50]}...")
         
-        for iteration in range(self.max_iterations):
+        # V10 Pivot: Mood-aware loop constraints
+        active_max_iterations = self.max_iterations
+        from ..cognitive.desire import Mood
+        from ..infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
+        
+        if mood == Mood.TIRED:
+            active_max_iterations = min(2, self.max_iterations)
+            get_behavioral_trace().record(
+                InfluenceType.PLANNING,
+                "ReActLoop",
+                f"Reduced max iterations to {active_max_iterations} (Mood: TIRED)",
+                {"original_max": self.max_iterations}
+            )
+            
+        for iteration in range(active_max_iterations):
             # V19: CHECK CANCELLATION before each iteration
             if is_cancelled():
                 print(f"  [ReActLoop] Generation cancelled by user at iteration {iteration + 1}")
@@ -1026,6 +1041,39 @@ class ReActLoop:
             last_result=final_last_result,
             status=final_status
         )
+    
+    def run(
+        self,
+        user_input: str = None,
+        graph_context: str = None,
+        available_tools: List = None,
+        state=None,
+        tool_hint: Optional[str] = None,
+        llm_overrides: Optional[Dict[str, Any]] = None,
+        timeout: int = 60,
+        mood: Optional[Any] = None
+    ) -> ExecutionResult:
+        """
+        Synchronous wrapper for arun.
+        Used by legacy callers or non-async threads.
+        """
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+        return loop.run_until_complete(self.arun(
+            user_input=user_input,
+            graph_context=graph_context,
+            available_tools=available_tools,
+            state=state,
+            tool_hint=tool_hint,
+            llm_overrides=llm_overrides,
+            timeout=timeout,
+            mood=mood
+        ))
     
     def _execute_steps(
         self,

@@ -18,6 +18,21 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Callable
 
 from .desire import get_desire_system, DesireSystem
+from .triggers import get_trigger_system
+
+
+def _trace_proactive(impact: str, details: Dict[str, Any] = None):
+    """Record proactive action or hesitation without coupling scheduler logic to UI."""
+    try:
+        from ..infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
+        get_behavioral_trace().record(
+            InfluenceType.PROACTIVITY,
+            "ProactiveScheduler",
+            impact,
+            details or {},
+        )
+    except Exception:
+        pass
 
 
 class ProactiveScheduler:
@@ -41,6 +56,7 @@ class ProactiveScheduler:
             return
             
         self.desire_system: DesireSystem = get_desire_system()
+        self.trigger_system = None # Initialized later with world_graph
         self.initiations_path: Optional[str] = None
         self.backoff_path: Optional[str] = None
         self.failed_count: int = 0
@@ -130,62 +146,78 @@ class ProactiveScheduler:
         
         return message
     
-    async def check_and_initiate(self) -> bool:
+    async def check_and_initiate(self, world_graph) -> bool:
         """
         Hourly check: Should Sakura reach out?
         
-        V15.2.1: Now respects ui_visible state (Bubble-Gate logic).
-        
-        Returns True if initiation occurred.
+        V10 Pivot: Earned Proactivity.
+        Only reaches out if a valid Trigger exists.
         """
-        # V15.2.1: Import shared state
+        if not self.trigger_system:
+            self.trigger_system = get_trigger_system(world_graph)
+
         from .state import get_proactive_state
         state = get_proactive_state()
         
-        # Gate 0: Check if UI is visible (Bubble-Gate)
         if not state.ui_visible:
-            # User has hidden the bubble - queue the message for later
-            should_act, reason = self.desire_system.should_initiate()
-            if should_act:
-                message = self.pop_initiation()
-                if message:
-                    state.queue_message(message)
-                    print(f" [ProactiveScheduler] UI hidden, message queued for later")
-                    return False
-            print(f" [ProactiveScheduler] UI hidden, staying silent")
+            _trace_proactive(
+                "Suppressed proactive check because the UI is hidden",
+                {"decision": "suppressed", "reason": "ui_hidden"},
+            )
             return False
         
-        # Gate 1: Check desire system
+        # 1. Check desire system (Rate limits, hours of day, loneliness)
         should_act, reason = self.desire_system.should_initiate()
-        
         if not should_act:
-            print(f" [ProactiveScheduler] Staying silent: {reason}")
+            _trace_proactive(
+                "Suppressed proactive check because desire gates were not met",
+                {"decision": "suppressed", "reason": reason},
+            )
             return False
         
-        # Gate 2: Get pre-computed message
-        message = self.pop_initiation()
-        
-        if not message:
-            print(" [ProactiveScheduler] No pre-computed messages available")
-            self._increment_failed_initiation("no_precomputed_message")
+        # 2. Check Triggers (Earned Proactivity)
+        triggers = self.trigger_system.evaluate()
+        if not triggers:
+            print(" [ProactiveScheduler] No earned triggers found - staying silent")
+            _trace_proactive(
+                "Stayed silent because no earned proactive trigger was strong enough",
+                {"decision": "suppressed", "reason": "no_earned_triggers"},
+            )
             return False
+            
+        top_trigger = triggers[0]
+        print(f" [ProactiveScheduler] Trigger activated: {top_trigger.id} ({top_trigger.reason})")
+
+        # 3. Generate Message (V10 Pivot: Dynamic)
+        # For now, use a template. Future: Use small LLM call.
+        message = f"Hey, I was just thinking about {top_trigger.data.get('project_name', 'your projects')}... want to continue working on it?"
         
-        # Gate 3: Send via WebSocket
+        # 4. Send via WebSocket
         if self.websocket_callback:
             try:
                 await self.websocket_callback(message)
                 self.desire_system.record_initiation()
-                print(f" [ProactiveScheduler] Sent: {message[:50]}...")
+                
+                from ..infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
+                get_behavioral_trace().record(
+                    InfluenceType.PROACTIVITY,
+                    "ProactiveScheduler",
+                    f"Initiated conversation via {top_trigger.id}",
+                    {"message": message, "reason": top_trigger.reason}
+                )
                 return True
             except Exception as e:
                 print(f" [ProactiveScheduler] WebSocket send failed: {e}")
-                self._increment_failed_initiation("websocket_send_failed")
+                _trace_proactive(
+                    "Delayed proactive message because WebSocket delivery failed",
+                    {"decision": "delayed", "reason": str(e)},
+                )
                 return False
-        else:
-            # No WebSocket callback - just log
-            print(f" [ProactiveScheduler] Would send (no WS): {message[:50]}...")
-            self.desire_system.record_initiation()
-            return True
+        _trace_proactive(
+            "Delayed proactive message because no delivery channel is connected",
+            {"decision": "delayed", "reason": "no_websocket_callback"},
+        )
+        return False
     
     def save_planned_initiations(self, messages: List[str]):
         """

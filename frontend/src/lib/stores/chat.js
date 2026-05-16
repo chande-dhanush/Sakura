@@ -10,6 +10,7 @@ const BACKEND_URL = 'http://localhost:3210';
  * @typedef {{ tool: string, args?: Record<string, unknown>, status?: string }} ToolUse
  * @typedef {{ id?: number | string, role: string, content: string, tools?: ToolUse[], mode?: string, metadata?: Record<string, any>, timestamp?: string }} ChatMessage
  * @typedef {{ stage?: string, status?: string, ms?: number, info?: string, timestamp: number }} TraceLog
+ * @typedef {{ timestamp: string, type: string, source: string, impact: string, details?: Record<string, any> }} BehavioralTrace
  * @typedef {{ tts_enabled?: boolean, llm_overrides?: Record<string, unknown> }} SendOptions
  * @typedef {'starting' | 'ready' | 'error' | 'setup_required'} BackendStatus
  */
@@ -22,6 +23,7 @@ export const currentTools = writable(/** @type {ToolUse[]} */ ([]));
 export const focusEntity = writable(null);
 export const connectionError = writable(/** @type {string | null} */ (null));
 export const traceLogs = writable(/** @type {TraceLog[]} */ ([])); // V10.4: Flight Recorder Traces
+export const behavioralTraces = writable(/** @type {BehavioralTrace[]} */ ([]));
 export const isListening = writable(false); // V19.5: Mic Recording Feedback
 
 // Backend status: 'starting' | 'ready' | 'error'
@@ -172,6 +174,7 @@ export async function sendMessage(query, options = {}) {
         }
 
         await refreshState();
+        await refreshBehaviorTrace();
 
     } catch (error) {
         // Friendly error messages instead of raw errors
@@ -195,6 +198,21 @@ export async function sendMessage(query, options = {}) {
     } finally {
         isStreaming.set(false);
         currentTools.set([]);
+    }
+}
+
+/**
+ * Refresh the human-readable behavioral inspector.
+ */
+export async function refreshBehaviorTrace(limit = 12) {
+    try {
+        const response = await fetch(`${BACKEND_URL}/behavior/trace?limit=${limit}`);
+        if (response.ok) {
+            const data = await response.json();
+            behavioralTraces.set(Array.isArray(data.traces) ? data.traces : []);
+        }
+    } catch (e) {
+        // Inspector should never disturb chat.
     }
 }
 
@@ -294,6 +312,7 @@ export async function clearChat() {
     // Clear frontend store
     messages.set([]);
     connectionError.set(null);
+    behavioralTraces.set([]);
 }
 
 /**

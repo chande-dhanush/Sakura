@@ -20,6 +20,7 @@ from ...utils.logging import get_logger
 if TYPE_CHECKING:
     from .planner import Planner
     from ..graph.world_graph import WorldGraph
+    from ..cognitive.desire import Mood
 
 from .context import (
     ExecutionMode, 
@@ -88,7 +89,8 @@ class Executor:
         request_id: Optional[str] = None,
         history: Optional[List[Dict]] = None,  # V17.1: Conversation history
         reference_context: str = "",           # V19-FIX: Threaded reference context
-        llm_overrides: Optional[Dict[str, Any]] = None  # V19: request-time overrides
+        llm_overrides: Optional[Dict[str, Any]] = None, # V19: request-time overrides
+        mood: Optional["Mood"] = None          # V10 Pivot: Mood-aware planning
     ) -> ExecutionResult:
         """
         Main dispatch entry point.
@@ -154,7 +156,7 @@ class Executor:
                     available_tools = micro_tools if micro_tools else self.tools
                     logger.info(f" [Executor] Sharded {len(available_tools)} tools for intent: {intent}")
                 
-                result = await self._dispatch_iterative(ctx, available_tools, tool_hint=tool_hint, llm_overrides=llm_overrides)
+                result = await self._dispatch_iterative(ctx, available_tools, tool_hint=tool_hint, llm_overrides=llm_overrides, mood=mood)
             
             else:
                 result = ExecutionResult.error(f"Unknown mode: {mode}")
@@ -196,13 +198,14 @@ class Executor:
             new_ctx.llm_call_count = ctx.llm_call_count
             return await self._dispatch_iterative(new_ctx, llm_overrides=llm_overrides)
     
-    async def _dispatch_iterative(self, ctx: ExecutionContext, available_tools: Optional[List] = None, tool_hint: Optional[str] = None, llm_overrides: Optional[Dict[str, Any]] = None) -> ExecutionResult:
+    async def _dispatch_iterative(self, ctx: ExecutionContext, available_tools: Optional[List] = None, tool_hint: Optional[str] = None, llm_overrides: Optional[Dict[str, Any]] = None, mood: Optional["Mood"] = None) -> ExecutionResult:
         """Dispatch to ReAct loop."""
         result = await self.react_loop.arun(
             ctx=ctx,
             available_tools=available_tools or self.tools,
             tool_hint=tool_hint,
-            llm_overrides=llm_overrides
+            llm_overrides=llm_overrides,
+            mood=mood
         )
 
         # V19.5: PlanVerifier Integration

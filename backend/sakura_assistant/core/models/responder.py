@@ -51,6 +51,7 @@ class ResponseContext:
     data_reasoning: bool = False
     session_summary: str = ""  # V10.5 Session Memory Injection
     requires_facts: bool = False  # V19.6: If True and no tools, soften tone
+    response_posture: Optional[Dict[str, Any]] = None
     
     def __post_init__(self):
         if self.history is None:
@@ -88,6 +89,7 @@ class ResponseGenerator:
     
     async def agenerate(self, context: ResponseContext, llm_override: Any = None) -> str:
         """Async version of generate."""
+        self._prepare_response_posture(context)
         messages = self._build_messages(context)
         
         # Use provided override or default
@@ -201,6 +203,7 @@ class ResponseGenerator:
         Returns:
             Final response text (validated and cleaned)
         """
+        self._prepare_response_posture(context)
         messages = self._build_messages(context)
         
         try:
@@ -354,6 +357,22 @@ STUDY MODE ACTIVE:
 - Use clear explanations
 - Cite sources when available
 """)
+
+        # Behavioral restraint: this affects pacing, not facts or tool fidelity.
+        posture = context.response_posture or self._infer_response_posture(context)
+        system_parts.append(f"""
+[CONVERSATIONAL RESTRAINT]
+Posture: {posture["mode"]}
+Budget: {posture["max_sentences"]} sentence(s) unless the user explicitly asks for more.
+Reason: {posture["reason"]}
+Warmth: {posture.get("warmth", "normal")}
+Rules:
+- Answer the actual ask first.
+- Do not over-explain, recap the system, or over-reference memory.
+- Leave breathing room; one useful sentence is allowed.
+- Brief does not mean cold; preserve warmth when the turn is emotionally meaningful.
+- Ask at most one clarification question, and only when it changes the answer.
+""")
         
         # Current mood and tool outputs
         system_parts.append(f"CURRENT MOOD: {context.current_mood}")
@@ -384,6 +403,174 @@ STUDY MODE ACTIVE:
         messages.append(HumanMessage(content=context.user_input))
         
         return messages
+
+    def _prepare_response_posture(self, context: ResponseContext) -> Dict[str, Any]:
+        """Infer and trace the conversational posture once per response."""
+        if context.response_posture:
+            return context.response_posture
+
+        posture = self._infer_response_posture(context)
+        context.response_posture = posture
+
+        try:
+            from ..infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
+            follow_up_allowed = posture["mode"] in {"expanded", "balanced"}
+            get_behavioral_trace().record(
+                InfluenceType.RESTRAINT,
+                "ResponseGenerator",
+                f"Selected {posture['mode']} posture with {posture['max_sentences']} sentence budget",
+                {
+                    "reason": posture["reason"],
+                    "has_tool_outputs": bool(context.tool_outputs),
+                    "study_mode": context.study_mode,
+                    "data_reasoning": context.data_reasoning,
+                    "follow_up_allowed": follow_up_allowed,
+                    "warmth": posture.get("warmth", "normal"),
+                    "voice": posture.get("voice", "normal"),
+                    "cadence": posture.get("cadence", {}),
+                }
+            )
+            if not follow_up_allowed:
+                get_behavioral_trace().record(
+                    InfluenceType.RESTRAINT,
+                    "ResponseGenerator",
+                    "Skipped follow-up pressure to preserve breathing room",
+                    {"posture": posture["mode"]},
+                )
+        except Exception:
+            pass
+
+        return posture
+
+    def _infer_response_posture(self, context: ResponseContext) -> Dict[str, Any]:
+        """Small deterministic policy for conversational pacing and restraint."""
+        text = context.user_input.strip()
+        lowered = text.lower()
+        words = re.findall(r"\w+", lowered)
+        word_count = len(words)
+
+        asks_for_depth = any(
+            phrase in lowered
+            for phrase in (
+                "explain",
+                "walk me through",
+                "deep dive",
+                "in detail",
+                "thorough",
+                "why",
+                "how does",
+                "compare",
+                "analyze",
+                "analyse",
+            )
+        )
+        simple_ack = lowered in {"ok", "okay", "k", "cool", "nice", "got it", "lol", "haha"}
+        gratitude_ack = lowered in {"thanks", "thank you", "ty"} or lowered.startswith(("thanks ", "thank you "))
+        emotional_signal = any(
+            phrase in lowered
+            for phrase in (
+                "stuck",
+                "frustrated",
+                "annoyed",
+                "tired",
+                "overwhelmed",
+                "panic",
+                "broken",
+                "not working",
+                "why won't",
+                "i hate",
+                "rough day",
+                "bad day",
+                "sad",
+                "lonely",
+                "scared",
+                "anxious",
+                "needed that",
+            )
+        )
+        last_assistant_long = any(
+            msg.get("role") in {"assistant", "ai"} and len(msg.get("content", "")) > 600
+            for msg in context.history[-2:]
+        )
+
+        if emotional_signal:
+            return {
+                "mode": "grounded",
+                "max_sentences": 2,
+                "reason": "User shows friction or fatigue; be steady and brief before adding more.",
+                "warmth": "steady",
+                "voice": "soft",
+                "cadence": {"pace": "slower", "pause_ms": 180},
+            }
+
+        if gratitude_ack:
+            return {
+                "mode": "warm_quiet",
+                "max_sentences": 1,
+                "reason": "User gave a small warm acknowledgement; answer lightly without withdrawing.",
+                "warmth": "warm",
+                "voice": "micro",
+                "cadence": {"pace": "soft", "pause_ms": 120},
+            }
+
+        if simple_ack:
+            return {
+                "mode": "quiet",
+                "max_sentences": 1,
+                "reason": "User gave a small acknowledgement; leave space instead of filling it.",
+                "warmth": "light",
+                "voice": "micro_optional",
+                "cadence": {"pace": "light", "pause_ms": 80},
+            }
+
+        if context.study_mode or context.data_reasoning or asks_for_depth:
+            return {
+                "mode": "expanded",
+                "max_sentences": 5,
+                "reason": "User is asking for explanation, analysis, or learning support.",
+                "warmth": "engaged",
+                "voice": "normal",
+                "cadence": {"pace": "normal", "pause_ms": 80},
+            }
+
+        if context.tool_outputs:
+            return {
+                "mode": "delivery",
+                "max_sentences": 2,
+                "reason": "Tool results are present; deliver the outcome without procedural chatter.",
+                "warmth": "clear",
+                "voice": "normal",
+                "cadence": {"pace": "brisk", "pause_ms": 40},
+            }
+
+        if last_assistant_long:
+            return {
+                "mode": "compressed",
+                "max_sentences": 2,
+                "reason": "Recent assistant turn was long; tighten cadence for conversational balance.",
+                "warmth": "steady",
+                "voice": "normal",
+                "cadence": {"pace": "measured", "pause_ms": 100},
+            }
+
+        if word_count <= 12:
+            return {
+                "mode": "light",
+                "max_sentences": 2,
+                "reason": "User gave a short turn; respond at matching weight.",
+                "warmth": "present",
+                "voice": "normal",
+                "cadence": {"pace": "light", "pause_ms": 80},
+            }
+
+        return {
+            "mode": "balanced",
+            "max_sentences": 3,
+            "reason": "Default conversational rhythm.",
+            "warmth": "normal",
+            "voice": "normal",
+            "cadence": {"pace": "normal", "pause_ms": 80},
+        }
     
     def _build_compact_context(self, history: List[Dict], current_input: str) -> str:
         """Build V4 compact context from history."""
