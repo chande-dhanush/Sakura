@@ -10,6 +10,16 @@ import re
 from dataclasses import dataclass
 from ...utils.episodic_memory import episodic_memory
 
+# Post-Refactor Refinement Engines
+from .adaptive_engine import AdaptiveInteractionEngine, FrictionDetector
+from .relevance_engine import ContextRelevanceEngine, ContextBudgeter
+from .workflow_engine import WorkflowContextEngine, SessionStateClassifier, ToolBiasingRegistry, ImplicitReferenceResolver
+from .confidence_engine import ConfidenceEngine
+from .attention_manager import AttentionManager
+from .failure_handler import TrustAwareFailureHandler
+from .telemetry import ReliabilityTelemetry
+from .preference_adaptation import PreferenceAdaptationEngine
+
 
 def _trace_memory_non_action(impact: str, details: Dict[str, Any]) -> None:
     """Record memory restraint without making context assembly depend on tracing."""
@@ -65,6 +75,17 @@ class ContextManager:
             self.wg = WorldGraph(identity_manager=get_identity_manager())
         
         self.summary_memory = summary_memory
+        
+        # Initialize Sub-Engines
+        self.adaptive_engine = AdaptiveInteractionEngine()
+        self.friction_detector = FrictionDetector(self.adaptive_engine)
+        self.relevance_engine = ContextRelevanceEngine()
+        self.workflow_engine = WorkflowContextEngine()
+        self.confidence_engine = ConfidenceEngine()
+        self.attention_manager = AttentionManager()
+        self.failure_handler = TrustAwareFailureHandler()
+        self.telemetry = ReliabilityTelemetry()
+        self.pref_engine = PreferenceAdaptationEngine()
     
     def _detect_signals(self, text: str) -> ContextSignals:
         """Parse user input to detect deterministic data requirements."""
@@ -166,22 +187,31 @@ class ContextManager:
                 },
             )
             return ""
-        
+            
         # V17/V19: Unified memory search with capped bounds
         result = coordinator.recall(user_input)
         
-        if result.has_results():
-            return result.to_context_string(max_chars=max_chars)
-
-        _trace_memory_non_action(
-            "Memory recall ran but found no relevant results",
-            {
-                "mode": mode,
-                "explicit_recall": is_explicit,
-                "max_chars": max_chars,
-            },
-        )
+        memories = []
+        if result.semantic:
+            for line in result.semantic.splitlines():
+                if line.strip().startswith("- "):
+                    memories.append({"text": line.strip()[2:], "confidence": 0.6})
+        for ep in result.episodic:
+            memories.append({"text": ep.get("summary", ""), "confidence": 0.8, "timestamp": ep.get("date")})
+            
+        win_info = self.workflow_engine.get_active_window_info()
+        active_app = win_info.get("process", "None")
+        active_project = getattr(state, "project_path", "") if state else ""
         
+        ranked = self.relevance_engine.rank_memories(memories, active_app, active_project)
+        filtered = self.relevance_engine.suppress_memories(ranked, threshold=2.0)
+        
+        if filtered:
+            parts = []
+            for item in filtered[:5]:
+                parts.append(f"- {item['text']}")
+            return "=== RECENT RELEVANT MEMORIES ===\n" + "\n".join(parts)
+
         # Fallback to recent episodes if explicit memory request but no hits
         if signals.episodes:
             recent = episodic_memory.get_recent_episodes(2)
@@ -191,7 +221,13 @@ class ContextManager:
             return "=== MEMORIES ===\nNo stored memories found."
             
         return ""
-
+    def _build_action_block(self) -> str:
+        """Retrieve recent world actions for context."""
+        recent_actions = self.wg.get_recent_actions(3)
+        if not recent_actions:
+            return ""
+            
+        action_strs = [f"T{a.turn}: {a.summary}" for a in recent_actions if a.summary]
     def _build_action_block(self) -> str:
         """Retrieve recent world actions for context."""
         recent_actions = self.wg.get_recent_actions(3)
@@ -207,61 +243,96 @@ class ContextManager:
     def get_context_for_llm(self, user_input: str, state: "RequestState" = None, mode: str = "CHAT", history: List[Dict] = None) -> Dict[str, str]:
         """
         Main entry point for llm.py. Returns segmented context strings.
-        
-        Args:
-            user_input: Current user message
-            state: V19 RequestState representation
-            mode: Fallback if state is missing
-            history: Optional conversation list
         """
         if state:
             mode = state.classification
             
+        # 1. Run Metrics and Friction Tracking
+        self.adaptive_engine.record_turn(user_input)
+        self.friction_detector.analyze_input(user_input)
+        
+        # 2. Query Workflow Context
+        win_info = self.workflow_engine.get_active_window_info()
+        active_app = win_info.get("process", "None")
+        session_state = SessionStateClassifier.classify_session(win_info, user_input)
+        
+        # Learn habits (focus hours and app transitions)
+        now_hour = datetime.now().hour
+        self.pref_engine.learn_focus_hours(now_hour)
+        last_app = getattr(self, "_last_app", None)
+        if last_app:
+            self.pref_engine.record_app_transition(last_app, active_app)
+        self._last_app = active_app
+        
+        # 3. Resolve Implicit References
+        implicit = ImplicitReferenceResolver.resolve_implicit_references(user_input)
+        
+        # 4. Determine Posture and Focus mode
+        posture = self.adaptive_engine.determine_posture(user_input, active_app)
+        is_focus = self.attention_manager.is_focus_mode_active(win_info)
+        if is_focus and posture in ["NORMAL", "DETAILED", "REFLECTIVE"]:
+            posture = "SHORT_ACK"
+            
+        # 5. Fetch Token Budgets
+        budgets = ContextBudgeter.get_budget(mode)
+        
         signals = self._detect_signals(user_input)
         
-        # 1. Assemble Planner Context (Deterministic Pruning)
-        # -----------------------------------------------
+        # Assemble Planner Context
         if mode == "DIRECT" and not signals.facts:
-            # Minimalist identity for direct tools
             planner_dynamic = self._build_identity_block(is_compact=True)
         else:
-            # Full context for planning or identity-focused direct queries
             parts = [self._build_identity_block(is_compact=False)]
-            
-            # Add episodic if relevant to plan or asked (V19 tiered)
             mem = self._build_episodic_block(user_input, signals, state)
-            if mem: parts.append(mem)
-            
-            # V17.1: Always include recent actions (removed PLAN-only gating)
+            if mem: 
+                parts.append(mem[:budgets["memory"]])
             act = self._build_action_block()
-            if act: parts.append(act)
-                
+            if act: 
+                parts.append(act[:budgets["active_context"]])
             planner_dynamic = "\n\n".join(parts)
 
-        # 2. Assemble Responder Context
-        # -----------------------------------------------
-        # The responder prompt uses the WorldGraph detailed responder context 
-        # (which includes active constraints)
+        # Assemble Responder Context
         responder_graph = self.wg.get_context_for_responder()
         
-        # 3. Assemble Memory Summary
-        # -----------------------------------------------
+        # Assemble Memory Summary
         summary = ""
         if self.summary_memory:
             summary = self.summary_memory.get_context_injection()
+            
+        # Resolve confidence of memory retrieval
+        memories_list = []
+        if "=== RECENT RELEVANT MEMORIES ===" in planner_dynamic:
+            for line in planner_dynamic.splitlines():
+                if line.strip().startswith("- "):
+                    memories_list.append({"score": 8.0, "text": line})
+        conf_data = self.confidence_engine.score_memory_retrieval(user_input, memories_list)
+        action_posture = self.confidence_engine.determine_action_posture(conf_data)
+        
+        # Inject implicit reference results into planner/responder context if found
+        if implicit:
+            ref_str = "\n=== RESOLVED IMPLICIT CONTEXT ===\n"
+            if "file_path" in implicit:
+                ref_str += f"Implicit 'file': {implicit['file_path']}\n"
+            if "error_context" in implicit:
+                ref_str += f"Implicit 'error': {implicit['error_context']}\n"
+            planner_dynamic += ref_str
             
         return {
             "planner_context": planner_dynamic,
             "responder_context": responder_graph,
             "summary_context": summary,
             "intent_adjustment": self.wg.get_intent_adjustment(),
-            "current_mood": self.wg.get_current_mood()
+            "current_mood": self.wg.get_current_mood(),
+            "posture": posture,
+            "session_state": session_state,
+            "active_app": active_app,
+            "is_focus": "true" if is_focus else "false",
+            "action_posture": action_posture
         }
 
 
 # Global Instance
 context_manager = ContextManager()
-
 
 def get_smart_context(user_input: str, history: List[Dict], mode: str = "CHAT") -> Dict[str, str]:
     """Shim for backward compatibility."""

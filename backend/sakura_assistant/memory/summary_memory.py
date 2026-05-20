@@ -157,25 +157,24 @@ New messages:
         print("  [SummaryMemory] Cleared")
     
     def _load(self) -> None:
-        """Load persisted summary from disk."""
+        """Load persisted summary from SQLite."""
         try:
-            if os.path.exists(self.persist_path):
-                with open(self.persist_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    self.summary = data.get("summary", "")
-                    print(f" [SummaryMemory] Loaded ({len(self.summary)} chars)")
+            from sakura_assistant.core.database import Database
+            data = Database.get_setting("summary_memory")
+            if data:
+                self.summary = data.get("summary", "")
+                print(f" [SummaryMemory] Loaded ({len(self.summary)} chars)")
         except Exception as e:
             print(f"   [SummaryMemory] Load failed: {e}")
     
     def _save(self) -> None:
-        """Persist summary to disk."""
+        """Persist summary to SQLite."""
         try:
-            os.makedirs(os.path.dirname(self.persist_path), exist_ok=True)
-            with open(self.persist_path, 'w', encoding='utf-8') as f:
-                json.dump({
-                    "summary": self.summary,
-                    "updated_at": datetime.now().isoformat()
-                }, f, indent=2)
+            from sakura_assistant.core.database import Database
+            Database.set_setting("summary_memory", {
+                "summary": self.summary,
+                "updated_at": datetime.now().isoformat()
+            })
         except Exception as e:
             print(f"   [SummaryMemory] Save failed: {e}")
 

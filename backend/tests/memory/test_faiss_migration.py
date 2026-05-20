@@ -12,7 +12,7 @@ class TestFaissMigration(unittest.TestCase):
     def test_add_message(self):
         store = get_memory_store()
         initial_count = len(store.conversation_history)
-        add_message_to_memory("Test message", "user")
+        store.append_to_history({"role": "user", "content": "Test message"})
         self.assertEqual(len(store.conversation_history), initial_count + 1)
         
     def test_old_import_redirect(self):

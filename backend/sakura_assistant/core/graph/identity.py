@@ -121,26 +121,14 @@ class IdentityManager:
         self._load_settings()
         self._initialized = True
     
-    def _get_settings_path(self) -> str:
-        """Get path to user_settings.json."""
-        if self._settings_path:
-            return self._settings_path
-        
-        from ...utils.pathing import get_project_root
-        self._settings_path = os.path.join(get_project_root(), "data", "user_settings.json")
-        return self._settings_path
-    
     def _load_settings(self) -> bool:
-        """Load identity from user_settings.json."""
-        path = self._get_settings_path()
-        
-        if not os.path.exists(path):
-            print(f"   [IdentityManager] No user_settings.json found")
-            return False
-        
+        """Load identity from SQLite settings table."""
         try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            from ..database import Database
+            data = Database.get_setting("user_settings")
+            if not data:
+                print(f"   [IdentityManager] No user_settings in database")
+                return False
             
             # Map settings keys to identity keys
             if data.get("user_name"):
@@ -166,11 +154,7 @@ class IdentityManager:
     
     def refresh(self) -> None:
         """
-        Reload identity from disk and broadcast change.
-        
-        Called by:
-        - /setup endpoint after saving
-        - File watcher (if implemented)
+        Reload identity from database and broadcast change.
         """
         old_identity = self._identity.copy()
         self._load_settings()
@@ -185,48 +169,30 @@ class IdentityManager:
     
     def update_and_save(self, updates: Dict[str, Any]) -> bool:
         """
-        Update identity and persist to disk.
-        
-        Args:
-            updates: Dict of fields to update
-            
-        Returns:
-            True if saved successfully
+        Update identity and persist to SQLite settings table.
         """
-        path = self._get_settings_path()
-        
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        
-        # Load existing
-        existing = {}
-        if os.path.exists(path):
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    existing = json.load(f)
-            except:
-                pass
-        
-        # Map identity keys to settings keys
-        key_map = {
-            "name": "user_name",
-            "location": "user_location",
-            "bio": "user_bio",
-            "age": "age",
-            "birthday": "birthday",
-            "interests": "interests",
-        }
-        
-        # Apply updates
-        for key, value in updates.items():
-            if key in key_map and value:
-                existing[key_map[key]] = value
-                self._identity[key] = value
-        
-        # Save
         try:
-            with open(path, 'w', encoding='utf-8') as f:
-                json.dump(existing, f, indent=2)
+            from ..database import Database
+            existing = Database.get_setting("user_settings", {})
+            
+            # Map identity keys to settings keys
+            key_map = {
+                "name": "user_name",
+                "location": "user_location",
+                "bio": "user_bio",
+                "age": "age",
+                "birthday": "birthday",
+                "interests": "interests",
+            }
+            
+            # Apply updates
+            for key, value in updates.items():
+                if key in key_map and value:
+                    existing[key_map[key]] = value
+                    self._identity[key] = value
+            
+            # Save
+            Database.set_setting("user_settings", existing)
             
             # Broadcast change
             get_event_bus().emit(self.IDENTITY_CHANGED, self._identity.copy())

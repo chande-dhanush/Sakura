@@ -42,8 +42,7 @@ from sakura_assistant.core.memory.reflection import get_reflection_engine  # V14
 # V14: Sleep Cycle for startup crystallization
 from sakura_assistant.core.infrastructure.scheduler import run_sleep_cycle_on_startup, get_dream_journal
 
-# V15: Cognitive Architecture
-from sakura_assistant.core.infrastructure.scheduler import schedule_cognitive_tasks
+
 
 from fastapi import FastAPI, Request, BackgroundTasks, WebSocket, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -158,9 +157,22 @@ async def lifespan(app: FastAPI):
             from sakura_assistant.core.memory.reflection import get_reflection_engine
             re = get_reflection_engine()
             print("👁️ [Reflection] Background monitor started (60s tick)")
+            loop_count = 0
             while True:
                 try:
                     await asyncio.sleep(60)
+                    loop_count += 1
+                    
+                    # Run long-term memory forgetting/decay every 5 minutes
+                    if loop_count % 5 == 0:
+                        try:
+                            from sakura_assistant.core.context.manager import context_manager
+                            if hasattr(context_manager, 'pref_engine'):
+                                context_manager.pref_engine.run_forgetting_decay()
+                                print("[DECAY] Long-term preference forgetting decay applied successfully.")
+                        except Exception as decay_err:
+                            log.warning(f"[Decay] Memory decay error: {decay_err}")
+                            
                     if assistant:
                         # Bug 4 fix: conversation_history lives on FaissMemoryStore,
                         # NOT on SummaryMemory (which only has recent_messages).
@@ -212,11 +224,7 @@ async def lifespan(app: FastAPI):
             # V14: Run Sleep Cycle on startup (24h cooldown)
             run_sleep_cycle_on_startup()
             
-            # V15: Schedule cognitive tasks (hourly desire tick)
-            schedule_cognitive_tasks()
-            
-            # V15: Wire up proactive WebSocket callback
-            setup_proactive_callback()
+
         except Exception as e:
             print(f"[WARN] Scheduler init warning: {e}")
     
@@ -1125,37 +1133,22 @@ async def speak_proactive(message: str):
 
 @app.get("/api/desire")
 async def get_desire_state():
-    try:
-        from sakura_assistant.core.cognitive.desire import get_desire_system
-        ds = get_desire_system(); state = ds.get_state(); mood = ds.get_mood()
-        return {"state": {"social_battery": state.social_battery, "loneliness": state.loneliness}, "mood": mood.value}
-    except: return {"error": "failed"}
+    # Stub desire system for UI compatibility
+    return {"state": {"social_battery": 100.0, "loneliness": 0.0}, "mood": "content"}
 
 
 @app.post("/api/proactive/test")
 async def test_proactive_message():
-    from sakura_assistant.core.cognitive.proactive import get_proactive_scheduler
-    m = get_proactive_scheduler().pop_initiation()
-    if m: await send_proactive_message(m); return {"status": "sent"}
     return {"status": "no_messages"}
 
 
 def setup_proactive_callback():
-    try:
-        from sakura_assistant.core.cognitive.proactive import get_proactive_scheduler
-        get_proactive_scheduler().websocket_callback = send_proactive_message
-    except: pass
+    pass
 
 
 @app.post("/api/ui/visibility")
 async def set_ui_visibility(request: Request):
-    try:
-        body = await request.json(); visible = body.get("visible", True)
-        from sakura_assistant.core.cognitive.state import get_proactive_state
-        m = get_proactive_state().set_visibility(visible)
-        if m: await send_proactive_message(m)
-        return {"status": "ok"}
-    except: return {"status": "error"}
+    return {"status": "ok"}
 
 
 MOOD_THEMES = {

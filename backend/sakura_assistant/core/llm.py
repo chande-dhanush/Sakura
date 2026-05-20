@@ -13,20 +13,18 @@ from .models import ReliableLLM
 
 # V10 Modular Components
 from .routing import IntentRouter
-from .execution import ToolExecutor
 from .models import ResponseGenerator, ResponseContext
 from .models.request import RequestState
 from .tools import get_all_tools
 
 # V17: Execution architecture
-from .execution import Executor, OneShotRunner, ResponseEmitter, EmitterFactory
+from .execution import OneShotRunner, ResponseEmitter, EmitterFactory
 
 # V7: World Graph
 from .graph import WorldGraph
 from ..utils.study_mode import detect_study_mode
 from .context import AgentState, RateLimitExceeded
 from .execution.context import LLMBudgetExceededError, ExecutionContext, ExecutionMode, GraphSnapshot
-from .execution.verifier import PlanVerifier  # FIX-5
 from ..utils.memory import cleanup_memory
 
 # V10.3: Summary Memory for long-context
@@ -43,21 +41,32 @@ from .memory.reflection import get_reflection_engine
 # V18.2: Memory Judger for long-term FAISS persistence (BUG-03 FIX)
 from .memory.judger import MemoryJudger
 
+
+class DummyDesireSystem:
+    def get_mood_prompt(self) -> str:
+        return "[MOOD: content] Sakura is feeling content and focused."
+    def get_mood(self):
+        class Mood:
+            value = "content"
+        return Mood()
+    def initialize(self, persist_path: str):
+        pass
+    def on_user_message(self, msg: str):
+        pass
+    def on_assistant_message(self, msg: str):
+        pass
+
+
 class SmartAssistant:
     """
-    Sakura V19.0 Facade
-    =================
-    Orchestrates the V17 execution architecture:
-    Router -> Executor -> Responder
-    
-    V17 Changes:
-    - Executor replaces direct ToolExecutor calls
-    - ExecutionContext threads mode/budget through pipeline
-    - ResponseEmitter guarantees exactly one message per request
+    Sakura V20.0 Facade (Sakura Lite)
+    =================================
+    Orchestrates the simplified execution architecture:
+    Router -> OneShotRunner (Regex + Single-turn LLM params) -> Responder
     """
 
     def __init__(self):
-        print("Initializing SmartAssistant Facade (V17)...")
+        print("Initializing SmartAssistant Facade (V20 - Sakura Lite)...")
         self.logger = logging.getLogger("SmartAssistant")
         self.container = get_container()
         self.tools = get_all_tools()
@@ -68,37 +77,36 @@ class SmartAssistant:
             router_llm = self.container.get_router_llm()
             planner_llm = self.container.get_planner_llm()
             responder_llm = self.container.get_responder_llm()
-            verifier_llm = self.container.get_verifier_llm()
             
             # Validate LLMs are available (prevents NoneType errors later)
-            if router_llm is None or planner_llm is None or responder_llm is None or verifier_llm is None:
+            if router_llm is None or planner_llm is None or responder_llm is None:
                 missing = []
                 if router_llm is None: missing.append("Router")
-                if planner_llm is None: missing.append("Planner")
+                if planner_llm is None: missing.append("Planner/Executor")
                 if responder_llm is None: missing.append("Responder")
-                if verifier_llm is None: missing.append("Verifier")
                 raise RuntimeError(
                     f"No LLM configured for: {', '.join(missing)}. "
                     f"Please check your provider keys and stage-specific model settings."
                 )
         except RuntimeError as config_err:
              print(f"  [CRITICAL] SmartAssistant configuration failed: {config_err}")
-             # We re-raise to prevent starting in a broken state
              raise
         
         # Initialize Components via Container
         self.router = IntentRouter(router_llm)
         
-        # V17: Keep ToolExecutor for ReActLoop (internal use only)
-        self.executor = ToolExecutor(
-            tools=self.tools,
-            summarizer_llm=planner_llm
+        # V17/Sakura Lite: Create OneShotRunner for single-turn execution
+        self.oneshot_runner = OneShotRunner(
+            tool_map=self.tool_map,
+            llm=self.container.get_executor_llm(),
+            output_handler=None
         )
         
-        # V17: Create OneShotRunner for fast-lane execution
-        self.oneshot_runner = OneShotRunner(
-            tool_runner=self.executor.tool_runner,
-            output_handler=self.executor.output_handler
+        # Create MultiStepPlanner for complex multi-turn execution
+        from .execution.planner import MultiStepPlanner
+        self.multi_step_planner = MultiStepPlanner(
+            tool_map=self.tool_map,
+            llm=self.container.get_executor_llm()
         )
         
         self.responder = ResponseGenerator(
@@ -119,14 +127,6 @@ class SmartAssistant:
         # V20.0: Use dedicated executor LLM for budget tracking
         self.memory_judger = MemoryJudger(self.container.get_executor_llm())
         
-        # V17: Create Executor (unified entry point)
-        self.executor_layer = Executor(
-            one_shot_runner=self.oneshot_runner,
-            react_loop=self.executor.react_loop,
-            world_graph=self.world_graph,
-            tools=self.tools
-        )
-        
         # V10.3: Summary Memory (compresses old turns for long-context)
         self.summary_memory = get_summary_memory(planner_llm)
         
@@ -139,18 +139,11 @@ class SmartAssistant:
         # V14: Background ReflectionEngine (constraint detection runs after response)
         self.reflection_engine = get_reflection_engine()
         
-        # V15: DesireSystem (CPU-based mood tracking)
-        from .cognitive.desire import get_desire_system
-        self.desire_system = get_desire_system()
-        self.desire_system.initialize(
-            persist_path=os.path.join(get_project_root(), "data", "desire_state.json")
-        )
+        # V15/V20: DesireSystem stub (CPU-based mood tracking removed in Sakura Lite)
+        self.desire_system = DummyDesireSystem()
         
         # V17: ResponseEmitter factory for guaranteed message emission
         self.emitter_factory = EmitterFactory()
-        
-        # V18 FIX-05: Plan Verifier
-        self.plan_verifier = PlanVerifier(verifier_llm)
         
         # V10 Pivot: Behavioral Trace
         from .infrastructure.behavioral_trace import get_behavioral_trace, InfluenceType
@@ -228,16 +221,9 @@ class SmartAssistant:
             
         try:
             # V18.3: Dynamic Personalization (FIX-C)
-            # Load FRESH user settings on every request
-            from sakura_assistant.utils.pathing import get_project_root
-            settings_path = os.path.join(get_project_root(), "data", "user_settings.json")
-            user_settings = {}
-            if os.path.exists(settings_path):
-                try:
-                    with open(settings_path, "r", encoding="utf-8") as f:
-                        user_settings = json.load(f)
-                except Exception as e:
-                    print(f"   [Settings] Load failed: {e}")
+            # Load FRESH user settings on every request from SQLite database
+            from sakura_assistant.core.database import Database
+            user_settings = Database.get_setting("user_settings", {})
 
             # 1. Base Layer (Override or Default)
             custom_prompt = user_settings.get("system_prompt_override", "")
@@ -363,6 +349,8 @@ class SmartAssistant:
             
             state.current_intent = route_result.classification
             
+
+            
             # 4. Execution (V17: Use Executor)
             tool_outputs = ""
             tool_used = "None"
@@ -384,74 +372,61 @@ class SmartAssistant:
                     tool_used = "MemoryCoordinator (Error)"
             
             elif route_result.needs_tools or route_result.tool_hint:
-                print(f"   V17 Dispatch Phase: {route_result.classification}")
                 state.record_llm_call("execution")
                 
                 with span("Executor"):
-                    # Pass overrides to dispatch
-                    exec_result = await self.executor_layer.dispatch(
-                        user_input=user_input,
-                        classification=route_result.classification,
-                        tool_hint=route_result.tool_hint,
-                        request_id=request_id,
-                        history=history,
-                        reference_context=req_state.reference_context,
-                        llm_overrides=llm_overrides,
-                        mood=self.desire_system.get_mood()
-                    )
+                    from .execution.context import execution_context_var
+                    ctx = execution_context_var.get()
+                    
+                    if route_result.classification == "PLAN":
+                        print(f"   [PLAN Mode] Routing to MultiStepPlanner for complex multi-turn reasoning")
+                        exec_result = await self.multi_step_planner.aexecute(
+                            ctx=ctx,
+                            llm_overrides=llm_overrides
+                        )
+                        mode_label = "multi_step_plan"
+                    else:
+                        print(f"   [DIRECT Mode] Routing to OneShotRunner: hint={route_result.tool_hint}")
+                        exec_result = await self.oneshot_runner.aexecute(
+                            tool_name=route_result.tool_hint,
+                            ctx=ctx,
+                            llm_overrides=llm_overrides
+                        )
+                        mode_label = "one_shot"
                 
-                # V17: Use ExecutionStatus instead of bool
                 recorder.log(
                     "Dispatcher", 
                     f"Tool: {exec_result.tool_used}, Status: {exec_result.status.value}", 
-                    metadata={"mode": exec_result.last_result.get("mode") if exec_result.last_result else "unknown"}
+                    metadata={"mode": mode_label}
                 )
                 
-                # V18 FIX-05: Ensure tool result is unconditionally assigned for Responder acknowledgment
+                # Ensure tool result is unconditionally assigned for Responder acknowledgment
                 tool_outputs = str(exec_result.outputs) if exec_result and exec_result.outputs else ""
                 tool_used = exec_result.tool_used if exec_result else "None"
                 
                 if exec_result.tool_messages:
                      # Log actions to World Graph (Sync)
                      for action in exec_result.tool_messages:
-                         try:
-                             # Handle ToolMessage objects (LangChain) or dicts
-                             tool_name = getattr(action, 'name', None) or action.get('tool', 'unknown')
-                             result_content = getattr(action, 'content', None) or action.get('content', '')
-                             
-                             self.world_graph.record_action(
-                                 tool=tool_name,
-                                 args={}, # Args not preserved in ToolMessage, acceptable for Graph history
-                                 result=str(result_content),
-                                 success=True
-                             )
-                         except Exception as wg_err:
-                             print(f"   World Graph recording failed: {wg_err}")
-                
-                # V18 FIX-05: Plan Verification
-                if route_result.classification == "PLAN" and exec_result:
-                    with span("Verifier"):
-                        # Convert steps (List[Dict]) to a readable summary for the Verifier
-                        plan_steps = exec_result.last_result.get("steps", []) if exec_result.last_result else []
-                        # V19: Resolve verifier LLM with overrides
-                        v_llm = self.container.get_verifier_llm(overrides=llm_overrides) if llm_overrides else self.plan_verifier.llm
-                        verification = await self.plan_verifier.averify(
-                            user_query=user_input,
-                            plan=plan_steps,
-                            tool_results=tool_outputs,
-                            llm_override=v_llm if llm_overrides else None
-                        )
-                        recorder.log(
-                            "Verifier", 
-                            f"Verdict: {verification['verdict']}", 
-                            metadata={"reason": verification['reason']}
-                        )
-            
+                          try:
+                              tool_name = getattr(action, 'name', None) or action.get('tool', 'unknown')
+                              result_content = getattr(action, 'content', None) or action.get('content', '')
+                              
+                              self.world_graph.record_action(
+                                  tool=tool_name,
+                                  args={}, # Args not preserved in ToolMessage, acceptable for Graph history
+                                  result=str(result_content),
+                                  success=True
+                              )
+                              
+                              # Telemetry: Record tool success/failure status
+                              success_val = not ("error" in str(result_content).lower() or "failed" in str(result_content).lower())
+                              self.context_manager.telemetry.record_tool_execution(tool_name, success_val)
+                          except Exception as wg_err:
+                              print(f"   World Graph recording failed: {wg_err}")
+
             # V10.3: Record turn (Sync)
             self.summary_memory.add_turn("user", user_input, trace_id=request_id)
             
-            # 5. Response (Async)
-            state.record_llm_call("responding")
             print(f" Async Response Phase")
             
             # V15.4: Get unified context from ContextManager
@@ -482,7 +457,6 @@ class SmartAssistant:
                         "had_reference_context": bool(reference_context),
                     }
                 )
-            
             # V15: Inject mood from DesireSystem
             mood_prompt = self.desire_system.get_mood_prompt()
             # V19-FIX-02: Inject reference resolution into responder context
@@ -498,6 +472,52 @@ class SmartAssistant:
                 if tool_outputs else False
             )
             
+            # Get posture from context manager
+            posture_mode = resp_ctx.get("posture", "NORMAL")
+            posture_map = {
+                "SILENT": {
+                    "mode": "silent",
+                    "max_sentences": 1,
+                    "reason": "Rapid fire utility actions requested.",
+                    "warmth": "neutral",
+                    "voice": "micro"
+                },
+                "SHORT_ACK": {
+                    "mode": "short_ack",
+                    "max_sentences": 1,
+                    "reason": "Focused coding session or high friction active.",
+                    "warmth": "light",
+                    "voice": "micro"
+                },
+                "NORMAL": {
+                    "mode": "normal",
+                    "max_sentences": 3,
+                    "reason": "Standard response pacing.",
+                    "warmth": "normal",
+                    "voice": "normal"
+                },
+                "DETAILED": {
+                    "mode": "detailed",
+                    "max_sentences": 6,
+                    "reason": "Explaining concepts or detailed answer requested.",
+                    "warmth": "engaged",
+                    "voice": "normal"
+                },
+                "REFLECTIVE": {
+                    "mode": "reflective",
+                    "max_sentences": 4,
+                    "reason": "User requested brainstorming or reflection.",
+                    "warmth": "steady",
+                    "voice": "normal"
+                }
+            }
+            response_posture = posture_map.get(posture_mode, posture_map["NORMAL"])
+
+            # Map confidence posture to softeners if needed
+            is_low_confidence = (resp_ctx.get("action_posture") == "HEDGE")
+            if is_low_confidence and tool_outputs and "[LOW_CONFIDENCE]" not in tool_outputs:
+                tool_outputs = "[LOW_CONFIDENCE] " + tool_outputs
+
             resp_context = ResponseContext(
                 user_input=user_input,
                 tool_outputs=tool_outputs,
@@ -508,7 +528,8 @@ class SmartAssistant:
                 study_mode=req_state.study_mode,
                 data_reasoning=has_ephemeral,
                 session_summary=resp_ctx.get("summary_context", ""),
-                requires_facts=(route_result.classification in ("DIRECT", "PLAN"))
+                requires_facts=(route_result.classification in ("DIRECT", "PLAN")),
+                response_posture=response_posture
             )
             
             with span("Responder"):
@@ -525,8 +546,6 @@ class SmartAssistant:
             self.summary_memory.add_turn("assistant", response_text, trace_id=request_id)
             
             # V18.2: Memory Judger (BUG-03 FIX)
-            # Fire-and-forget: Evaluate if this turn should be stored in long-term memory.
-            # Runs on ALL routes (CHAT, DIRECT, PLAN).
             import asyncio
             asyncio.create_task(
                 self.memory_judger.evaluate(
@@ -550,6 +569,8 @@ class SmartAssistant:
                     t_name = getattr(action, 'name', None) or action.get('tool', 'unknown')
                     if t_name and t_name not in all_tools_used:
                         all_tools_used.append(t_name)
+            
+
             
             # Fallback to tool_used if list is empty (single tool case)
             if not all_tools_used and tool_used and tool_used != "None":
@@ -575,6 +596,15 @@ class SmartAssistant:
                 "tokens": usage  # Inject token metrics
             })
             
+            # Telemetry: Record successful run
+            is_plan_mode = (route_result.classification == "PLAN") if 'route_result' in locals() else False
+            self.context_manager.telemetry.record_run(
+                success=True,
+                latency=time.time() - start_time,
+                is_planner=is_plan_mode
+            )
+            self.context_manager.failure_handler.record_success()
+            
             return {
                 "content": response_text,
                 "mode": route_result.classification,
@@ -588,10 +618,18 @@ class SmartAssistant:
                     "response_posture": resp_context.response_posture or {}
                 }
             }
+        except (RateLimitExceeded, LLMBudgetExceededError) as e:
+            # Telemetry: Record run failure
+            is_plan_mode = (route_result.classification == "PLAN") if 'route_result' in locals() else False
+            self.context_manager.telemetry.record_run(
+                success=False,
+                latency=time.time() - start_time,
+                is_planner=is_plan_mode
+            )
+            self.context_manager.failure_handler.record_failure()
             
-        except (RateLimitExceeded, LLMBudgetExceededError):
             recorder.end_trace(success=False, response_preview="budget_exceeded")
-            error_response = "I'm a little overwhelmed right now, could you try again?"
+            error_response = self.context_manager.failure_handler.handle_tool_failure("llm_budget", e)
             await emitter.emit(error_response, {"status": "budget_exceeded"})
             mode_val = route_result.classification if 'route_result' in locals() else "unknown"
             return {
@@ -608,11 +646,20 @@ class SmartAssistant:
                 }
             }
         except Exception as e:
+            # Telemetry: Record run failure
+            is_plan_mode = (route_result.classification == "PLAN") if 'route_result' in locals() else False
+            self.context_manager.telemetry.record_run(
+                success=False,
+                latency=time.time() - start_time,
+                is_planner=is_plan_mode
+            )
+            self.context_manager.failure_handler.record_failure()
+            
             recorder.end_trace(success=False, response_preview=str(e)[:50])
             print(f" Async Pipeline Error: {e}")
             import traceback
             traceback.print_exc()
-            error_response = f"I encountered an error: {e}"
+            error_response = self.context_manager.failure_handler.handle_tool_failure("llm_pipeline", e)
             await emitter.emit(error_response, {"status": "error"})
             mode_val = route_result.classification if 'route_result' in locals() else "unknown"
             return {

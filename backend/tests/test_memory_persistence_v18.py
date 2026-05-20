@@ -10,6 +10,9 @@ sys.path.append(project_root)
 from sakura_assistant.core.llm import SmartAssistant
 from sakura_assistant.memory.faiss_store import get_memory_store
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_memory_flow():
     print("  [Test] Initializing SmartAssistant...")
     assistant = SmartAssistant()

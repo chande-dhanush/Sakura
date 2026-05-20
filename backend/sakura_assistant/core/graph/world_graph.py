@@ -485,6 +485,15 @@ class WorldGraph:
         # Persistence
         self.persist_path = persist_path
         
+        # Configure database path for testing if running under pytest
+        import sys
+        if "pytest" in sys.modules:
+            from ..database import set_db_path
+            if persist_path:
+                set_db_path(persist_path.replace(".json", ".db"))
+            else:
+                set_db_path(":memory:")
+        
         # V7.1: Thread safety lock (protects all mutations)
         self._lock = threading.RLock()
         
@@ -501,8 +510,7 @@ class WorldGraph:
         self._initialize_identity()
         
         # Load persisted state if available
-        if persist_path and os.path.exists(persist_path):
-            self._load_from_disk()
+        self._load_from_disk()
         
         print(f" [WorldGraph] Initialized (session={self.current_session[:8]})")
         
@@ -1440,124 +1448,185 @@ class WorldGraph:
     #                                                                            
     
     def save(self) -> None:
-        """
-        Save graph to disk using atomic write pattern.
-        
-        V7.1: Writes to temp file first, then atomically replaces target.
-        This prevents data corruption on crash/power loss.
-        """
-        if not self.persist_path:
-            return
-        
+        """Save graph to SQLite."""
         with self._lock:
-            # V9.1: Filter out EPHEMERAL entities before save (retention policy)
-            # Only persist: PROMOTED, and always user:*/pref:*
-            entities_to_persist = {
-                eid: e.to_dict() for eid, e in self.entities.items()
-                if e.lifecycle != EntityLifecycle.EPHEMERAL or
-                   eid.startswith("user:") or eid.startswith("pref:")
-            }
-            
-            data = {
-                "version": "v7.1",  # V17.1: Schema update for responses
-                "current_turn": self.current_turn,
-                "current_session": self.current_session,
-                "entities": entities_to_persist,
-                "actions": [a.to_dict() for a in self.actions[-100:]],  # Keep last 100
-                "responses": [r.to_dict() for r in self.responses[-10:]],  # V17.1: Keep last 10
-            }
-            
-            os.makedirs(os.path.dirname(self.persist_path), exist_ok=True)
-            
-            # Atomic write: write to temp file in same directory, then replace
-            dir_path = os.path.dirname(self.persist_path)
             try:
-                with tempfile.NamedTemporaryFile(
-                    mode='w', 
-                    dir=dir_path, 
-                    suffix='.tmp',
-                    delete=False
-                ) as tmp_file:
-                    json.dump(data, tmp_file, indent=2)
-                    tmp_path = tmp_file.name
+                from ..database import get_db_connection, Database
+                conn = get_db_connection()
                 
-                # Atomic replace (works on Windows and POSIX)
-                os.replace(tmp_path, self.persist_path)
-                print(f" [WorldGraph] Saved to {self.persist_path}")
+                # Save turn and session
+                Database.set_setting("world_graph_current_turn", self.current_turn)
+                Database.set_setting("world_graph_current_session", self.current_session)
                 
+                # Filter out EPHEMERAL entities before save (retention policy)
+                # Only persist: PROMOTED, and always user:*/pref:*
+                entities_to_persist = {
+                    eid: e for eid, e in self.entities.items()
+                    if e.lifecycle != EntityLifecycle.EPHEMERAL or
+                       eid.startswith("user:") or eid.startswith("pref:")
+                }
+                
+                # We start transaction/write
+                with conn:
+                    # Clear current entities/actions/responses in database to rewrite them
+                    conn.execute("DELETE FROM entities")
+                    for eid, e in entities_to_persist.items():
+                        conn.execute("""
+                            INSERT INTO entities (
+                                id, type, name, attributes, lifecycle, source, mutable_by,
+                                created_at, last_referenced, reference_count, familiarity, sentiment, confidence, not_claims, summary
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            e.id, e.type.value, e.name, json.dumps(e.attributes), e.lifecycle.value, e.source.value,
+                            json.dumps(list(e.mutable_by)), e.created_at, e.last_referenced, e.reference_count,
+                            e.familiarity, e.sentiment, e.confidence, json.dumps(e.not_claims), e.summary
+                        ))
+                    
+                    # Actions (keep last 100)
+                    conn.execute("DELETE FROM actions")
+                    for a in self.actions[-100:]:
+                        conn.execute("""
+                            INSERT INTO actions (
+                                id, turn, timestamp, action_type, tool, args, result, success,
+                                focus_entity, entities_involved, depends_on, user_intent, user_satisfaction, significance, key_facts, summary, session_id
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            a.id, a.turn, a.timestamp, a.action_type.value, a.tool, json.dumps(a.args), a.result,
+                            1 if a.success else 0, a.focus_entity, json.dumps(a.entities_involved), a.depends_on,
+                            a.user_intent, a.user_satisfaction, a.significance, json.dumps(a.key_facts), a.summary, a.session_id
+                        ))
+                    
+                    # Responses (keep last 10)
+                    conn.execute("DELETE FROM responses")
+                    for r in self.responses[-10:]:
+                        conn.execute("""
+                            INSERT OR REPLACE INTO responses (turn, content, timestamp, mode, tool_context)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (
+                            r.turn, r.content, r.timestamp, r.mode, r.tool_context
+                        ))
+                        
+                print(f" [WorldGraph] Saved to database")
             except Exception as e:
                 print(f" [WorldGraph] Save failed: {e}")
-                # Clean up temp file if it exists
-                if 'tmp_path' in locals() and os.path.exists(tmp_path):
-                    try:
-                        os.remove(tmp_path)
-                    except:
-                        pass
     
     def reset(self) -> bool:
         """
-        V7.1: Complete reset of World Graph state.
-        Deletes persisted file and re-initializes with fresh identity.
-        
-        Returns:
-            True if reset succeeded, False otherwise
+        Complete reset of World Graph state in SQLite.
         """
         with self._lock:
             try:
-                # 1. Delete persisted file
-                if os.path.exists(self.persist_path):
-                    os.remove(self.persist_path)
-                    print(f"  [WorldGraph] Deleted {self.persist_path}")
+                from ..database import get_db_connection, Database
+                conn = get_db_connection()
                 
-                # 2. Clear all in-memory state
+                with conn:
+                    conn.execute("DELETE FROM entities")
+                    conn.execute("DELETE FROM actions")
+                    conn.execute("DELETE FROM responses")
+                    conn.execute("DELETE FROM settings WHERE key LIKE 'world_graph_%'")
+                
+                # Clear all in-memory state
                 self.entities.clear()
                 self.actions.clear()
+                self.responses.clear()
                 self.current_turn = 0
                 self.current_session = self._generate_session_id()
                 self.session_start = datetime.now()
                 self.last_compression_turn = 0
                 
-                # Note: Identity will be re-initialized on first interaction
                 print(f" [WorldGraph] Reset complete - fresh state initialized")
                 return True
-                
             except Exception as e:
                 print(f" [WorldGraph] Reset failed: {e}")
                 return False
     
     def _load_from_disk(self) -> None:
-        """Load graph from disk."""
+        """Load graph from SQLite."""
         try:
-            with open(self.persist_path, "r") as f:
-                data = json.load(f)
+            from ..database import get_db_connection, Database
+            conn = get_db_connection()
             
-            if data.get("version") not in ("v7", "v7.1"):  # V17.1: Accept both versions
-                print(f"   [WorldGraph] Version mismatch, starting fresh")
-                return
+            # Load turn and session
+            self.current_turn = Database.get_setting("world_graph_current_turn", 0)
+            self.current_session = Database.get_setting("world_graph_current_session", self._generate_session_id())
             
-            self.current_turn = data.get("current_turn", 0)
-            
-            # Load entities (V17.1: Load ALL entities, but sync identity from IdentityManager)
-            for eid, edata in data.get("entities", {}).items():
-                entity = EntityNode.from_dict(edata)
+            # Load entities
+            cursor = conn.execute("SELECT * FROM entities")
+            for row in cursor.fetchall():
+                # Reconstruct EntityNode from SQLite row
+                mutable_by = set(json.loads(row['mutable_by'])) if row['mutable_by'] else set()
                 
-                # Special handling for user identity: preserve graph metadata, update identity fields
-                if eid == "user:self" and self._identity_manager:
+                # Convert source to EntitySource enum
+                src_val = row['source']
+                try:
+                    src = EntitySource(src_val)
+                except ValueError:
+                    # Fallback mapping or fallback enum
+                    src = EntitySource.SYSTEM
+                    
+                entity = EntityNode(
+                    id=row['id'],
+                    type=EntityType(row['type']),
+                    name=row['name'],
+                    attributes=json.loads(row['attributes']) if row['attributes'] else {},
+                    lifecycle=EntityLifecycle(row['lifecycle']),
+                    source=src,
+                    mutable_by=mutable_by,
+                    created_at=row['created_at'],
+                    last_referenced=row['last_referenced'],
+                    reference_count=row['reference_count'],
+                    familiarity=row['familiarity'],
+                    sentiment=row['sentiment'],
+                    confidence=row['confidence'],
+                    not_claims=json.loads(row['not_claims']) if row['not_claims'] else [],
+                    summary=row['summary']
+                )
+                
+                # Special handling for user identity
+                if entity.id == "user:self" and self._identity_manager:
                     entity.name = self._identity_manager.name
                     entity.attributes.update(self.USER_ATTRIBUTES)
                     entity.summary = self._generate_user_summary()
                 
-                self.entities[eid] = entity
+                self.entities[entity.id] = entity
             
-            # Load actions
-            for adata in data.get("actions", []):
-                self.actions.append(ActionNode.from_dict(adata))
+            # Load actions (keep last 100)
+            cursor = conn.execute("SELECT * FROM actions ORDER BY id ASC")
+            for row in cursor.fetchall():
+                action = ActionNode(
+                    id=row['id'],
+                    turn=row['turn'],
+                    timestamp=row['timestamp'],
+                    action_type=ActionType(row['action_type']),
+                    tool=row['tool'],
+                    args=json.loads(row['args']) if row['args'] else {},
+                    result=row['result'],
+                    success=bool(row['success']),
+                    focus_entity=row['focus_entity'],
+                    entities_involved=json.loads(row['entities_involved']) if row['entities_involved'] else [],
+                    depends_on=row['depends_on'],
+                    user_intent=row['user_intent'],
+                    user_satisfaction=row['user_satisfaction'],
+                    significance=row['significance'],
+                    key_facts=json.loads(row['key_facts']) if row['key_facts'] else [],
+                    summary=row['summary'],
+                    session_id=row['session_id']
+                )
+                self.actions.append(action)
             
-            # V17.1: Load responses
-            for rdata in data.get("responses", []):
-                self.responses.append(ResponseNode.from_dict(rdata))
-            
-            print(f"  [WorldGraph] Loaded {len(self.entities)} entities, {len(self.actions)} actions, {len(self.responses)} responses")
+            # Load responses
+            cursor = conn.execute("SELECT * FROM responses ORDER BY turn ASC")
+            for row in cursor.fetchall():
+                response = ResponseNode(
+                    turn=row['turn'],
+                    content=row['content'],
+                    timestamp=row['timestamp'],
+                    mode=row['mode'],
+                    tool_context=row['tool_context']
+                )
+                self.responses.append(response)
+                
+            print(f"  [WorldGraph] Loaded {len(self.entities)} entities, {len(self.actions)} actions, {len(self.responses)} responses from database")
             
         except Exception as e:
             print(f"   [WorldGraph] Load failed: {e}")

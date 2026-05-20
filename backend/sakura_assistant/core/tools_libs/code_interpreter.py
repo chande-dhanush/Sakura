@@ -26,10 +26,8 @@ from sympy.parsing.sympy_parser import parse_expr, standard_transformations, imp
 from langchain_core.tools import tool
 
 # Configuration
-DOCKER_IMAGE = "sakura-python-sandbox:latest"
 DEFAULT_TIMEOUT = 30
 MAX_OUTPUT_CHARS = 8000  # Prevent context overflow
-SANDBOX_MEMORY_LIMIT = "512m"
 
 # Path to uploads directory (shared with sandbox)
 def get_uploads_dir() -> Path:
@@ -39,55 +37,6 @@ def get_uploads_dir() -> Path:
     uploads.mkdir(exist_ok=True)
     return uploads
 
-
-def _check_docker_available() -> bool:
-    """Check if Docker is available and running."""
-    try:
-        result = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            timeout=5
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
-
-
-def _check_sandbox_image() -> bool:
-    """Check if the sandbox image exists, build if needed."""
-    try:
-        result = subprocess.run(
-            ["docker", "images", "-q", DOCKER_IMAGE],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        if result.stdout.strip():
-            return True
-        
-        # Image doesn't exist, try to build it
-        from sakura_assistant.utils.pathing import get_bundled_path
-        dockerfile_path = Path(get_bundled_path("docker/python-sandbox.Dockerfile"))
-        if not dockerfile_path.exists():
-            return False
-        
-        print(f" Building sandbox image from {dockerfile_path}...")
-        build_result = subprocess.run(
-            [
-                "docker", "build",
-                "-f", str(dockerfile_path),
-                "-t", DOCKER_IMAGE,
-                str(dockerfile_path.parent)
-            ],
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 min build timeout
-        )
-        return build_result.returncode == 0
-        
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        print(f" Docker image check failed: {e}")
-        return False
 
 
 def secure_math_n(expression):
@@ -135,7 +84,7 @@ def execute_python(
     data_file: Optional[str] = None
 ) -> str:
     """
-    Execute Python code in an isolated Docker sandbox.
+    Execute Python code in a local Python subprocess.
     
     Use this for:
     - Data analysis (pandas, numpy)
@@ -157,21 +106,18 @@ def execute_python(
     Available packages: pandas, numpy, matplotlib, seaborn, scipy, sympy
     
     IMPORTANT: To see output, use print() statements.
-    For plots, save to /code/output.png and it will be returned.
+    For plots, save to output.png and it will be returned.
     """
+    import sys
+    import shutil
     # Clamp timeout
     timeout = min(max(timeout, 5), 60)
     
-    # Check Docker availability
-    if not _check_docker_available():
-        return "Error: Docker is not available. Please ensure Docker Desktop is running."
-    
-    # Ensure sandbox image exists
-    if not _check_sandbox_image():
-        return "Error: Failed to build or find sandbox image. Check Docker logs."
-    
     # Sanitize code
     code = _sanitize_code(code)
+    
+    # Replace absolute docker path '/code/' with './'
+    code = code.replace("/code/", "./")
     
     # Create temporary directory for code and output
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -181,38 +127,25 @@ def execute_python(
         script_path = tmpdir_path / "script.py"
         script_path.write_text(code, encoding="utf-8")
         
-        # Prepare Docker command
-        docker_cmd = [
-            "docker", "run",
-            "--rm",  # Remove container after execution
-            "--network", "none",  # No network access
-            "--memory", SANDBOX_MEMORY_LIMIT,
-            "--cpus", "1",  # Limit CPU
-            "--pids-limit", "50",  # V13: Prevent fork bombs
-            "--read-only",  # Read-only root filesystem
-            "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",  # Writable /tmp
-            "-v", f"{tmpdir_path}:/code:rw",  # Mount code directory
-        ]
-        
-        # Mount data file if specified
+        # Copy data file if specified
         if data_file:
             uploads_dir = get_uploads_dir()
             data_path = uploads_dir / data_file
             if data_path.exists():
-                docker_cmd.extend(["-v", f"{data_path}:/data/{data_file}:ro"])
+                # Replicate docker mount: put it in a 'data' folder inside tmpdir
+                dest_dir = tmpdir_path / "data"
+                dest_dir.mkdir(exist_ok=True)
+                shutil.copy2(data_path, dest_dir / data_file)
             else:
                 return f"Error: Data file '{data_file}' not found in uploads."
         
-        # Add image and command
-        docker_cmd.extend([
-            DOCKER_IMAGE,
-            "python", "/code/script.py"
-        ])
+        # Prepare Python command
+        python_cmd = [sys.executable, str(script_path)]
         
         try:
             # Execute with timeout
             result = subprocess.run(
-                docker_cmd,
+                python_cmd,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -236,14 +169,13 @@ def execute_python(
             if not output:
                 output = "(No output - did you forget to print() your results?)"
             
-            # Check for generated plot
+            # Check for generated plot (matplotlib saves locally to output.png)
             plot_path = tmpdir_path / "output.png"
             if plot_path.exists():
                 # Save plot to uploads for potential display
-                import shutil
                 output_name = f"plot_{uuid.uuid4().hex[:8]}.png"
                 dest_path = get_uploads_dir() / output_name
-                shutil.copy(plot_path, dest_path)
+                shutil.copy2(plot_path, dest_path)
                 output += f"\n\n Plot saved: {output_name}"
             
             # Truncate if too long
@@ -264,11 +196,11 @@ def check_code_interpreter_status() -> str:
     """
     Check if the Code Interpreter is ready to use.
     
-    Returns status of Docker and sandbox image.
+    Returns status of the local python environment.
     """
+    import sys
     status = {
-        "docker_available": _check_docker_available(),
-        "sandbox_image_ready": False,
+        "python_executable": sys.executable,
         "uploads_dir": str(get_uploads_dir()),
         "available_packages": [
             "pandas", "numpy", "matplotlib", 
@@ -276,24 +208,13 @@ def check_code_interpreter_status() -> str:
         ]
     }
     
-    if status["docker_available"]:
-        status["sandbox_image_ready"] = _check_sandbox_image()
-    
-    if status["docker_available"] and status["sandbox_image_ready"]:
-        return f""" Code Interpreter is ready!
+    return f""" Local Code Interpreter is ready!
 
-Docker: Running
-Sandbox Image: {DOCKER_IMAGE}
+Python Executable: {status['python_executable']}
 Uploads Directory: {status['uploads_dir']}
 Available Packages: {', '.join(status['available_packages'])}
 
 Use execute_python() to run code."""
-    
-    elif not status["docker_available"]:
-        return " Docker is not available. Please start Docker Desktop."
-    
-    else:
-        return "   Sandbox image not ready. It will be built on first use."
 
 
 # Export tools for registration

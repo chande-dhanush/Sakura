@@ -81,7 +81,7 @@ class TestConfidenceBoost:
     """Test touch() confidence boost."""
     
     def test_touch_increases_confidence(self):
-        """touch() should increase confidence by 0.05."""
+        """touch() should reinforce confidence to 1.0."""
         entity = EntityNode(
             id="entity:test:boost",
             type=EntityType.TOPIC,
@@ -89,10 +89,9 @@ class TestConfidenceBoost:
             confidence=0.5
         )
         
-        old_conf = entity.confidence
         entity.touch()
         
-        assert entity.confidence == old_conf + 0.05
+        assert entity.confidence == 1.0
     
     def test_touch_caps_at_1(self):
         """Confidence should not exceed 1.0."""
@@ -138,8 +137,8 @@ class TestLifecycleDemotion:
         assert demoted == False
         assert entity.lifecycle == EntityLifecycle.PROMOTED
     
-    def test_promoted_to_candidate_demotion(self):
-        """PROMOTED should demote to CANDIDATE when confidence < 0.3."""
+    def test_promoted_to_ephemeral_demotion(self):
+        """PROMOTED should demote to EPHEMERAL when confidence < 0.2."""
         entity = EntityNode(
             id="entity:test:demote1",
             type=EntityType.TOPIC,
@@ -147,25 +146,14 @@ class TestLifecycleDemotion:
             lifecycle=EntityLifecycle.PROMOTED,
             source=EntitySource.TOOL_RESULT,
             confidence=0.5,
-            last_referenced=datetime.now() - timedelta(days=60)  # Will decay to ~0.25
+            last_referenced=datetime.now() - timedelta(days=30)  # Will decay to ~0.25 (no demote)
         )
         
         demoted = entity.check_lifecycle_demotion()
-        assert demoted == True
-        assert entity.lifecycle == EntityLifecycle.CANDIDATE
-    
-    def test_candidate_to_ephemeral_demotion(self):
-        """CANDIDATE should demote to EPHEMERAL when confidence < 0.15."""
-        entity = EntityNode(
-            id="entity:test:demote2",
-            type=EntityType.TOPIC,
-            name="Demotion Test 2",
-            lifecycle=EntityLifecycle.CANDIDATE,
-            source=EntitySource.LLM_INFERRED,
-            confidence=0.3,
-            last_referenced=datetime.now() - timedelta(days=90)  # Will decay to ~0.1
-        )
+        assert demoted == False
+        assert entity.lifecycle == EntityLifecycle.PROMOTED
         
+        entity.last_referenced = datetime.now() - timedelta(days=60)  # Will decay to ~0.125 (demote)
         demoted = entity.check_lifecycle_demotion()
         assert demoted == True
         assert entity.lifecycle == EntityLifecycle.EPHEMERAL

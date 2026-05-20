@@ -150,7 +150,7 @@ class TestEntityLifecycle:
         assert entity.lifecycle == EntityLifecycle.EPHEMERAL
     
     def test_promotion_requires_references(self):
-        """Ephemeral entities need multiple references to become candidates."""
+        """Ephemeral entities need multiple references to become PROMOTED."""
         graph = WorldGraph()
         
         entity = graph.get_or_create_entity(
@@ -159,14 +159,21 @@ class TestEntityLifecycle:
             source=EntitySource.TOOL_RESULT
         )
         
-        # Reference it multiple times
+        # Reference it multiple times, but not enough to auto-promote immediately
         for _ in range(3):
             entity.touch()
         
+        # Should still be EPHEMERAL
+        assert entity.lifecycle == EntityLifecycle.EPHEMERAL
+        
+        # Touch 2 more times (total 5 references)
+        for _ in range(2):
+            entity.touch()
+            
         graph._check_promotions()
         
-        # Should be CANDIDATE now
-        assert entity.lifecycle == EntityLifecycle.CANDIDATE
+        # Should be PROMOTED now due to reference_count >= 5
+        assert entity.lifecycle == EntityLifecycle.PROMOTED
 
 
 class TestReferenceResolution:

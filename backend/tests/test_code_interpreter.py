@@ -1,9 +1,9 @@
 """
 Code Interpreter Test Suite
 ============================
-Tests for the Docker-sandboxed Python execution tool.
+Tests for the local Python execution tool.
 
-Run: pytest sakura_assistant/tests/test_code_interpreter.py -v
+Run: python -m pytest tests/test_code_interpreter.py -v
 """
 
 import pytest
@@ -16,13 +16,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from sakura_assistant.core.tools_libs.code_interpreter import (
     execute_python, 
     check_code_interpreter_status,
-    _check_docker_available,
     _sanitize_code
 )
 
 
 class TestCodeInterpreterBasics:
-    """Basic unit tests that don't require Docker."""
+    """Basic unit tests."""
     
     def test_sanitize_code_allows_safe_code(self):
         """Sanitize should not block normal code."""
@@ -34,22 +33,19 @@ class TestCodeInterpreterBasics:
         """Sanitize should log warning for dangerous patterns."""
         code = "import os; os.system('rm -rf /')"
         result = _sanitize_code(code)
-        # Code still passes (Docker is the real sandbox)
         assert "os.system" in result
-        # But a warning should be printed
         captured = capsys.readouterr()
         assert "potentially dangerous" in captured.out.lower() or result == code
     
     def test_status_check_returns_structured_info(self):
         """Status check should return meaningful information."""
         result = check_code_interpreter_status.invoke({})
-        assert "docker" in result.lower() or "Docker" in result
-        assert "sandbox" in result.lower() or "packages" in result.lower()
+        assert "ready" in result.lower()
+        assert "packages" in result.lower()
 
 
-@pytest.mark.skipif(not _check_docker_available(), reason="Docker not available")
-class TestCodeInterpreterWithDocker:
-    """Tests that require Docker to be running."""
+class TestCodeInterpreterLocalExecution:
+    """Tests executing python scripts in a local subprocess."""
     
     def test_basic_print(self):
         """Basic print execution should work."""
@@ -108,35 +104,6 @@ print(f"Solutions: {result}")
         result = execute_python.invoke({"code": code, "timeout": 5})
         assert "timed out" in result.lower() or "timeout" in result.lower()
     
-    def test_no_network_access(self):
-        """Network access should be blocked."""
-        code = """
-import urllib.request
-try:
-    urllib.request.urlopen('https://google.com', timeout=5)
-    print('NETWORK ALLOWED - BAD!')
-except Exception as e:
-    print(f'Network blocked: {type(e).__name__}')
-"""
-        result = execute_python.invoke({"code": code})
-        # Should fail with network error, not succeed
-        assert "blocked" in result.lower() or "error" in result.lower() or "NETWORK ALLOWED" not in result
-    
-    def test_memory_limit(self):
-        """Large memory allocations should fail."""
-        code = """
-try:
-    x = [0] * (1024**3)  # Try to allocate ~8GB
-    print('MEMORY NOT LIMITED - BAD!')
-except MemoryError:
-    print('Memory limit enforced')
-except Exception as e:
-    print(f'Limited by: {type(e).__name__}')
-"""
-        result = execute_python.invoke({"code": code})
-        # Should fail due to 512MB limit
-        assert "MEMORY NOT LIMITED" not in result
-    
     def test_no_output_warning(self):
         """Code without print should get a hint."""
         code = "x = 1 + 1"  # No print
@@ -153,9 +120,4 @@ except Exception as e:
         """Very long outputs should be truncated."""
         code = "print('x' * 10000)"  # 10k chars
         result = execute_python.invoke({"code": code})
-        # Should still work but potentially be truncated if > MAX_OUTPUT_CHARS
         assert "x" in result
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

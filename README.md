@@ -1,14 +1,37 @@
-# 🌸 Sakura V19.5 — Forensic Reliability & Restoration
+# 🌸 Sakura V21.1-LITE — Post-Refactor Refinement
 
-**The Ultimate Production-Ready Personal AI Assistant.**
+**A Fast, Context-Aware Desktop Cognitive Layer.**
 *Tauri + Svelte (Frontend) | FastAPI + LangChain (Backend)*
 
-![Version](https://img.shields.io/badge/version-19.5-pink?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-21.1--LITE-pink?style=for-the-badge)
 ![Tauri](https://img.shields.io/badge/Tauri-2.x-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-green?style=for-the-badge)
-![Stability](https://img.shields.io/badge/architecture-Forensic%20Soul-purple?style=for-the-badge)
+![Stability](https://img.shields.io/badge/architecture-Context%20Intelligence-purple?style=for-the-badge)
 
 ---
+
+## 🔄 V21.1 — Post-Refactor Refinement
+
+Sakura V21.1 completes the Lite transition from an experimental AGI-style orchestration system to a fast, context-aware desktop cognitive layer.
+
+### What Changed
+- **Purged:** ReAct planner loops, Desire/emotion system, Proactive scheduler, Docker sandboxing
+- **Added:** 13 context intelligence engines for workflow-aware, trust-calibrated responses
+- **Result:** Sub-200ms direct tool execution, single-turn LLM routing, contextual memory ranking
+
+### Context Intelligence Engines (New in V21.1)
+- Adaptive Interaction Engine (response posture control)
+- Friction Detector (correction/frustration sensing)
+- Context Relevance Engine (memory ranking with recency decay)
+- Workflow Context Engine (active app/window tracking)
+- Session State Classifier (CODING/WRITING/RESEARCH/MEDIA/GENERAL)
+- Tool Biasing Registry (session-aware tool recommendations)
+- Implicit Reference Resolver ("that file", "the error")
+- Confidence Engine (action posture: CLARIFY/HEDGE/PROCEED)
+- Attention Manager (focus mode detection)
+- Trust-Aware Failure Handler (calibrated error messaging)
+- Reliability Telemetry (health metrics logging)
+- Preference Adaptation Engine (habit learning & memory decay)
 
 ## ✨ Why Sakura?
 
@@ -73,9 +96,29 @@ Alternatively, you can manually edit the `.env` file in the root directory.
 
 ---
 
-## 🌸 What's New in V19.5?
+## 🌸 Changelog
 
-V19.5 is the **Forensic Reliability Update**, focusing on eliminating execution regressions and restoring full-stack stability.
+### V21.1 — Post-Refactor Refinement
+- **Context Intelligence**: Added 13 context engines (see section above).
+- **Memory Ranking**: Context Relevance Engine with recency decay replaces flat recall.
+- **Session Awareness**: Session State Classifier drives tool biasing and response posture.
+- **Confidence Routing**: Confidence Engine gates actions into CLARIFY / HEDGE / PROCEED.
+- **Telemetry**: Reliability Telemetry engine for health metrics and failure tracking.
+
+### V21.0 — Lite Architecture
+- **Architecture Pivot**: Removed ReAct planner loops in favor of single-turn LLM routing.
+- **Emotion Purge**: Stripped DesireSystem, social battery, and proactive scheduler.
+- **Sandbox Removal**: Replaced Docker-based code interpreter with direct execution.
+- **Latency Target**: Achieved sub-200ms tool dispatch for common operations.
+
+### V20.0 — Structural Cleanup
+- **Dependency Pruning**: Removed unused LangChain orchestration layers.
+- **Router Simplification**: Collapsed DIRECT/PLAN/CHAT into a two-path router (TOOL / CHAT).
+- **Memory Refactor**: Unified short-term and long-term memory into a single ranked store.
+
+### V19.5 — Forensic Reliability & Restoration
+
+V19.5 was the **Forensic Reliability Update**, focusing on eliminating execution regressions and restoring full-stack stability.
 
 - **Forensic Relabeling**: Purged "Planner" span leakage from CHAT routes by explicitly relabeling memory compression stages.
 - **Keep-Warm TTS**: Eliminated the 10s delay on manual speaker-button clicks by persisting the Kokoro model in memory.
@@ -93,6 +136,7 @@ V19.5 is the **Forensic Reliability Update**, focusing on eliminating execution 
     - **Zero-Latency TTS**: Implemented "Keep-Warm" strategy for Kokoro (sub-2s responses).
     - **Unified Audio**: Migrated to `sounddevice` + `pygame` for robust cross-platform playback.
     - **MSI Ready**: Optimized Tauri bundle configuration for production Windows installs.
+
 ---
 
 ## ⌨️ Keyboard Shortcuts

@@ -134,8 +134,8 @@ def open_app(app_name: str) -> str:
     """Open a desktop application by name or path."""
     import shutil
     import subprocess
+    import psutil
     
-    # FIX 1: App Resolution Layer
     # 1. Normalize input
     name = app_name.lower().strip()
     
@@ -155,15 +155,53 @@ def open_app(app_name: str) -> str:
     
     target = APP_MAP.get(name, name)
     
-    # 3. Resolve path via shutil.which
+    # 3. Process Check: Check if app is already running
+    is_running = False
+    proc_target = target if target.endswith(".exe") else f"{target}.exe"
+    for proc in psutil.process_iter(['name']):
+        try:
+            if proc.info['name'] and proc.info['name'].lower() == proc_target.lower():
+                is_running = True
+                break
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+
+    if is_running:
+        # Attempt to focus the window on Windows
+        try:
+            import win32gui
+            import win32con
+            focused = [False]
+            
+            def callback(hwnd, extra):
+                if win32gui.IsWindowVisible(hwnd):
+                    title = win32gui.GetWindowText(hwnd).lower()
+                    if name in title or target.lower() in title:
+                        # Restore and bring to front
+                        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                        win32gui.SetForegroundWindow(hwnd)
+                        focused[0] = True
+                        return False # Stop enumeration
+                return True
+                
+            try:
+                win32gui.EnumWindows(callback, None)
+            except Exception:
+                pass
+                
+            if focused[0]:
+                return f" '{app_name}' is already running. Focused its active window."
+            return f" '{app_name}' is already running."
+        except Exception:
+            return f" '{app_name}' is already running."
+
+    # 4. Resolve path via shutil.which
     resolved_path = shutil.which(target)
     if not resolved_path and target != name:
         resolved_path = shutil.which(name)
     
     try:
         if resolved_path:
-            # FIX 2: Safe Execution
-            # subprocess.Popen is preferred for background exes to avoid blocking
             if resolved_path.lower().endswith(".exe"):
                 subprocess.Popen([resolved_path], shell=False, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008) # DETACHED_PROCESS
                 return f" Launched '{app_name}' (resolved to: {resolved_path})."
@@ -171,13 +209,11 @@ def open_app(app_name: str) -> str:
                 os.startfile(resolved_path)
                 return f" Opened '{app_name}' (resolved to: {resolved_path})."
         
-        # 4. Fallback to OS (os.startfile)
-        # This handles UWP apps, shell protocols (e.g. 'whatsapp:'), and registered apps
+        # Fallback to OS (os.startfile)
         os.startfile(app_name)
         return f" Launched '{app_name}' via OS shell fallback."
         
     except Exception as e:
-        # FIX 3: Validation (Catching launch failures)
         return f" Failed to resolve or launch '{app_name}': {e}"
 
 @tool

@@ -1,0 +1,21 @@
+Startup Error (Setup Mode Triggered):
+Traceback (most recent call last):
+  File "D:\Personal Projects\Sakura V10\backend\server.py", line 148, in lifespan
+    assistant = SmartAssistant()
+  File "D:\Personal Projects\Sakura V10\backend\sakura_assistant\core\llm.py", line 68, in __init__
+    router_llm = self.container.get_router_llm()
+  File "D:\Personal Projects\Sakura V10\backend\sakura_assistant\core\infrastructure\container.py", line 132, in get_router_llm
+    self._llms[key] = self._create_reliable_llm(
+                      ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        stage="router",
+        ^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        name="Router",
+        ^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Personal Projects\Sakura V10\backend\sakura_assistant\core\infrastructure\container.py", line 235, in _create_reliable_llm
+    primary = self._build_provider_llm(provider=provider, model=model, temperature=temperature, stage=stage)
+  File "D:\Personal Projects\Sakura V10\backend\sakura_assistant\core\infrastructure\container.py", line 314, in _build_provider_llm
+    from langchain_groq import ChatGroq
+ModuleNotFoundError: No module named 'langchain_groq'

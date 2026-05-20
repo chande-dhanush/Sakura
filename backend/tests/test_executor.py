@@ -1,7 +1,6 @@
 """
-Test Suite: Executor Module
-===========================
-Tests for the ToolExecutor class.
+Test Suite: Executor Module & OneShotRunner (Sakura Lite)
+========================================================
 """
 import unittest
 import sys
@@ -10,7 +9,9 @@ import os
 # Add parent to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sakura_assistant.core.execution.executor import ToolExecutor, ExecutionResult, ExecutionStatus, ToolRunner, OutputHandler
+from sakura_assistant.core.execution.executor import validate_path, SecurityError
+from sakura_assistant.core.execution.oneshot_runner import OneShotRunner
+from sakura_assistant.core.execution.context import ExecutionContext, ExecutionResult, ExecutionStatus, ExecutionMode
 
 
 class MockTool:
@@ -22,14 +23,8 @@ class MockTool:
     def invoke(self, args: dict) -> str:
         return self._result
 
-
-class FailingTool:
-    """Tool that always fails."""
-    def __init__(self, name: str):
-        self.name = name
-    
-    def invoke(self, args: dict) -> str:
-        raise Exception("Tool failed intentionally")
+    async def ainvoke(self, args: dict) -> str:
+        return self._result
 
 
 class MockLLM:
@@ -39,136 +34,107 @@ class MockLLM:
     def invoke(self, *args, **kwargs):
         return self.response
     async def ainvoke(self, *args, **kwargs):
-        return self.response
+        from langchain_core.messages import AIMessage
+        return AIMessage(content=self.response)
+    def bind_tools(self, tools):
+        return self
 
 
-class TestToolExecutor(unittest.TestCase):
-    """Test ToolExecutor functionality."""
+class TestPathValidation(unittest.TestCase):
+    """Test path validation and sanitization security gates."""
     
-    @classmethod
-    def setUpClass(cls):
-        """Import the executor."""
-        cls.ToolExecutor = ToolExecutor
-        cls.ExecutionResult = ExecutionResult
-        cls.ToolRunner = ToolRunner
-        cls.OutputHandler = OutputHandler
-        cls.MockLLM = MockLLM()
-    
-    def test_execute_single_success(self):
-        """Test single tool execution success."""
-        tools = [MockTool("test_tool", "Success!")]
-        executor = self.ToolExecutor(tools, self.MockLLM)
-        runner = ToolRunner(executor.tool_map, executor.policy)
-        run_res = runner.run("test_tool", {})
+    def test_safe_paths(self):
+        """Verify safe paths pass validation."""
+        self.assertTrue(len(validate_path("notes/my_note.txt")) > 0)
+        self.assertTrue(len(validate_path("data/world_graph.json")) > 0)
         
-        self.assertTrue(run_res.success)
-        self.assertEqual(run_res.output, "Success!")
-    
-    def test_execute_single_not_found(self):
-        """Test single tool execution with missing tool."""
-        executor = self.ToolExecutor([])
-        runner = ToolRunner(executor.tool_map, executor.policy)
-        run_res = runner.run("missing_tool", {})
-        
-        self.assertFalse(run_res.success)
-        self.assertIn("not found", run_res.output)
-    
-    def test_execute_plan_success(self):
-        """Test plan execution with multiple tools."""
-        tools = [
-            MockTool("tool_a", "Result A"),
-            MockTool("tool_b", "Result B"),
-        ]
-        executor = self.ToolExecutor(tools, self.MockLLM)
-        
-        steps = [
-            {"id": 1, "tool": "tool_a", "args": {}},
-            {"id": 2, "tool": "tool_b", "args": {}},
-        ]
-        
-        # Use react_loop._execute_steps for multi-step mechanical test
-        result = executor.react_loop._execute_steps(steps, "test input", None)
-        self.assertEqual(result.tool_used, "tool_b")
-        self.assertIn("Result A", result.outputs)
-        self.assertIn("Result B", result.outputs)
-        self.assertEqual(len(result.tool_messages), 2)
-    
-    def test_execute_plan_partial_failure(self):
-        """Test plan execution with one failing tool."""
-        tools = [
-            MockTool("good_tool", "OK"),
-            FailingTool("bad_tool"),
-        ]
-        executor = self.ToolExecutor(tools, self.MockLLM)
-        
-        steps = [
-            {"id": 1, "tool": "good_tool", "args": {}},
-            {"id": 2, "tool": "bad_tool", "args": {}},
-        ]
-        
-        # Use react_loop._execute_steps for multi-step mechanical test
-        result = executor.react_loop._execute_steps(steps, "test input", None)
-        
-        self.assertTrue(result.succeeded)  # Partial success (good_tool worked)
-        self.assertEqual(result.status, ExecutionStatus.PARTIAL)
-        self.assertIn("Error", result.outputs)
-    
-    def test_execute_plan_max_iterations(self):
-        """Test that plan execution respects max_iterations."""
-        tools = [MockTool(f"tool_{i}", f"Result {i}") for i in range(10)]
-        executor = self.ToolExecutor(tools, self.MockLLM)
-        
-        steps = [{"id": i, "tool": f"tool_{i}", "args": {}} for i in range(10)]
-        
-        # Temporarily inject steps for the test
-        executor.react_loop.max_iterations = 3
-        result = executor.react_loop._execute_steps(steps, "test input", None)
-        
-        # Should only execute 3 steps
-        self.assertEqual(len(result.tool_messages), 3)
-    
-    def test_prune_output_short(self):
-        """Test that short outputs are not pruned."""
-        handler = OutputHandler()
-        short_text = "This is a short output."
-        result = handler.prune(short_text)
-        self.assertEqual(result, short_text)
-    
-    def test_prune_output_long_text(self):
-        """Test that long text is truncated."""
-        handler = OutputHandler()
-        long_text = "x" * 2000
-        result = handler.prune(long_text, max_chars=100)
-        self.assertLess(len(result), 200)
-        self.assertIn("TRUNCATED", result)
-    
-    def test_prune_output_json(self):
-        """Test JSON-aware pruning."""
-        handler = OutputHandler()
-        large_json = '{"html_body": "' + "x" * 5000 + '", "title": "Test"}'
-        result = handler.prune(large_json, max_chars=500)
-        self.assertIn("title", result)
-        self.assertLess(len(result), 600)
+    def test_dangerous_paths(self):
+        """Verify dangerous paths raise SecurityError."""
+        with self.assertRaises(SecurityError):
+            validate_path("../../../etc/passwd")
+            
+        with self.assertRaises(SecurityError):
+            validate_path("c:\\windows\\system32\\cmd.exe")
 
 
-class TestExecutionResult(unittest.TestCase):
-    """Test ExecutionResult dataclass."""
-    
-    def test_dataclass_fields(self):
-        """Test ExecutionResult has correct fields."""
-        from sakura_assistant.core.execution.executor import ExecutionResult, ExecutionStatus
-        
-        result = ExecutionResult(
-            outputs="test output",
-            tool_messages=[],
-            tool_used="test_tool",
-            last_result={"tool": "test_tool", "success": True},
-            status=ExecutionStatus.SUCCESS
+class TestOneShotRunner(unittest.TestCase):
+    """Test OneShotRunner execution pipeline."""
+
+    def test_execute_not_found(self):
+        """Test executing a tool that does not exist in map."""
+        runner = OneShotRunner(tool_map={}, llm=MockLLM())
+        ctx = ExecutionContext.create(
+            mode=ExecutionMode.ONE_SHOT,
+            request_id="test_req",
+            user_input="test input"
         )
         
-        self.assertEqual(result.outputs, "test output")
-        self.assertEqual(result.tool_used, "test_tool")
-        self.assertTrue(result.succeeded)
+        # Running via asyncio.run since aexecute is async
+        import asyncio
+        result = asyncio.run(runner.aexecute("missing_tool", ctx))
+        
+        self.assertEqual(result.status, ExecutionStatus.FAILED)
+        self.assertIn("not found", result.outputs)
+
+    def test_execute_success(self):
+        """Test successful execution with regex/mock tool."""
+        mock_tool = MockTool("get_system_info", "CPU 10%")
+        runner = OneShotRunner(tool_map={"get_system_info": mock_tool}, llm=MockLLM())
+        ctx = ExecutionContext.create(
+            mode=ExecutionMode.ONE_SHOT,
+            request_id="test_req",
+            user_input="get system info"
+        )
+        
+        import asyncio
+        result = asyncio.run(runner.aexecute("get_system_info", ctx))
+        
+        self.assertEqual(result.status, ExecutionStatus.SUCCESS)
+        self.assertEqual(result.tool_used, "get_system_info")
+
+
+class TestMultiStepPlanner(unittest.TestCase):
+    """Test MultiStepPlanner execution pipeline."""
+
+    def test_execute_success(self):
+        """Test successful planning loop where tool is executed."""
+        from sakura_assistant.core.execution.planner import MultiStepPlanner
+        from langchain_core.messages import AIMessage
+        
+        class MockPlanningLLM:
+            def __init__(self):
+                self.calls = 0
+            def bind_tools(self, tools):
+                return self
+            async def ainvoke(self, messages):
+                self.calls += 1
+                if self.calls == 1:
+                    # Request tool call
+                    msg = AIMessage(content="Let's run the tool.")
+                    msg.tool_calls = [{
+                        "name": "get_system_info",
+                        "args": {},
+                        "id": "call_123"
+                    }]
+                    return msg
+                else:
+                    # Return final text
+                    return AIMessage(content="The CPU is 10%. Done.")
+        
+        mock_tool = MockTool("get_system_info", "CPU 10%")
+        planner = MultiStepPlanner(tool_map={"get_system_info": mock_tool}, llm=MockPlanningLLM())
+        ctx = ExecutionContext.create(
+            mode=ExecutionMode.ITERATIVE,
+            request_id="test_req",
+            user_input="how is the system status?"
+        )
+        
+        import asyncio
+        result = asyncio.run(planner.aexecute(ctx))
+        
+        self.assertEqual(result.status, ExecutionStatus.SUCCESS)
+        self.assertEqual(result.tool_used, "get_system_info")
+        self.assertIn("The CPU is 10%. Done.", result.outputs)
 
 
 if __name__ == "__main__":

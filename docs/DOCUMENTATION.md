@@ -1,874 +1,171 @@
-# Sakura V19.6 — Execution Stability & Hardening
-*System Certified: May 1, 2026*
+# Sakura V21.1-LITE — Technical Specification
+*System Certified: May 20, 2026*
 
 ---
 
 ## 🎯 Overview
-**Sakura** is a production-grade personal AI assistant optimized for cost, performance, and CPU-only deployment.
-**V17.5 "Precise Soul":** Featuring **Model-Specific Token Counting**, **SSE Tool Streaming**, V17.4 **Observability Fix**, plus all prior architecture (Stable Soul, Dependency Injection, Search Cascade).
-**V18.1 "Ironclad Reliability":** 8-point surgical fix sprint eliminating production bugs: Fixed Token Tracking (BUG-04), Tool Result Propagation (BUG-05), Memory Recall Routing (BUG-08), Personal Fact Persistence (BUG-03), Tool Hint Alignment (BUG-01), Weather Hallucination Guard (BUG-02), Cleaner Arg Extraction (BUG-06), and Executor Success Guard (BUG-07).
-**V19.0 "DeepSeek Integration":** Added DeepSeek as a first-class provider. Implemented request-time LLM overrides for stage-specific model hot-swapping. Enforced request-scoped safety rails (MAX_LLM_CALLS) across the full request lifecycle (Router -> Planner -> Verifier -> Responder).
-**V19.2 "Execution Stability & Hardening":** Resolved critical regressions in clipboard routing and planning loops. Implemented tool alias normalization and terminal action enforcement for system-level tasks. Hardened metadata preservation during budget failures to eliminate `mode="unknown"` issues.
-**V19.5 "Voice I/O Hardening":** Full-stack forensic audit and production readiness overhaul. Replaced legacy voice stack with Groq Whisper (STT), Kokoro (TTS), and openWakeWord. Implemented "zero-setup" first-run model downloads and project-relative storage. Optimized Tauri MSI bundling for seamless distribution.
-**V19.6 "Abstention & Confidence Gating":** Implemented surgical reliability fixes to reduce hallucinations. Added `LOW_CONFIDENCE` propagation flow, one-shot nonsense retries in `ToolRunner`, and conditional tone softening in the `Responder` for factual queries without tool verification.
-**V20.0 "Deterministic Execution & Model Isolation":** Finalized execution pipeline hardening. Implemented deterministic tool call deduplication via request-scoped caching and argument normalization. Refactored rate limiting into a model-specific registry to prevent cross-throttling. Enhanced `open_app` with natural language resolution and PATH integration.
 
+**Sakura Lite** is a desktop-integrated AI assistant optimized for low latency, high reliability, and minimal resource footprint on local environments. 
 
-**Tech Stack:** Tauri + Svelte (frontend), FastAPI + LangChain (backend), multi-model LLM support (Groq, Gemini).
+### **The Lite Philosophy**
+Sakura Lite abandons complex multi-turn AGI-like cognitive loops (ReAct planner, verification cascades, and emotional metabolic ticks) in favor of a **deterministic single-turn execution flow**. By focusing on spatial operating system context (screen, clipboard, active window) and high-speed pronoun reference resolution, Sakura Lite achieves sub-second responsiveness while running on a single developer machine.
 
----
+*   **V21.0 "Sakura Lite Transition" (Current):** Purged legacy cognitive systems (Desire system, Planner loop, Verifier chain) and consolidated all storage (settings, graph, memory metadata, conversation logs) into a single, WAL-enabled thread-safe SQLite database (`data/sakura.db`). Replaced Docker with a secure local Python execution sandbox. Streamlined execution flow around `OneShotRunner`.
+*   **V20.0 "Deterministic Execution & Isolation":** Implemented tool call deduplication and registry-level rate-limiting isolation.
+*   **V19.5 "Voice I/O Hardening":** Upgraded local audio interfaces with Kokoro TTS, Groq Whisper (STT), and openWakeWord. Implemented Keep-Warm TTS runtime.
+*   **V19.0 "Model Abstraction":** Introduced modular stage models and request-time overrides.
 
-## 🛡️ Reliability & Uncertainty Handling (V19.6)
-
-Sakura V19.6 introduces a "Low Confidence" propagation layer to handle ambiguous or failing execution paths gracefully without hallucinating.
-
-### **The LOW_CONFIDENCE Flow**
-1.  **Detection (ToolRunner)**: If a tool returns nonsense (repeated characters, empty strings) after one retry, it is flagged as `[LOW_CONFIDENCE]`.
-2.  **Propagation (ReActLoop)**: The loop detects this flag and terminates immediately to prevent the Planner from trying to "fix" the nonsense with more tools.
-3.  **Consumption (Responder)**: The flag is passed to the ResponseGenerator, which switches to a cautious tone.
-
-### **Abstention Policy**
-Sakura follows a strict "no guessing" rule defined in `SYSTEM_PERSONALITY`. 
-- If information is missing, unclear, or inconsistent, Sakura is instructed to say she is unsure or ask a clarifying question.
-- **Ambiguity Handling**: Queries like "What's the weather?" without a location are routed to `CHAT` by the Router to ask for the missing info once, rather than entering a blind execution loop.
-
-### **Tool Sanity Checks**
-- **One-Shot Retry**: Every tool execution is validated for "nonsense" patterns. If detected, the system retries exactly once before failing over.
-- **Fallback**: Persistent failures result in a `[LOW_CONFIDENCE]` marker rather than an exception crash or a fake success claim.
-
-### **Conditional Tone Logic**
-Sakura's tone adapts based on execution certainty:
-- **Sharp/Confident**: Standard chat and successful tool execution.
-- **Softened/Cautious**: If a factual query (`requires_facts`) is answered without tools or with `[LOW_CONFIDENCE]` data, Sakura prepends cautious phrasing (e.g., "I might be wrong, but...").
+**Tech Stack:** Tauri + Svelte (frontend client), FastAPI + Python (backend server), SQLite (state store), Groq/Gemini API (cloud inference), Kokoro + openWakeWord (local audio).
 
 ---
 
-## ✨ Feature Matrix
+## ⚡ Execution Pipeline: One-Shot Runner
 
-| Feature | Version | Description |
-|---------|---------|-------------|
-| World Graph | V7+ | Single source of truth for identity, memory, context |
-| EQ Layer | V7+ | Frustration/urgency detection, mood-aware responses |
-| Self-Check Guard | V7+ | Validates responses against graph identity |
-| Iterative ReAct Loop | V8+ | Plan → Execute → Observe → Replan (max 5 turns) |
-| Ephemeral RAG | V8+ | Session-scoped document memory with Chroma |
-| Hard 4-LLM Call Limit | V5+ | Circuit breaker prevents runaway costs |
-| Multi-LLM Failover | V5+ | Groq → Gemini cascade with timeout protection |
-| Memory Judger | V4+ | LLM-based importance filtering |
-| 54 Tools | V13 | Gmail, Calendar, Spotify, Notes, Vision, RAG, Code, Audio |
-| Kokoro TTS | V19.5 | Neural voice synthesis with Keep-Warm (sub-2s) |
-| openWakeWord | V19.5 | ONNX-accelerated "Sakura" voice activation |
-| Auto-Setup | V19.5 | Zero-manual download first-run model staging |
-| Smart Router | V10+ | DIRECT/PLAN/CHAT classification with tool hints |
-| DIRECT Fast Lane | V10+ | Skip Planner+Verifier for single-tool actions |
-| Tool Cache | V10+ | TTL-based cache for weather, search, etc. |
-| Tauri UI | V10+ | Native desktop app with Svelte frontend |
-| SSE Streaming | V10+ | Real-time token streaming via FastAPI |
-| Thought Stream | V12+ | Real-time WebSocket reasoning feed for UI |
-| Code Interpreter | V13 | Execute Python in Docker sandbox |
-| Temporal Decay | V13 | Memory confidence decays over time (30-day half-life) |
-| Unified ReflectionEngine | V14 | Background constraint detection (saves 1 LLM call) |
-| Sleep Cycle | V14 | Startup fact crystallization with 24h cooldown |
-| DesireSystem | V15 | CPU-based mood tracking (social_battery, loneliness) |
-| ProactiveScheduler | V15 | Autonomous check-ins when lonely (0 daytime LLM cost) |
-| Mood Injection | V15 | Responder adapts tone based on internal state |
-| Pre-Computed Initiations | V15 | 3 AM icebreaker generation for next-day use |
-| **Bubble-Gate** | **V15.2** | Respects UI visibility — won't interrupt when hidden |
-| **Message Queue (TTL)** | **V15.2** | Queues proactive messages for 2h when hidden |
-| **CPU Guard** | **V15.2** | Skips TTS when CPU > 80% to prevent stutter |
-| **Reactive Themes** | **V15.2** | UI colors shift based on mood (5 palettes) |
-| **Temporal Grounding** | **V15.2.1** | Router injects current date/time to prevent 2024 hallucinations |
-| **Tool Result Assertion** | **V15.2.1** | Dev guard catches "tool succeeded but responder denied" bug |
-| **RRULE Recurrence** | **V15.2.1** | "everyday" → RRULE:FREQ=DAILY for proper recurring events |
-| **Stale Date Guard** | **V15.2.1** | Calendar rejects dates >1 year in past |
-| **Dev Mode Sidecar Bypass** | **V15.2.1** | Debug builds use Python directly, not bundled sidecar |
-| **Port 3210** | **V15.2.1** | Changed from 8000 to avoid conflicts with other apps |
-| **WebSocket Origin Validation** | **V15.2.2** | Prevents hijacking attacks from malicious websites |
-| **Path Injection Defense** | **V15.2.2** | DANGEROUS_PATTERNS + Unicode normalization |
-| **Scraped Content Sanitization** | **V15.2.2** | Filters prompt injection from web content |
-| **RLock Thread Safety** | **V15.2.2** | Prevents TOCTOU race conditions in ProactiveState |
-| **Backoff Persistence** | **V15.2.2** | Failed initiation count survives app restarts |
-| **Deterministic Context Router** | **V15.4** | Unified `ContextManager.get_context_for_llm()` for all context injection |
-| **ContextSignals** | **V15.4** | Dataclass-driven regex signals for deterministic routing (Identity, Location, Temporal) |
-| **Mode-Based Pruning** | **V15.4** | Planner gets compact context, Responder gets full context |
-| **Unified Context API** | **V15.4** | Single source of truth returns 5 blocks (planner, responder, summary, intent, mood) |
-| **Sync/Async Parity** | **V15.4** | DesireSystem mood injection verified in both `run()` and `arun()` paths |
-| **Reactive Identity** | **V16.0** | `IdentityManager` + `EventBus` broadcasts identity changes instantly (Zombie Fix) |
-| **Micro-Toolsets** | **V16.0** | Intent-based minimal toolsets with `UNIVERSAL_TOOLS` safety net |
-| **Deterministic Hallucination Block** | **V16.0** | Regex-based self-check in `Responder` prevents identity lies (< 1ms) |
-| **Context Caching** | **V16.0** | Single `WorldGraph` traversal per turn (shared Plan/Respond), saves 50% tokens |
-| **Search Cascade** | **V16.1** | `TOOL_HIERARCHY` prefers Wikipedia > Tavily, unlocks fallback on retry |
-| **Semantic Tool Gating** | **V16.1** | `encyclopedia` intent hides general search to improve fact quality |
-| **Seamless Self-Check** | **V16.1** | Identity corrections are natural and polite, no debug-style notes |
-| **Dependency Injection** | **V16.2** | `WorldGraph` decoupled from `IdentityManager`; constructor injection used |
-| **Execution V17** | **V17.0** | Unified Sync/Async paths, Contractual Latency Budgets, `ExecutionDispatcher` |
-| **Core Refactor** | **V17.0** | Bloated `core/` split into 6 logical subdirectories (Encryption, Graph, Routing...) |
-| **Guaranteed Emission** | **V17.0** | `ResponseEmitter` ensures 0% silent failures (UI safety net) |
-| **Token Tracking Fix** | **V17.4** | `FlightRecorder.log_llm_call()` invoked from `ReliableLLM` wrapper |
-| **Cost Calculation** | **V17.4** | Real-time cost tracking per LLM call using `MODEL_COSTS` |
-| **Groq XML Recovery Logging** | **V17.4** | Estimated tokens logged for recovered Groq API errors |
-| **Precise Token Counting** | **V17.5** | Model-specific tokenizers: tiktoken (GPT), calibrated heuristics (Llama/Gemini/Claude) |
-| **SSE Tool Streaming** | **V17.5** | Real-time progress updates during slow tool execution via `ProgressEmitter` |
-| **Execution Budget** | **V18.0** | Hard LLM call enforcement (limit: 6) via `execution_context_var` contextvar |
-| **Fidelity Check Regeneration** | **V18.0** | Deterministic check forces Responder to regenerate if tool outputs are silently ignored |
-| **Search Cascade Parity** | **V18.0** | Tier-1 failure auto-triggers Tier-2 fallback synchronously AND asynchronously |
-| **Fact-Gate Routing** | **V18.0** | Wh-questions forced to PLAN/DIRECT to strictly prevent zero-tool CHAT hallucinations |
-| **Universal Ephemeral** | **V18.0** | `query_ephemeral` embedded in `UNIVERSAL_TOOLS` for guaranteed contextual continuity |
-| **Planner Error Visibility** | **V18.0** | ReActLoop parsing errors escalated to Responder so users aren't left in the dark |
-| **Hallucination Gateway** | **V18.0** | Intercepts malformed tool inputs (URLs instead of JSON) and safely redirects |
-| **Ephemeral Data Reasoning** | **V18.0** | Detects virtual handles; forces `data_reasoning=True` upon Responder generation |
-| **Negative Search Specificity** | **V18.0** | Regex exclusions prevent generic `search` from swallowing specialized intents |
-| **AI Vision (Lllama-4-Scout)** | **V18.0** | Dedicated Groq-hosted vision layer for screenshot/image analysis with fallback |
-| **V18.1 Reliability Sprint** | **V18.1** | 8-part reliability patch fixing token tracking, tool hints, and memory recall |
-| **DeepSeek Provider** | **V19.0** | First-class integration for DeepSeek V3/V4 (OpenAI-compatible direct API) |
-| **Model Abstraction** | **V19.0** | Independent model/provider configuration for every stage (Router, Planner, Responder, Verifier) |
-| **Request Overrides** | **V19.0** | `llm_overrides` support in `/chat` allows dynamic model selection per request |
-| **Unified Budgeting** | **V19.0** | `max_llm_calls` budget synced between `AgentState` and `ExecutionContext` for full-lifecycle protection |
-| **UI Configuration Gating**| **V19.0** | Setup UI disables providers with missing API keys and validates DeepSeek model requirements |
-| **Terminal Enforcement** | **V19.2** | System actions (clipboard, screen) terminate planning loops instantly to save budget |
-| **Tool Alias Resilience** | **V19.2** | Support for common hallucinated names (e.g., `read_clipboard` → `clipboard_read`) |
-| **Metadata Hardening** | **V19.2** | Guarantees consistent `mode` and `tool_used` metadata in all error/budget paths |
-| **MemoryManager Labels** | **V19.5** | Relabeled SummaryMemory calls to prevent false "Planner" spans in CHAT traces |
-| **Trace Propagation** | **V19.5** | Explicit `trace_id` passing for background tasks (e.g., MemoryJudger) |
-| **TTS Keep-Warm** | **V19.5** | Removed aggressive offloading to eliminate 10s latency on speaker button |
-| **Tauri Audio Access** | **V19.5** | Fixed asset protocol permissions for `temp_audio` in dev mode |
-| **Voice Production Flag** | **V19.5** | Ensured `--voice` is passed to the sidecar in production builds |
-| **Tool Call Deduplication**| **V20.0** | Request-scoped cache with recursive argument normalization prevents redundant tool runs |
-| **Model Isolation RL** | **V20.0** | Per-model Token Buckets prevent Groq/Gemini cross-throttling |
-| **Natural App Resolution**| **V20.0** | `open_app` supports names (vscode, brave) via APP_MAP and PATH resolution |
-| **Safe Async Limiting** | **V20.0** | Refactored lock management in rate limiter for async cancellation safety |
+Rather than looping through multi-turn agentic thoughts, Sakura Lite resolves queries using a high-speed, single-turn execution model.
 
----
-
-## 🧱 Architecture: Stable Soul (V16 / V16.2)
-
-### 1. The ID-EventBus System
-V16 solves state synchronization issues ("Zombie Identity") by decoupling `world_graph.py` from hardcoded configs.
-- **IdentityManager**: Singleton loading from `user_settings.json`.
-- **EventBus**: Pub/Sub system where `WorldGraph` subscribes to `IDENTITY_CHANGED`.
-- **Flow**: User updates `/setup` → IdentityManager refreshes → EventBus broadcasts → WorldGraph updates RAM instance.
-
-### 2. Dependency Injection (V16.2)
-To eliminate circular dependencies between `WorldGraph` and `IdentityManager`:
-- **IdentityManager** is injected into `WorldGraph`'s constructor.
-- Lazy imports inside property methods (`@property def USER_NAME`) have been **removed**.
-- This enforces a clean DAG (Directed Acyclic Graph) for module dependencies.
-
-### 3. Micro-Toolsets & Search Cascade (V16.1)
-To break the "Tavily Trap" (LLM laziness using general search for everything), V16 implements strict gating with a safety fallback.
-
-#### The Hierarchy
-1. **Tier 1 (Specialized):** Wikipedia, Arxiv, Spotify, Calendar.
-2. **Tier 2 (General):** Web Search (Tavily), Google.
-
-#### The Cascade Logic
-- **Pass 1 (Gated):** Query "Who is Elon Musk?" → `[search_wikipedia, quick_math, system]` (Tavily HIDDEN).
-- **Pass 2 (Fallback):** If Wikipedia returns empty/error, `Planner` retries with `fallback_mode=True` → `[web_search, ...]` (Tavily UNLOCKED).
-
-This structure ensures 90% of factual queries use high-signal, low-token APIs (Wikipedia), while strictly preserving coverage via the fallback.
-
-### 4. V17 Execution Architecture
-V17 introduces a hardened execution pipeline that eliminates "split-brain" bugs between sync and async modes.
-- **ExecutionDispatcher:** Central routing logic that chooses between `OneShotRunner` (fast lane) and `ReActLoop` (complex lane) based on `ExecutionContext`.
-- **Contractual Budgets:** `ReActLoop` now enforces strict time budgets (e.g., 20s for research) using `asyncio.wait_for()`, returning `PARTIAL` status on timeout.
-- **Unified Path:** Both `run()` (sync) and `arun()` (async) now flow through the same Dispatcher, ensuring identical behavior.
-
----
-
-## 🎭 Sakura V19.0 — Model Abstraction & Request Overrides
-
-V19 introduces a flexible, decoupled LLM abstraction layer that allows for granular control over which model handles which stage of the cognitive process.
-
-### 1. Granular Stage Assignment
-Users can now configure independent providers and models for:
-*   **Router**: (Groq/Gemini recommended for speed)
-*   **Planner**: (DeepSeek V4 Flash recommended for complex reasoning)
-*   **Responder**: (GPT-4o or DeepSeek V3 for personality)
-*   **Verifier**: (Groq for fast fact-checking)
-
-### 2. Request-Time Overrides
-The `/chat` endpoint now accepts an optional `llm_overrides` object, allowing the frontend (or API users) to hot-swap models for a single turn:
-```json
-{
-  "query": "Solve this complex math problem",
-  "llm_overrides": {
-    "planner": {
-      "provider": "deepseek",
-      "model": "deepseek-v4-flash"
-    }
-  }
-}
+```
+                      +-----------------------------------+
+                      |         Tauri Svelte UI           |
+                      +-----------------------------------+
+                                        ^
+                                        | (Local WebSockets / HTTP)
+                                        v
+                      +-----------------------------------+
+                      |         FastAPI Backend           |
+                      +-----------------------------------+
+                                        |
+                               [User Input / Hotkey]
+                                        |
+                                        v
+                         +-----------------------------+
+                         |  Regex Tool Router (Local)  |
+                         +-----------------------------+
+                           /                         \
+                (Matches Regex)                     (No Match)
+                         /                             \
+                        v                               v
+             +--------------------+           +-------------------+
+             | Direct Python Tool |           | Single-Turn LLM   |
+             | Execution (<150ms) |           | Extraction Route  |
+             +--------------------+           +-------------------+
+                        \                               /
+                         \                             /
+                          v                           v
+                      +-----------------------------------+
+                      |    Thread-Safe SQLite Database    |
+                      |  (Memory, Notes, WorldGraph, Log) |
+                      +-----------------------------------+
 ```
 
-### 3. DeepSeek as a First-Class Provider
-DeepSeek is integrated via a direct OpenAI-compatible driver. Unlike "auto" providers that might guess a model ID, DeepSeek requires **explicit model configuration** (e.g., `deepseek-v4-flash`) to ensure compatibility and performance.
+### **1. Local Regex Fast Lane**
+Direct queries that match registered regex patterns (e.g., "open vscode", "read my clipboard", "what's on my screen") bypass the LLM routing stage entirely. The FastAPI backend dispatches them to their respective system utility tools in **<50ms**.
 
-### 4. Lifecycle Budget Enforcement
-The `MAX_LLM_CALLS` limit (default: 6) is now enforced across the **entire request**. 
-*   **Router**: Counts as 1 call.
-*   **Planner**: Counts toward the loop limit.
-*   **Verifier**: Counts as 1 call.
-*   **Responder**: Counts as 1 call.
-If the combined count exceeds the limit, the system gracefully terminates with an `LLMBudgetExceededError` to prevent runaway costs.
+### **2. OneShotRunner (DIRECT Mode)**
+For standard singular actions that require LLM extraction (e.g., "remind me to call John in 10 minutes" or "what is the weather in Paris?"), the router classifies the task as `DIRECT`. The `OneShotRunner` extracts parameters and runs the tool in a single turn.
+
+### **3. MultiStepPlanner (PLAN Mode)**
+For complex, multi-step queries (e.g., research, code writing, or multi-stage calculations), the router classifies the task as `PLAN`. The `MultiStepPlanner` initiates a lightweight ReAct planning loop (up to 4 turns). It executes tools sequentially, analyzes observations, and synthesizes a final response, keeping the loop structured and observable without heavy cognitive overhead.
 
 ---
 
-## 🌸 Sakura V19.2 — Execution Stability & Hardening
+## 💾 Unified SQLite Data Layer
 
-V19.2 addresses operational "ghosting" bugs where tools were successfully executed but the pipeline failed to terminate or report the status correctly.
+All historical JSON files and concurrent databases have been consolidated into `data/sakura.db` running in WAL (Write-Ahead Logging) mode. A Python `threading.RLock` protects all writes to prevent Windows sharing violations.
 
-### 1. Terminal Action Enforcement
-* **The Vulnerability:** Certain system tools (like `clipboard_read`) were not marked as terminal, causing the Planner to repeatedly generate "Next Step: read clipboard" in a loop until the budget was exhausted.
-* **The Fix:** Added a `TERMINAL_ACTIONS` registry in `ExecutionPolicy`. Once a tool in this registry succeeds, the `ReActLoop` breaks immediately, saving up to 66% of the LLM budget for simple tasks.
-
-### 2. Tool Alias Normalization
-* **The Vulnerability:** LLMs frequently hallucinate `read_clipboard` or `write_clipboard` despite the registry using `clipboard_read`. This led to unnecessary "Tool not found" errors and planning retries.
-* **The Fix:** Implemented a tool alias layer in `tools.py`. Hallucinated names are now first-class mappings to the underlying tool implementations.
-
-### 3. Direct Path Intent Exceptions
-* **The Vulnerability:** Aggressive reference resolution triggers ("my ", "that ") forced queries like "read my clipboard" into the Planner (PLAN), adding 3+ LLM calls of latency for a static system task.
-* **The Fix:** Updated `router.py` with intent-specific exceptions. System nouns like "clipboard", "screen", and "volume" now bypass the PLAN trigger even when possessives are used, forcing a high-speed `DIRECT` route.
-
-### 4. Mode & Metadata Persistence
-* **The Vulnerability:** Exceptions (Budget/Timeout) occasionally returned `mode="unknown"` and empty tool lists in metadata, breaking auditability.
-* **The Fix:** Hardened the pipeline's error response contract to always preserve the `RouteResult` classification and accurately reflect any tools that were executed prior to the failure.
+### **Table Schema**
+*   **`settings`:** Key-value storage mapping user settings, bio, and temporal cache.
+*   **`conversations`:** Chronological chat history.
+*   **`memory_items`:** Extracted facts and FAISS indices pointing to the raw index binary (`data/faiss_index.bin`).
+*   **`entities` / `actions` / `responses`:** Structured World Graph representation of pronouns, nouns, and actions. High-overhead float-based emotional decay math has been purged.
+*   **`reminders`:** Scheduler state for future events.
+*   **`traces`:** Flight Recorder trace logs.
 
 ---
 
-## 🌸 Sakura V19.5 — Reliability Audit & Restoration
+## 🧠 Context Intelligence Layer (V21.1)
 
-V19.5 represents a comprehensive forensic audit to eliminate "ghost" planner calls and restore full-stack Voice/TTS functionality.
+These engines were added in the Post-Refactor Refinement Phase (Phases A-E) to transform Sakura from a clean architecture into a genuinely attentive, context-aware workflow companion — without reintroducing AGI theater, synthetic emotions, or orchestration creep.
 
-### 1. Memory Stage Relabeling (Execution Path Hardening)
-* **The Vulnerability:** LLM calls during memory compression were using the default model name, which often defaulted to "Planner" in global traces. This caused CHAT route traces to incorrectly show a "Planner" stage, implying an execution-path regression.
-* **The Fix:** Explicitly relabeled `SummaryMemory` compression calls to **"MemoryManager"**. This preserves trace integrity and confirms that CHAT routes remain zero-tool paths.
+All engines are initialized in `ContextManager.__init__()` and orchestrated through `get_context_for_llm()` in `manager.py`.
 
-### 2. Background Telemetry Attribution
-* **The Vulnerability:** Background tasks (like `MemoryJudger`) and nested LLM calls (like `SummaryMemory`) were losing context, resulting in `trace_id: null` in Flight Recorder logs.
-* **The Fix:** Updated `ReliableLLM` and `FlightRecorder` to support explicit `trace_id` overrides. Propagated the request ID through all `asyncio` task boundaries and synchronous wrappers.
+### **Engines**
 
-### 3. Voice & TTS Restoration
-* **The Vulnerability:** Pressing the speaker button in the UI had a ~10-15s delay or failed entirely due to aggressive model offloading and Tauri security restrictions on local assets.
-* **The Keep-Warm Fix:** Removed the "aggressive offloading" logic that deleted the Kokoro model after every call. The model now stays warm in RAM for 5 minutes of idle time, reducing latency by **7x** (~14s → ~2s).
-* **The Capability Fix:** Updated Tauri's `fs:allow-read` permissions to allow the frontend to access `backend/temp_audio` via the asset protocol in dev mode.
-* **The Production Fix:** Ensured the `--voice` flag is passed to the bundled backend sidecar in production builds within `lib.rs`.
+- **`AdaptiveInteractionEngine`** (`adaptive_engine.py`): Tracks interaction metrics (query lengths, response lengths, inter-request delays, interruption frequency) in SQLite. Determines the current **Response Posture** (`SILENT`, `SHORT_ACK`, `NORMAL`, `DETAILED`, `REFLECTIVE`) based on time-of-day, rapid-fire detection, active app, friction level, and query intent keywords.
 
-### 4. Registry Cleanup
-* **The Vulnerability:** Hallucinated `query_memory` tool hints persisted in system prompts and routing patterns, causing the Planner to try calling a non-existent tool.
-* **The Fix:** Purged all remaining `query_memory` references from `config.py` and `forced_router.py`. Memory handling is now correctly delegated to the context window and RAG layers.
+- **`FrictionDetector`** (`adaptive_engine.py`): Monitors user input for correction/frustration patterns ("no", "wrong", "stop", "redo"). When friction is detected, it automatically increases the friction level in `AdaptiveInteractionEngine`, causing the response posture to scale down to `SHORT_ACK` to reduce annoyance.
 
+- **`ContextRelevanceEngine`** (`relevance_engine.py`): Ranks retrieved RAG memories using a multi-factor scoring system: retrieval confidence × recency decay (48-hour halflife) + active app match boost + current project folder boost + file extension relevance boost. Memories scoring below a configurable threshold are suppressed to prevent stale/creepy memory resurfacing.
 
----
+- **`ContextBudgeter`** (`relevance_engine.py`): Allocates character budgets dynamically based on request classification (`CHAT`, `DIRECT`, `PLAN`). Chat turns get large history budgets but no screen/clipboard. Direct tool calls get large clipboard/screen budgets but minimal history. Plan modes get balanced budgets across all sources.
 
-## 🌸 Sakura V18.1 — Ironclad Reliability (Surgical Diagnostics)
+- **`WorkflowContextEngine`** (`workflow_engine.py`): Queries the active foreground window title and process name using native Windows APIs (`win32gui`, `win32process`, `psutil`). Latency: <1ms.
 
-V18 focused exclusively on closing structural loopholes that historically caused silent data ingestion ignorance, hallucinated responses, or execution infinite loops.
+- **`SessionStateClassifier`** (`workflow_engine.py`): Classifies the current user session into one of five states — `CODING`, `WRITING`, `RESEARCH`, `MEDIA`, `GENERAL` — based on the active process name and query keywords.
 
-### 1. Hard Budget Enforcement (Circuit Breaker)
-* **The Vulnerability:** `ReActLoop` iterative planning could enter infinite loop hallucinatory states, consuming API tokens rapidly if the LLM got stuck.
-* **The Fix:** We introduced `execution_context_var` using Python's `contextvars` to pass the `ExecutionContext` implicitly through `ReliableLLM` wrapper parameters. Every LangChain `invoke`/`ainvoke` hook now inherently validates against an absolute maximum `max_llm_calls=6`. Exceeding this instantly trips an `LLMBudgetExceededError`. 
+- **`ToolBiasingRegistry`** (`workflow_engine.py`): Returns boosted tool recommendation weights depending on the active session state. For example, `CODING` sessions boost `execute_code` (1.5x) and `file_read` (1.3x); `RESEARCH` sessions boost `search_web` (1.6x).
 
-### 2. Responder Data Fidelity Verification
-* **The Vulnerability:** In complex queries, the Responder might receive highly specific factual data from a tool, but summarize poorly or hallucinate completely un-referencing the facts.
-* **The Fix:** A highly deterministic regex step runs *after* Responder generation. If the tool output is large (>50 chars), it extracts the capital nouns/numbers and searches the output. If the response features 0 exact matches, the system injects `fidelity_override=True`, reprimands the LLM in the system prompt for ignoring the data, and forcefully loops a fixed regeneration cycle.
+- **`ImplicitReferenceResolver`** (`workflow_engine.py`): Resolves implicit terms like "that file", "the error", or "open it" by querying the clipboard and the last recorded action in SQLite. Injects resolved context into the LLM prompt so the model doesn't need to guess.
 
-### 3. Factual Intent Specificity Guards
-* **The Vulnerability:** Users asking "Who?", "What?" or "Where?" could occasionally fall through the smart router into `CHAT` mode, allowing confident, zero-source hallucinations.
-* **The Fix:** Expanded `complex_indicators` Wh-words logic within `router.py`. Furthermore, modified the system prompt logic to explicitly define factual inquiries as an absolute violation of CHAT parameters, forcing them to output `DIRECT` or `PLAN`.
+- **`ConfidenceEngine`** (`confidence_engine.py`): Scores the confidence, relevance, and ambiguity of implicit reference resolutions and memory retrievals. Determines an **Action Posture**: `CLARIFY` (confidence <0.4), `HEDGE` (0.4-0.75), or `PROCEED` (≥0.75).
 
-### 4. Visibility, Parity, and Context Ephemerality
-* **Search Cascade Sync Parity**: The powerful search-expansion layer (if `search_wikipedia` fails, expand toolset to include `web_search`) was missing from the older synchronous `run()` execution path. We matched perfect feature parity between async / sync execution logic.
-* **Universal Context Valve Handles**: The Context Valve creates virtual IDs (`Ephemeral Store ID: eph_XXX`) when a tool generates huge text. We injected `query_ephemeral` into `UNIVERSAL_TOOLS` permanently, eliminating instances where the context handle became permanently disconnected across mode switches.
-* **data_reasoning Overrides**: When an ephemeral handle exists in context, `llm.py` parses it and toggles `data_reasoning=True` on `ResponseContext` forcefully, guiding the final LLM synthesis step correctly rather than treating the handle token string as plain text.
-* **Error Escalation**: Sub-loop Planner exceptions explicitly throw `ExecutionResult.error()` strings backwards to the UI, guaranteeing identical visibility.
+- **`AttentionManager`** (`attention_manager.py`): Detects focus mode (fullscreen apps, rapid typing, gaming) and suppresses interruptions, TTS prompts, and verbose responses during high-focus states.
 
-### 5. Responder Context Synchronization
-* **The Vulnerability:** `ResponseContext` instantiation crashed `SmartAssistant.arun()` because legacy parameters (`assistant_name`, `system_prompt`, `tool_used`) were retained post-refactor, causing unexpected keyword arguments.
-* **The Fix:** Hard-aligned the instantiation call in `llm.py` to match the exact `ResponseContext` dataclass signature. Furthermore, we implemented dynamic injection for custom assistant identities (`sakura_name`) directly into the responder's base personality prompt to ensure custom user settings are not discarded prior to reaching the responder module.
+- **`TrustAwareFailureHandler`** (`failure_handler.py`): Tracks a rolling trust score (0.0-1.5) based on consecutive successes and failures. When trust is low (<0.6), failure messages use humble/transparent phrasing and suggest manual alternatives. When trust is high, failures use calm/direct phrasing.
 
----
+- **`ReliabilityTelemetry`** (`telemetry.py`): Logs tool success/failure rates, cancellation rates, planner turn metrics, latency history, and context mismatch events back to SQLite for long-term health reporting.
 
-## 👁️ V18 Vision Architecture (Independent Layer)
+- **`PreferenceAdaptationEngine`** (`preference_adaptation.py`): Learns temporal behavior patterns (focus hours, app transition habits) and manages forgetting/decay logic that periodically reduces entity familiarity scores and prunes ephemeral entities from the WorldGraph.
 
-V18 introduces a dedicated **Vision Layer** to handle complex image analysis (screenshots, camera inputs, UI reading) without overloading the main ReAct reasoning chain.
+### **Context Flow**
 
-### 1. Dedicated VisionClient
-Unlike the main agent which uses `ReliableLLM` with budgeting and history injection, the `VisionClient` is a **stateless, atomic service**:
-- **Primary Model**: `meta-llama/llama-4-scout-17b-16e-instruct` (Groq)
-- **Fallback Model**: `llama-3.2-90b-vision-preview` (Groq)
-- **Logic**: Primary failure triggers one immediate retry with the fallback model. Total failure returns a descriptive error string to the tool, ensuring the agent remains functional.
-
-### 2. Tool Integration (`read_screen`)
-The `read_screen` tool was upgraded from basic OCR to full AI vision:
-- **Image Input**: Supports path strings, PIL Images, and raw base64 bytes.
-- **Context Injection**: Tool optionally retrieves the current `user_input` from `execution_context_var` and passes it as context to the vision model (e.g., "The user is asking about the error in the console").
-- **Sync/Async Bridge**: Uses `nest-asyncio` to execute async Groq calls within the legacy synchronous tool framework.
-
-### 3. Observability
-Vision calls are logged to `FlightRecorder` with a dedicated `vision` stage prefix, allowing for separate latency and cost auditing ($0.11 - $0.90 per 1M tokens).
-
-
----
-
-## 🛡️ Security & Stability (V15.2.2)
-
-### "Peace Treaty" Protocol
-Following a rigorous audit by Claude 3.5 Sonnet and Gemini 2.0 Flash, **Sakura V15.2.2** implements a defense-in-depth security strategy.
-
-### 1. Indirect Prompt Injection Defense
-**The Attack:** Malicious websites containing hidden text like "SYSTEM PROMPT: IGNORE PREVIOUS INSTRUCTIONS" could hijack the LLM.
-**The Defense (V15.2.2):**
-- **Sanitization Layer:** All scraped web content passes through `_sanitize_scraped_content()` which strips script/style tags and regex-filters known injection patterns.
-- **Context Capping:** Scraped content is hard-capped at 10,000 characters to prevent buffer overflow attacks.
-
-### 2. Path Traversal & Homoglyph Protection
-**The Attack:** Attackers using Unicode homoglyphs (e.g., Greek 'ο' vs Latin 'o') to bypass path filters and access `C:/Windows`.
-**The Defense (V15.2.2):**
-- **Unicode Normalization:** All file paths are normalized to NFC/NFKD forms before validation.
-- **Blocklist:** 28+ dangerous patterns blocked, including `.bashrc`, `.ssh`, `autostart`, `cron`, and system directories.
-
-### 3. WebSocket Hijacking Prevention
-**The Attack:** Malicious websites on `localhost` connecting to Sakura's backend WebSocket.
-**The Defense (V15.2.2):**
-- **Origin Validation:** The `/ws/status` endpoint strictly enforces `Origin` headers, allowing only `tauri://localhost` and authorized dev servers.
-
-### 4. Concurrency Hardening (TOCTOU)
-**The Risk:** Race conditions where the UI visibility state changes between a check and a write operation.
-**The Defense (V15.2.2):**
-- **Thread Safety:** `ProactiveState` now uses `threading.RLock` to wrap all state mutations, ensuring atomic operations for visibility checks and message queueing.
-
-### 5. Persistent Backoff
-**The Risk:** User bypassing rate limits by restarting the application.
-**The Defense (V15.2.2):**
-- **State Persistence:** Failed initiation counts are saved to `data/proactive_backoff.json`, ensuring the backoff timer survives application restarts.
-
----
-
-```mermaid
-graph TD
-    %% High Contrast Theme - Forces Black Text for Readability
-    classDef client fill:#BBDEFB,stroke:#0D47A1,stroke-width:2px,color:#000000;
-    classDef server fill:#FFE0B2,stroke:#E65100,stroke-width:2px,color:#000000;
-    classDef brain fill:#E1BEE7,stroke:#4A148C,stroke-width:2px,color:#000000;
-    classDef storage fill:#C8E6C9,stroke:#1B5E20,stroke-width:2px,color:#000000;
-
-    %% 1. Frontend Layer
-    subgraph Client ["🖥️ Client Layer (Tauri + Svelte)"]
-        UI[Chat Interface]:::client
-        Stream[Thought Stream Log]:::client
-        Voice[Kokoro TTS Engine]:::client
-    end
-
-    %% 2. Backend Entry
-    subgraph Backend ["🐍 Backend Layer (FastAPI)"]
-        API[HTTP Server]:::server
-        WS[WebSocket Broadcaster]:::server
-    end
-
-    %% 3. Intelligence Pipeline
-    subgraph Brain ["🧠 Intelligence Pipeline"]
-        Router{Smart Router}:::brain
-        RL[Token Bucket Rate Limiter]:::brain
-        
-        subgraph ReAct ["ReAct Agent Loop"]
-            Planner[Llama 70B Planner]:::brain
-            Executor[Tool Executor]:::brain
-            Valve{Context Valve}:::brain
-        end
-        
-        Synthesizer[GPT OSS 20B Responder]:::brain
-    end
-
-    %% 4. Data Layer
-    subgraph Data ["💾 Memory & Storage"]
-        WG[(World Graph)]:::storage
-        Cache[(Smart Search Cache)]:::storage
-        EphRAG[(Ephemeral RAG)]:::storage
-    end
-
-    %% Connections
-    UI -->|POST /chat| API
-    API --> Router
-    
-    %% Broadcasting Updates
-    Executor -.->|Event: TOOL_START| WS
-    Planner -.->|Event: THINKING| WS
-    Valve -.->|Event: OVERFLOW| WS
-    WS -.->|Real-time JSON| Stream
-
-    %% Pipeline Flow
-    Router -->|Simple| Synthesizer
-    Router -->|Complex| Planner
-    
-    %% The Brain Loop
-    Planner <-->|Check Quota| RL
-    Planner -->|Action| Executor
-    Executor -->|Run| Valve
-    
-    %% Data Interaction
-    Valve -->|< 2k chars| Planner
-    Valve -->|> 2k chars| EphRAG
-    EphRAG -.->|Handle ID| Planner
-    
-    Executor <--> Cache
-    Synthesizer <--> WG
-    Synthesizer -->|Final Text| UI
-    UI -->|Text| Voice
 ```
-
-### Component Overview
-
-| Layer | Components | Purpose |
-|-------|------------|--------|
-| **Tauri Shell** | Window Manager, Hotkeys | Native desktop experience |
-| **FastAPI Backend** | server.py, SSE endpoints | API and streaming |
-| **World Graph** | EntityNode, ActionNode | Identity and context memory |
-| **LLM Pipeline** | Router, Planner, Executor | Query processing |
-| **Memory Layer** | Chroma, FAISS, Judger | Persistent storage |
-
----
-
-## 🔀 Routing System (V10)
-
-V10 introduces a 4-layer routing funnel for optimal latency.
-
-### Layer Overview
-
-| Layer | Component | Action |
-|-------|-----------|--------|
-| 0 | `forced_router.py` | Regex patterns → Execute immediately (0ms) |
-| 1 | Smart Router (8B) | Classify → DIRECT, PLAN, or CHAT |
-| 2 | DIRECT path | Cache check → Single tool → Skip Planner/Verifier |
-| 3 | PLAN path | Full ReAct loop with Planner (70B) |
-| 4 | Deduplication Layer| Normalized args → Deterministic Cache (eph) → 0ms retry avoidance |
-
-### Route Classifications
-
-| Route | Description | LLM Calls |
-|-------|-------------|-----------|
-| CHAT | Pure conversation | 1 (Router) + 1 (Responder) |
-| DIRECT | Single obvious tool | 1 (Router) + 1 (Tool) + 1 (Responder) |
-| PLAN | Multi-step or research | 1 (Router) + N (Planner) + 1 (Verifier) + 1 (Responder) |
-| DEDUPE | Repeated tool call | 0 (Result served from cache) |
-
-### Cache TTLs
-
-```python
-CACHE_TTL = {
-    "get_weather": 600,       # 10 mins (ACTUAL)
-    "web_search": 0,          # NOT CACHED
-    "get_news": 3600,         # 1 hour
-    "define_word": 0,         # NOT CACHED
-}
+User Input → FrictionDetector → AdaptiveInteractionEngine (posture)
+                                         ↓
+                              WorkflowContextEngine (active app)
+                                         ↓
+                              SessionStateClassifier (session type)
+                                         ↓
+                              ToolBiasingRegistry (tool weights)
+                                         ↓
+                              ImplicitReferenceResolver ("that file")
+                                         ↓
+                              ContextRelevanceEngine (ranked memories)
+                                         ↓
+                              ContextBudgeter (token allocation)
+                                         ↓
+                              ConfidenceEngine (action posture)
+                                         ↓
+                              AttentionManager (focus suppression)
+                                         ↓
+                              LLM Response Generation
 ```
 
 ---
 
-## 🔄 ReAct Loop
+## 🧱 Purged Legacy Systems
 
-The iterative reasoning loop for complex queries.
+The following systems have been completely removed from the codebase to reduce maintenance burden and eliminate operational latency:
 
-```mermaid
-graph TD
-    %% Global Styling
-    classDef default fill:#2D2D2D,stroke:#FFFFFF,stroke-width:1px,color:#FFFFFF;
-    classDef logic fill:#0D47A1,stroke:#00BFFF,stroke-width:2px,color:#FFFFFF;
-    classDef special fill:#333333,stroke:#FFFFFF,stroke-dasharray: 5 5,color:#FFFFFF;
-    classDef invisible fill:none,stroke:none,color:none;
-
-    %% Main Flow
-    User([User]) --> UI[Svelte UI]
-    UI --> Planner[Planner: 70B]
-    
-    %% The ReAct Loop Area
-    subgraph Execution_Cycle [ReAct Loop]
-        direction TB
-        Planner --> RL[Rate Limiter: 0.5s Delay]
-        RL --> Tool[Tool Execution]
-        
-        Tool --> Check{Output > 2k Chars?}
-        class Check logic
-        
-        %% Small Path
-        Check -- No --> Small[Raw Text Result]
-        Small --> Planner
-        
-        %% Big Path (Valve)
-        Check -- Yes --> Valve[Context Valve]
-        class Valve special
-        
-        Valve --> Process[Chunk & Embed]
-        Process --> Handle[Return Virtual Handle: eph_123]
-        Handle --> Planner
-    end
-
-    %% Final Output
-    Planner -- Final Context --> Responder[Responder: 20B]
-    Responder --> Update[Update World Graph]
-    Update --> FinalUI[Final Structured Response]
-
-    %% WebSocket Logs (Dashed lines moved to not overlap)
-    Planner -.->|Log: Thinking| WS(WebSocket)
-    Valve -.->|Log: Indexing| WS
-    Responder -.->|Log: Synthesizing| WS
-    class WS special
-
-    %% Explicit Link Styling for visibility
-    linkStyle default stroke:#FFFFFF,stroke-width:1px;
-    linkStyle 4,5,7 stroke:#00BFFF,stroke-width:2px;
-```
-
-### Protections
-| Protection | Description |
-|------------|-------------|
-| Goal Reminder | Original query injected each iteration |
-| History Cap | Last 5 items only (prevents token explosion) |
-| Smart Pruner | JSON-aware truncation (preserves valid syntax) |
-| Summarization | LLM summarizes outputs >2000 chars |
+1.  **ReAct Planning Loop (`planner.py` & `verifier.py`):** Multi-turn reasoning loops that generated sequential steps, observations, and replans are replaced by the `OneShotRunner`.
+2.  **Desire System (`desire.py` / `cognitive/`):** Simulated metabolic float values tracking loneliness, duty, and battery are deleted.
+3.  **Proactive Scheduler (`proactive.py`):** Hourly background ticks and 3 AM automated message generation are purged.
+4.  **Docker Sandbox (`Dockerfile` sidecars):** Replaced with a restricted local Python execution model running via `subprocess.Popen` in [code_interpreter.py](file:///d:/Personal%20Projects/Sakura%20V10/backend/sakura_assistant/core/tools_libs/code_interpreter.py).
 
 ---
 
-## 🧠 World Graph
-
-The **single source of truth** for identity, memory, and context.
-
-### Components
-
-| Component | Purpose |
-|-----------|---------|
-| `EntityNode` | Things that exist (user, songs, topics) with lifecycle |
-| `ActionNode` | Things that happened (tool calls) with focus_entity |
-| `ResolutionResult` | Multi-hypothesis reference resolution |
-
-### Entity Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> EPHEMERAL
-    EPHEMERAL --> CANDIDATE : ref_count ≥ 3
-    EPHEMERAL --> [*] : garbage collected
-    CANDIDATE --> PROMOTED : ref_count ≥ 5 + 0.7 confidence
-    CANDIDATE --> EPHEMERAL : stale (30 days)
-    PROMOTED --> PROMOTED : protected forever
-    
-    note right of EPHEMERAL : Temporary mentions
-    note right of CANDIDATE : Awaiting confirmation
-    note right of PROMOTED : Trusted, searchable
-```
-
-### EQ Layer (Emotional Intelligence)
-
-| Intent | Triggers | Response Adjustment |
-|--------|----------|---------------------|
-| FRUSTRATED | "no", "wrong", "ugh" | Be extra helpful |
-| URGENT | "now", "quick", "asap" | Be concise |
-| CURIOUS | Questions ("what?") | Elaborate freely |
-| PLAYFUL | "lol", "haha" | Match energy |
-| TASK_FOCUSED | "play", "open" | Be efficient |
-
-### System Invariants
-1. `user:self` immutable to tools
-2. LLM_INFERRED never auto-promoted
-3. External search banned when `is_user_reference=True`
-4. Every mutation logs source
-
----
-
-## 🔧 Tools (54)
-
-### Tool List
-
-| # | Tool | Description |
-|---|------|-------------|
-| 1 | `spotify_control` | Play/Pause/Next/Previous music |
-| 2 | `play_youtube` | Play video/audio on YouTube |
-| 3 | `web_search` | Tavily-powered web search |
-| 4 | `web_scrape` | Scrape website with auto-RAG offload |
-| 5 | `read_screen` | Screenshot + Gemini Vision analysis |
-| 6 | `gmail_read_email` | Read emails with filters |
-| 7 | `gmail_send_email` | Send emails |
-| 8 | `calendar_get_events` | Fetch calendar events |
-| 9 | `calendar_create_event` | Create events |
-| 10 | `tasks_list` | List Google Tasks |
-| 11 | `tasks_create` | Create Google Task |
-| 12 | `note_create` | Create markdown note |
-| 13 | `note_append` | Append to note |
-| 14 | `note_read` | Read note content |
-| 15 | `note_list` | List notes in folder |
-| 16 | `note_open` | Open note in editor |
-| 17 | `note_delete` | Delete note (with backup) |
-| 18 | `note_search` | Search notes by keyword |
-| 19 | `file_read` | Read local file |
-| 20 | `file_write` | Write local file |
-| 21 | `file_open` | Open file with default app |
-| 22 | `open_app` | Open desktop application |
-| 23 | `clipboard_read` | Read clipboard content |
-| 24 | `clipboard_write` | Write to clipboard |
-| 25 | `get_system_info` | System info (time, date, battery) |
-| 26 | `get_weather` | Weather via wttr.in |
-| 27 | `set_timer` | Windows-native timer (Toast + Sound) |
-| 28 | `set_reminder` | Schedule future reminders |
-| 29 | `volume_control` | System volume control |
-| 30 | `currency_convert` | Currency conversion |
-| 31 | `quick_math` | Safe calculator (sympy) |
-| 32 | `define_word` | Dictionary lookup |
-| 33 | `get_news` | Google News RSS headlines |
-| 34 | `get_location` | IP-based location |
-| 35 | `search_wikipedia` | Wikipedia summary |
-| 36 | `search_arxiv` | Scientific paper search |
-| 37 | `update_user_memory` | Store user facts/preferences |
-| 38 | `ingest_document` | Ingest document to RAG |
-| 39 | `fetch_document_context` | RAG document search (long-term) |
-| 40 | `list_uploaded_documents` | List ingested docs |
-| 41 | `delete_document` | Remove document from RAG |
-| 42 | `get_rag_telemetry` | RAG system stats |
-| 43 | `trigger_reindex` | Force RAG reindexing |
-| 44 | `retrieve_document_context` | Query ephemeral RAG by doc_id |
-| 45 | `forget_document` | Delete specific ephemeral doc |
-| 46 | `clear_all_ephemeral_memory` | Wipe all session docs |
-| 47 | `research_topic` | Multi-step deep research |
-| 48 | `query_ephemeral` | Query intercepted large outputs |
-
-### Tool Categories
-
-```python
-TOOL_GROUPS = {
-    "music": ["spotify_control", "play_youtube"],
-    "search": ["web_search", "web_scrape", "search_wikipedia", "search_arxiv"],
-    "email": ["gmail_read_email", "gmail_send_email"],
-    "calendar": ["calendar_get_events", "calendar_create_event"],
-    "tasks": ["tasks_list", "tasks_create"],
-    "notes": ["note_create", "note_append", "note_read", "note_list", "note_open", "note_delete", "note_search"],
-    "files": ["file_read", "file_write", "file_open"],
-    "system": ["read_screen", "open_app", "volume_control", "get_system_info", "clipboard_read", "clipboard_write"],
-    "utility": ["get_weather", "set_timer", "set_reminder", "currency_convert", "quick_math", "define_word", "get_news", "get_location"],
-    "memory": ["update_user_memory", "ingest_document"],
-    "rag": ["fetch_document_context", "list_uploaded_documents", "delete_document", "get_rag_telemetry", "trigger_reindex"],
-    "ephemeral_rag": ["retrieve_document_context", "forget_document", "clear_all_ephemeral_memory"],
-}
-```
-
----
-
-## 💾 Memory System
-
-### Memory Layers
-
-| Layer | Storage | Purpose |
-|-------|---------|---------|
-| World Graph | JSON | Identity, entities, actions, focus |
-| Chroma (Long-Term) | Per-Doc Dirs | Permanent document RAG |
-| Chroma (Ephemeral) | Per-Doc Dirs | Session-scoped document RAG |
-| Memory Judger | LLM (8B) | Importance filtering |
-| FAISS | Memory-mapped | Conversation history vectors |
-| Episodic Memory | JSON | Significant events (keyword search) |
-
-### Ephemeral RAG Flow
-
-```mermaid
-graph TD
-    A[User: Research Jack the Ripper] --> B[Router: Llama 8B]
-    B --> C[Tool: web_scrape]
-    C --> D[Ephemeral Memory: abc123]
-    
-    D --> E[Planner: Llama 70B]
-    E --> F[Tool: retrieve_document_context]
-    F --> G[Context Chunks]
-    
-    G --> H[Responder: Llama 70B]
-    H --> I[Final Answer + Citations]
-
-    %% High Contrast Theme - Forces Black Text for Readability
-    classDef client fill:#BBDEFB,stroke:#0D47A1,stroke-width:2px,color:#000000;
-    classDef server fill:#FFE0B2,stroke:#E65100,stroke-width:2px,color:#000000;
-    classDef brain fill:#E1BEE7,stroke:#4A148C,stroke-width:2px,color:#000000;
-    classDef storage fill:#C8E6C9,stroke:#1B5E20,stroke-width:2px,color:#000000;
-
-```
-
----
-
-## 🎨 UI & Voice Architecture
-
-### Hybrid Rust+Python Load Order
-1. Tauri spawns `server.py` with `--voice` flag
-2. Polls `http://127.0.0.1:3210/health` (15s timeout)
-3. Initializes WebView only after backend confirms `200 OK`
-
-### Window Modes
-
-| Window | Size | Behavior |
-|--------|------|----------|
-| Bubble | 220x220 | Transparent, always-on-top, bottom-right |
-| Main | 480x640 | Hidden by default, shows on interaction |
-
-### Voice Integration
-- **Wake Word:** "Sakura" (openWakeWord ONNX inference via wake_word.py)
-- **TTS:** Kokoro neural synthesis with idle unload
-- **Manual Trigger:** Speaker button in chat → `/voice/speak`
-
-### Hard Quit
-- Rust `force_quit` command sends `SIGTERM` to Python
-- Calls `std::process::exit(0)` immediately
-- Bypasses potential HTTP shutdown hangs
-
----
-
-## 🛡️ Security
-
-### Path Sandboxing & Persistence
-- Blocks: `C:/Windows`, `Program Files`, `AppData` (for execution context)
-- Prevents parent traversal (`../`)
-- Restricts to project root + Documents/Desktop/Downloads
-- **PyInstaller Persistence:** All internal storage (models, logs, memory) is dynamically resolved to `%APPDATA%\SakuraV10` to prevent data loss when running as a frozen `_MEIPASS` binary.
-
-### Safe Math
-- Replaced `eval()` with `sympy.sympify()` + whitelist
-- No arbitrary code execution
-
-### API Authentication
-- `X-Auth` header with SHA256 comparison
-- Timing-attack resistant
-
-### Identity Protection
-- `user:self` entity immutable to tools
-- LLM-inferred facts never auto-promoted
-
----
-
-## ⚡ Performance
-
-### Timeout Protection
-
-| Component | Timeout | Fallback |
-|-----------|---------|----------|
-| LLM calls | 60s | Gemini backup |
-| Verifier | 15s | Default to PASS |
-| RAG retrieval | 30s | Continue without context |
-
-### Multi-Model Failover
-
-| Stage | Primary | Backup |
-|-------|---------|--------|
-| Router | Llama 3.1 8B (Groq) | Gemini 2.0 Flash |
-| Planner | Llama 3.3 70B (Groq) | Gemini 2.0 Flash |
-| Verifier | Llama 3.1 8B (Groq) | Gemini 2.0 Flash |
-| Responder | GPT OSS 20B | Gemini 2.0 Flash |
-
-### Token Savings
-
-| Query Type | Before | After | Savings |
-|------------|--------|-------|---------|
-| Music | ~800 | ~115 | 86% |
-| Complex Plan | ~5000 | ~950 | 81% |
-| History | O(n) | O(1) | Flat cost |
-
----
-
-## 📊 Observability System (V17.4 / V17.5)
-
-### Flight Recorder Architecture
-
-The Flight Recorder provides comprehensive logging for debugging, cost tracking, and performance analysis.
-
-```mermaid
-graph LR
-    LLM[ReliableLLM] -->|log_llm_call| FR[FlightRecorder]
-    Tools[Tool Execution] -->|span| FR
-    FR -->|callback| SSE[SSE Stream]
-    FR -->|write| JSONL[flight_recorder.jsonl]
-    SSE --> UI[Sakura Sight UI]
-```
-
-### Token Tracking (V17.4)
-
-| Component | Function | Purpose |
-|-----------|----------|----------|
-| `_extract_tokens()` | wrapper.py | Extract tokens from 4 LangChain response formats |
-| `_log_llm_tokens()` | wrapper.py | Safe wrapper for FlightRecorder logging |
-| `log_llm_call()` | flight_recorder.py | Calculate cost, accumulate trace totals |
-
-### Precise Token Counting (V17.5)
-
-| Model Family | Method | Accuracy |
-|--------------|--------|----------|
-| GPT/OpenAI | tiktoken (cached) | ±1% |
-| Llama/Mistral | 3.5 chars/token | ±5% |
-| Gemini | 3.8 chars/token | ±5% |
-| Claude | 3.7 chars/token | ±5% |
-
-**File:** `backend/sakura_assistant/utils/token_counter.py`
-
-```python
-from sakura_assistant.utils.token_counter import count_tokens, estimate_cost
-
-tokens = count_tokens("Hello world", model="gpt-4o")  # Returns 3
-cost = estimate_cost({"prompt": 1000, "completion": 500}, model="llama-3.1-8b-instant")
-```
-
-### SSE Tool Streaming (V17.5)
-
-Slow tools emit real-time progress updates via `ProgressEmitter`.
-
-**File:** `backend/sakura_assistant/utils/progress_emitter.py`
-
-| Tool | Progress Events |
-|------|-----------------|
-| `web_search` | 🔍 Searching → ✅ Found N results |
-| `search_wikipedia` | 🔍 Searching → 📖 Found article → ✅ Retrieved summary |
-| `web_scrape` | 🌐 Connecting → 📥 Downloaded → 🔍 Extracting → ✅ Complete |
-| `research_topic` | 🔬 Starting → 📂 Cache check → 🔍 Phase 1/3 → 🧠 Phase 3/3 → ✅ Complete |
-
-**Usage in Tools:**
-```python
-from sakura_assistant.utils.progress_emitter import get_progress_emitter
-
-emitter = get_progress_emitter()
-emitter.tool_progress("web_search", "🔍 Searching web...")
-emitter.tool_success("web_search", "✅ Found 5 results")
-```
-
-### Model Cost Table
-
-```python
-MODEL_COSTS = {
-    "llama-3.1-8b-instant": {"input": 0.05, "output": 0.08},
-    "llama-3.3-70b-versatile": {"input": 0.59, "output": 0.79},
-    "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
-    "gpt-4o": {"input": 2.50, "output": 10.00},
-    "default": {"input": 0.50, "output": 1.00},
-}  # USD per 1M tokens
-```
-
----
-
-## 📋 Test Suite
-
-| Test File | Coverage |
-|-----------|----------|
-| `test_world_graph.py` | World Graph core, EQ layer, compression |
-| `test_agent_state.py` | Rate limit, reset, hindsight |
-| `test_api_auth.py` | Authentication, timing attacks |
-| `test_router.py` | Intent classification |
-| `test_executor.py` | Tool execution |
-| `test_responder.py` | Response generation, guardrails |
-| `test_sandboxing.py` | Path validation security |
-| `test_quick_math_security.py` | Safe math evaluation |
-| `test_container.py` | Dependency injection |
-| `memory/test_chroma_*.py` | Ingestion, retrieval, isolation |
-
----
-
-## 🛡️ RAG Audit Certification (V12)
-**Date:** January 13, 2026
-
-| Component | Score | Status |
-|-----------|-------|--------|
-| **Web RAG** | 1.0/1.0 | ✅ Perfect accuracy |
-| **Document RAG** | 1.0/1.0 | ✅ Perfect isolation & retrieval |
-| **Memory RAG** | 0.67/1.0 | ⚠️ Nuance failure (Fixed in V12.1) |
-
-*Audit conducted using LLM-as-a-Judge (Llama 3 70B).*
+## 🔒 Security Sandboxing
+
+### **Path Traversal Shield**
+File-system tools route through the canonical `validate_path` validation engine in [executor.py](file:///d:/Personal%20Projects/Sakura%20V10/backend/sakura_assistant/core/execution/executor.py). 
+*   **Unicode Normalization:** All file paths are normalized to NFC/NFKD forms.
+*   **Blocklist Filters:** Prevents access to system folders (`C:/Windows`, `Program Files`, `AppData`) or parent traversals (`../`).
+*   **Scope Restriction:** Code execution and file creation are restricted to the project root, Documents, Desktop, and Downloads folders.
+
+### **Subprocess Sandbox (Code Interpreter)**
+Python code execution is sandboxed using native OS process restrictions:
+*   Memory caps and CPU core counts are restricted.
+*   A strict execution timeout (default: 10s) terminates runaway calculations.
+*   Sanitizers warn and block imports of dangerous modules (`os`, `sys`, `subprocess`, `socket`, `requests`).
 
 ---
 
@@ -876,358 +173,59 @@ MODEL_COSTS = {
 
 ```
 sakura-v10/
-├── backend/                        # Core Backend Service
-│   ├── sakura_assistant/           # Core Python logic
-│   │   ├── config.py               # Configuration & personality
+├── backend/                        # FastAPI Backend Service
+│   ├── sakura_assistant/           # Core Python Logic
+│   │   ├── config.py               # Personality & User configurations
 │   │   ├── core/
-│   │   │   ├── context/            # State Management
-│   │   │   │   ├── manager.py      # Context orchestration
-│   │   │   │   └── governor.py     # Safety limits
-│   │   │   ├── execution/          # Execution Pipeline
-│   │   │   │   ├── dispatcher.py   # Mode routing (V17)
-│   │   │   │   ├── executor.py     # ReAct Loop
-│   │   │   │   ├── planner.py      # Planning logic
-│   │   │   │   └── oneshot.py      # Fast-lane runner
-│   │   │   ├── graph/              # Graph Database
-│   │   │   │   ├── world_graph.py  # Entity/Action nodes
-│   │   │   │   ├── identity.py     # Identity manager
-│   │   │   │   └── ephemeral.py    # Short-term RAG
-│   │   │   ├── infrastructure/     # System Services
-│   │   │   │   ├── scheduler.py    # Background tasks
-│   │   │   │   └── voice.py        # Voice engine
-│   │   │   ├── models/             # LLM Layer
-│   │   │   │   ├── wrapper.py      # Model abstraction
-│   │   │   │   └── responder.py    # Response generation
-│   │   │   ├── routing/            # Intent Layer
-│   │   │   │   ├── router.py       # Intent classification
-│   │   │   │   └── toolsets.py     # Micro-toolsets
-│   │   │   ├── llm.py              # System Facade
-│   │   │   └── tools.py            # Tool Registry
-│   │   ├── memory/
-│   │   │   ├── chroma_store/       # Long-term + ephemeral RAG
-│   │   │   └── faiss_store/        # Conversation history
-│   │   ├── utils/
-│   │   │   ├── tts.py              # Kokoro TTS
-│   │   │   ├── wake_word.py        # DTW detection
-│   │   │   ├── logging.py          # Structured logging
-│   │   │   └── metrics.py          # Prometheus endpoint
-│   │   └── tests/                  # Test suite (17 files)
-│   │   ├── memory/
-│   │   │   ├── chroma_store/       # Long-term + ephemeral RAG
-│   │   │   └── faiss_store/        # Conversation history
-│   │   ├── utils/
-│   │   │   ├── tts.py              # Kokoro TTS
-│   │   │   ├── wake_word.py        # DTW detection
-│   │   │   ├── logging.py          # Structured logging
-│   │   │   └── metrics.py          # Prometheus endpoint
-│   │   └── tests/                  # Test suite (17 files)
-│   ├── server.py                   # FastAPI entry point
-│   ├── first_setup.py              # Setup wizard
-│   ├── Dockerfile                  # Container build
-│   └── requirements.txt            # Python dependencies
+│   │   │   ├── context/            # Context Intelligence Layer
+│   │   │   │   ├── manager.py      # Context Router & Assembly
+│   │   │   │   ├── adaptive_engine.py   # Interaction Metrics & Response Posture
+│   │   │   │   ├── relevance_engine.py  # Memory Ranking & Token Budgeting
+│   │   │   │   ├── workflow_engine.py   # Active App & Session Classification
+│   │   │   │   ├── confidence_engine.py # Confidence & Action Posture Scoring
+│   │   │   │   ├── attention_manager.py # Focus Mode & Interruption Suppression
+│   │   │   │   ├── failure_handler.py   # Trust-Aware Failure Messaging
+│   │   │   │   ├── telemetry.py         # Reliability Health Metrics
+│   │   │   │   ├── preference_adaptation.py # Habit Learning & Memory Decay
+│   │   │   │   ├── governor.py          # Context Governor
+│   │   │   │   └── state.py             # Agent State & Rate Limiting
+│   │   │   ├── database.py         # Thread-safe WAL SQLite connector
+│   │   │   ├── execution/          # Execution Routing
+│   │   │   │   ├── executor.py     # Path security and validation helpers
+│   │   │   │   └── oneshot_runner.py# Single-turn routing & execution engine
+│   │   │   ├── graph/              # World Graph structures (SQLite-backed)
+│   │   │   ├── infrastructure/     # Scheduler services
+│   │   │   ├── models/             # LLM Model wrappers
+│   │   │   ├── routing/            # Intent mapping and fast routing
+│   │   │   ├── llm.py              # System Facade and Request Handler
+│   │   │   ├── tools.py            # Tool Registry and dispatch
+│   │   │   └── tools_libs/         # Built-in execution tool definitions
+│   │   ├── memory/                 # FAISS store and search utilities
+│   │   ├── utils/                  # TTS (Kokoro), WakeWord, and Logging helpers
+│   │   └── tests/                  # Pytest unit suites
+│   ├── server.py                   # FastAPI app entry point & compatibility stubs
+│   ├── requirements.txt            # Python environment dependencies
+│   └── pyproject.toml              # Build & test configurations
 │
-├── frontend/                       # Tauri + Svelte UI
-│   ├── src/                        # Svelte components
-│   ├── src-tauri/
-│   │   ├── src/lib.rs              # Rust shell
-│   │   └── tauri.conf.json         # Window config
-│   └── package.json
+├── frontend/                       # Tauri Svelte client
+│   ├── src/                        # UI markup & components
+│   └── src-tauri/                  # Rust window client shell
 │
-├── setup.ps1 / setup.sh            # Automated installers
-├── toggle_startup.ps1 / .sh        # Autostart toggle
-├── uninstall.ps1 / .sh             # Clean removal
-├── docker-compose.yml              # Container orchestration
-├── .env.example                    # API key template
-└── DOCUMENTATION.md                # This file
-```
-
----
-
-## 🐳 Docker Deployment
-
-### Build and Run
-
-```bash
-# Build backend image
-docker build -t sakura-backend ./backend
-
-# Run with docker-compose
-docker-compose up -d
-
-# View logs
-docker-compose logs -f backend
-```
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GROQ_API_KEY` | ✅ | Groq API for LLM calls |
-| `GOOGLE_API_KEY` | ✅ | Google Gemini (fallback) |
-| `TAVILY_API_KEY` | ⬜ | Web search tool |
-
-### Volumes
-
-| Volume | Purpose |
-|--------|---------|
-| `./backend/data:/app/data` | Persist World Graph, history |
-| `./.env:/app/.env:ro` | API keys (read-only) |
-
-> **Note:** Docker mode disables `open_app` and `read_screen` tools.
-
----
-
-## 🔧 System Reset
-
-Complete data wipe (preserves source code):
-
-```bash
-cd backend
-python tools/system_reset.py
-```
-
-**Requires:** Type "RESET" to confirm.
-
-**Deletes:**
-- Conversation history
-- World Graph
-- Chroma/FAISS stores
-- Episodic memory
-
-**Preserves:**
-- `.env`, `config.json`, `credentials.json`
-- Source code
-- Notes/ folder
-
----
-
-## 📝 Version History
-
-| Version | Key Changes |
-|---------|-------------|
-| V4 | Frozen pipeline, Memory Judger, FAISS mmap |
-| V5 | Verifier loop, 4-LLM limit, hindsight retry |
-| V6 | Conversation state tracker (deprecated) |
-| V7 | World Graph, EQ Layer, self-check, focus entity |
-| V8 | Iterative ReAct Loop, Ephemeral RAG, Citation Support |
-| V9 | Smart Pruner, Multi-Action Router, Config-Driven Tools |
-| V9.1 | Token Diet (15-tool cap), WordGraph Retention, Summarization |
-| **V10** | Smart Router, DIRECT Fast Lane, Tool Cache, Tauri UI |
-| **V10.1** | File Upload, Terminal Action Guard, Window Auto-Show |
-| **V10.4** | Flight Recorder, Async LLM, Token Bucket Rate Limits |
-| **V11** | Smart Research, Context Valve, Reflection Engine |
-| **V12** | WebSocket Thought Stream, Native Logs, RAG Certification |
-| **V13** | Code Interpreter, Audio Tools, Temporal Decay (30-day half-life) |
-| **V14** | Unified ReflectionEngine, Sleep Cycle, Constraint Detection |
-| **V15** | DesireSystem, ProactiveScheduler, Mood Injection, Bubble-Gate |
-| **V15.2** | Message Queue, CPU Guard, Reactive Themes, Security Hardening |
-| **V15.4** | **Deterministic Context Router, ContextSignals, Unified Context API** |
-| **V16.2** | Dependency Injection, Stable Soul Architecture |
-| **V17.0** | **Execution V17 (Dispatcher, Budgets), Core Refactor (6 subdirs), Guaranteed Emission** |
-| **V17.4** | **Observability Fix: Token Tracking, Cost Calculation, Groq XML Recovery Logging** |
-```python
-MODEL_COSTS = {
-    "llama-3.1-8b-instant": {"input": 0.05, "output": 0.08},
-    "llama-3.3-70b-versatile": {"input": 0.59, "output": 0.79},
-    "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
-    "gpt-4o": {"input": 2.50, "output": 10.00},
-    "default": {"input": 0.50, "output": 1.00},
-}  # USD per 1M tokens
+├── docs/                           # Strategic & system documentation
+│   ├── SAKURA_CANONICAL_STRATEGIC_REPORT.md
+│   ├── SAKURA_LITE_ARCHITECTURE.md
+│   └── DOCUMENTATION.md            # This file
 ```
 
 ---
 
 ## 📋 Test Suite
 
-| Test File | Coverage |
-|-----------|----------|
-| `test_world_graph.py` | World Graph core, EQ layer, compression |
-| `test_agent_state.py` | Rate limit, reset, hindsight |
-| `test_api_auth.py` | Authentication, timing attacks |
-| `test_router.py` | Intent classification |
-| `test_executor.py` | Tool execution |
-| `test_responder.py` | Response generation, guardrails |
-| `test_sandboxing.py` | Path validation security |
-| `test_quick_math_security.py` | Safe math evaluation |
-| `test_container.py` | Dependency injection |
-| `memory/test_chroma_*.py` | Ingestion, retrieval, isolation |
-
----
-
-## 🛡️ RAG Audit Certification (V12)
-**Date:** January 13, 2026
-
-| Component | Score | Status |
-|-----------|-------|--------|
-| **Web RAG** | 1.0/1.0 | ✅ Perfect accuracy |
-| **Document RAG** | 1.0/1.0 | ✅ Perfect isolation & retrieval |
-| **Memory RAG** | 0.67/1.0 | ⚠️ Nuance failure (Fixed in V12.1) |
-
-*Audit conducted using LLM-as-a-Judge (Llama 3 70B).*
-
----
-
-## 📁 Project Structure
-
-```
-sakura-v10/
-├── backend/                        # Core Backend Service
-│   ├── sakura_assistant/           # Core Python logic
-│   │   ├── config.py               # Configuration & personality
-│   │   ├── core/
-│   │   │   ├── context/            # State Management
-│   │   │   │   ├── manager.py      # Context orchestration
-│   │   │   │   └── governor.py     # Safety limits
-│   │   │   ├── execution/          # Execution Pipeline
-│   │   │   │   ├── dispatcher.py   # Mode routing (V17)
-│   │   │   │   ├── executor.py     # ReAct Loop
-│   │   │   │   ├── planner.py      # Planning logic
-│   │   │   │   └── oneshot.py      # Fast-lane runner
-│   │   │   ├── graph/              # Graph Database
-│   │   │   │   ├── world_graph.py  # Entity/Action nodes
-│   │   │   │   ├── identity.py     # Identity manager
-│   │   │   │   └── ephemeral.py    # Short-term RAG
-│   │   │   ├── infrastructure/     # System Services
-│   │   │   │   ├── scheduler.py    # Background tasks
-│   │   │   │   └── voice.py        # Voice engine
-│   │   │   ├── models/             # LLM Layer
-│   │   │   ├── wrapper.py      # Model abstraction
-│   │   │   │   └── responder.py    # Response generation
-│   │   │   ├── routing/            # Intent Layer
-│   │   │   │   ├── router.py       # Intent classification
-│   │   │   │   └── toolsets.py     # Micro-toolsets
-│   │   │   ├── llm.py              # System Facade
-│   │   │   └── tools.py            # Tool Registry
-│   │   ├── memory/
-│   │   │   ├── chroma_store/       # Long-term + ephemeral RAG
-│   │   │   └── faiss_store/        # Conversation history
-│   │   ├── utils/
-│   │   │   ├── tts.py              # Kokoro TTS
-│   │   │   ├── wake_word.py        # DTW detection
-│   │   │   ├── logging.py          # Structured logging
-│   │   │   └── metrics.py          # Prometheus endpoint
-│   │   └── tests/                  # Test suite (17 files)
-│   │   ├── memory/
-│   │   │   ├── chroma_store/       # Long-term + ephemeral RAG
-│   │   │   └── faiss_store/        # Conversation history
-│   │   ├── utils/
-│   │   │   ├── tts.py              # Kokoro TTS
-│   │   │   ├── wake_word.py        # DTW detection
-│   │   │   ├── logging.py          # Structured logging
-│   │   │   └── metrics.py          # Prometheus endpoint
-│   │   └── tests/                  # Test suite (17 files)
-│   ├── server.py                   # FastAPI entry point
-│   ├── first_setup.py              # Setup wizard
-│   ├── Dockerfile                  # Container build
-│   └── requirements.txt            # Python dependencies
-│
-├── frontend/                       # Tauri + Svelte UI
-│   ├── src/                        # Svelte components
-│   ├── src-tauri/
-│   │   ├── src/lib.rs              # Rust shell
-│   │   └── tauri.conf.json         # Window config
-│   └── package.json
-│
-├── setup.ps1 / setup.sh            # Automated installers
-├── toggle_startup.ps1 / .sh        # Autostart toggle
-├── uninstall.ps1 / .sh             # Clean removal
-├── docker-compose.yml              # Container orchestration
-├── .env.example                    # API key template
-└── DOCUMENTATION.md                # This file
-```
-
----
-
-## 🐳 Docker Deployment
-
-### Build and Run
-
-```bash
-# Build backend image
-docker build -t sakura-backend ./backend
-
-# Run with docker-compose
-docker-compose up -d
-
-# View logs
-docker-compose logs -f backend
-```
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GROQ_API_KEY` | ✅ | Groq API for LLM calls |
-| `GOOGLE_API_KEY` | ✅ | Google Gemini (fallback) |
-| `TAVILY_API_KEY` | ⬜ | Web search tool |
-
-### Volumes
-
-| Volume | Purpose |
-|--------|---------|
-| `./backend/data:/app/data` | Persist World Graph, history |
-| `./.env:/app/.env:ro` | API keys (read-only) |
-
-> **Note:** Docker mode disables `open_app` and `read_screen` tools.
-
----
-
-## 🔧 System Reset
-
-Complete data wipe (preserves source code):
-
-```bash
-cd backend
-python tools/system_reset.py
-```
-
-**Requires:** Type "RESET" to confirm.
-
-**Deletes:**
-- Conversation history
-- World Graph
-- Chroma/FAISS stores
-- Episodic memory
-
-**Preserves:**
-- `.env`, `config.json`, `credentials.json`
-- Source code
-- Notes/ folder
-
----
-
-## 📝 Version History
-
-| Version | Key Changes |
-|---------|-------------|
-| V4 | Frozen pipeline, Memory Judger, FAISS mmap |
-| V5 | Verifier loop, 4-LLM limit, hindsight retry |
-| V6 | Conversation state tracker (deprecated) |
-| V7 | World Graph, EQ Layer, self-check, focus entity |
-| V8 | Iterative ReAct Loop, Ephemeral RAG, Citation Support |
-| V9 | Smart Pruner, Multi-Action Router, Config-Driven Tools |
-| V9.1 | Token Diet (15-tool cap), WordGraph Retention, Summarization |
-| **V10** | Smart Router, DIRECT Fast Lane, Tool Cache, Tauri UI |
-| **V10.1** | File Upload, Terminal Action Guard, Window Auto-Show |
-| **V10.4** | Flight Recorder, Async LLM, Token Bucket Rate Limits |
-| **V11** | Smart Research, Context Valve, Reflection Engine |
-| **V12** | WebSocket Thought Stream, Native Logs, RAG Certification |
-| **V13** | Code Interpreter, Audio Tools, Temporal Decay (30-day half-life) |
-| **V14** | Unified ReflectionEngine, Sleep Cycle, Constraint Detection |
-| **V15** | DesireSystem, ProactiveScheduler, Mood Injection, Bubble-Gate |
-| **V15.2** | Message Queue, CPU Guard, Reactive Themes, Security Hardening |
-| **V15.4** | **Deterministic Context Router, ContextSignals, Unified Context API** |
-| **V16.2** | Dependency Injection, Stable Soul Architecture |
-| **V17.0** | **Execution V17 (Dispatcher, Budgets), Core Refactor (6 subdirs), Guaranteed Emission** |
-| **V17.4** | **Observability Fix: Token Tracking, Cost Calculation, Groq XML Recovery Logging** |
-| **V17.5** | **Precise Token Counting, SSE Tool Streaming** |
-| **V18.1** | **Ironclad Reliability Sprint (8 surgical fixes)** |
-| **V19.0** | **DeepSeek Integration, Model Abstraction, Stage Overrides** |
-| **V19.6** | **Abstention & Confidence Gating, nonsense retries** |
-| **V20.0** | **Pipeline Hardening: Deterministic Deduplication & Model Isolation** |
-| **V17.5** | **Precise Token Counting (tiktoken), SSE Tool Streaming (ProgressEmitter)** |
-| **V18.0** | **Ironclad Reliability Phase: Vision Layer (Llama 4 Scout), Hard LLM Core Budgets (6 Calls), High Fidelity Regeneration, Hallucination Gateways, Async/Sync Search Parity** |
-
----
-
-*Documentation updated for Sakura V18.0 — March 31, 2026*
+| Test Module | Coverage |
+| :--- | :--- |
+| `tests/test_code_interpreter.py` | Python execution output, syntax checking, sandboxing, resource timeouts |
+| `tests/test_executor.py` | Path validation security, dangerous path blocklists, `OneShotRunner` tool execution paths |
+| `tests/test_world_graph.py` | SQLite entity/relationship insertions and reference queries |
+| `tests/test_api_auth.py` | API authorization validation and timing attack defenses |
+| `tests/test_router.py` | Intent classification accuracy and regex extraction routes |
+| `tests/test_context_refinement_v19.py` | Context engines: session classification, friction detection, posture adaptation, tool biasing, confidence scoring, telemetry, trust-aware failure handling (12 tests) |

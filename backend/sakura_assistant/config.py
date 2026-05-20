@@ -138,41 +138,13 @@ RAG_CONTEXT_MAX_CHARS = 500         # Reduced from 2000 for token savings
 EXECUTOR_MAX_ITERATIONS = 5          # Hard cap on tool execution steps
 ENABLE_PLANNER_CACHE = True          # Cache idempotent planner outputs
 
-# --- User Settings Loading (V10.2) ---
-USER_SETTINGS_FILE = os.path.join(get_project_root(), "data", "user_settings.json")
-_USER_SETTINGS = {}
-
-if os.path.exists(USER_SETTINGS_FILE):
-    try:
-        with open(USER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            _USER_SETTINGS = json.load(f)
-    except Exception as e:
-        print(f"   Error loading user_settings.json: {e}")
-
-def _build_user_details() -> str:
-    """Build USER_DETAILS dynamically from settings or use defaults."""
-    name = _USER_SETTINGS.get("user_name", "User")
-    location = _USER_SETTINGS.get("user_location", "")
-    bio = _USER_SETTINGS.get("user_bio", "")
-    
-    details = f"""
-=== USER IDENTITY (this is YOUR user, not someone else) ===
-Name: {name}
-"""
-    if location:
-        details += f"Location: {location}\n"
-    if bio:
-        details += f"About: {bio}\n"
-    
-    details += """
+# --- User Identity Rules (V10.2) ---
+USER_DETAILS = """
 CRITICAL BEHAVIOR:
-- If the user asks "who am I" or "what do you know about me", answer ONLY using this block and the assistant's own long-term memory.
+- If the user asks "who am I" or "what do you know about me", answer ONLY using the USER CONTEXT block and the assistant's own long-term memory.
 - NEVER use web search results about celebrities or public figures.
 - NEVER claim the user is an actor or any external person from the internet.
 """
-    return details.strip()
-
-USER_DETAILS = _build_user_details()
 
 
 # Wake Word Detection (V5.1)

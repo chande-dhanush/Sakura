@@ -200,7 +200,7 @@ class VectorMemoryStore:
             # self._embeddings_model = SentenceTransformer(EMBEDDING_MODEL_NAME)  # REMOVED
             
             # 2. Load or Create FAISS Index (with mmap if enabled)
-            if FAISS_INDEX_PATH.exists() and MEMORY_METADATA_FILE.exists():
+            if FAISS_INDEX_PATH.exists():
                 try:
                     # P0: Use mmap to avoid loading entire index into RAM
                     if FAISS_MMAP:
@@ -218,24 +218,34 @@ class VectorMemoryStore:
                         self.faiss_index = faiss.read_index(str(FAISS_INDEX_PATH))
                         self._mmap_active = False
                     
-                    with open(MEMORY_METADATA_FILE, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                        self.memory_texts = metadata.get('texts', [])
-                        self.memory_metadata = metadata.get('metadata', [])
-                        self.inverted_index = metadata.get('inverted_index', {})
+                    # Load metadata from SQLite instead of JSON files
+                    from sakura_assistant.core.database import get_db_connection, Database
+                    conn = get_db_connection()
+                    cursor = conn.execute(
+                        "SELECT faiss_index, text, timestamp, role, hash, importance FROM memory_items ORDER BY faiss_index ASC"
+                    )
+                    rows = cursor.fetchall()
                     
-                    # Patch 1: Load importance from separate file
-                    if MEMORY_IMPORTANCE_PATH.exists():
-                        try:
-                            with open(MEMORY_IMPORTANCE_PATH, 'r', encoding='utf-8') as f:
-                                self.memory_importance = json.load(f)
-                        except Exception:
-                            self.memory_importance = {}
+                    self.memory_texts = [row['text'] for row in rows]
+                    self.memory_metadata = [
+                        {
+                            'timestamp': row['timestamp'],
+                            'role': row['role'],
+                            'hash': row['hash']
+                        } for row in rows
+                    ]
+                    self.memory_importance = {
+                        str(row['faiss_index']): row['importance'] for row in rows
+                    }
+                    self.inverted_index = Database.get_setting("memory_inverted_index", {})
                     
-                    if not self._mmap_active:
+                    if len(self.memory_texts) != self.faiss_index.ntotal:
+                        print(f"   [Store] Vector count mismatch: index has {self.faiss_index.ntotal}, metadata has {len(self.memory_texts)}. Recreating new index.")
+                        self._create_new_index()
+                    elif not self._mmap_active:
                         print(f" Loaded FAISS index with {self.faiss_index.ntotal} vectors")
                 except Exception as e:
-                    print(f"   Error loading FAISS index: {e}. Creating new one.")
+                    print(f"   Error loading FAISS index/metadata: {e}. Creating new one.")
                     self._create_new_index()
             else:
                 self._create_new_index()
@@ -280,52 +290,82 @@ class VectorMemoryStore:
             try:
                 faiss.write_index(self.faiss_index, str(FAISS_INDEX_PATH))
                 
-                # Use atomic write for metadata AND inverted index
-                metadata_obj = {
-                    'texts': self.memory_texts,
-                    'metadata': self.memory_metadata,
-                    'inverted_index': self.inverted_index
-                }
-                write_memory_atomic(MEMORY_METADATA_FILE, metadata_obj)
+                # Write to SQLite database
+                from sakura_assistant.core.database import get_db_connection, Database
+                conn = get_db_connection()
+                with conn:
+                    conn.execute("DELETE FROM memory_items")
+                    for i in range(len(self.memory_texts)):
+                        meta = self.memory_metadata[i] if i < len(self.memory_metadata) else {}
+                        imp = float(self.memory_importance.get(str(i), 0.0))
+                        conn.execute("""
+                            INSERT INTO memory_items (faiss_index, text, timestamp, role, hash, importance)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (
+                            i,
+                            self.memory_texts[i],
+                            meta.get('timestamp'),
+                            meta.get('role'),
+                            meta.get('hash'),
+                            imp
+                        ))
                 
-                # Patch 1: Save importance to separate file
-                with open(MEMORY_IMPORTANCE_PATH, 'w', encoding='utf-8') as f:
-                    json.dump(self.memory_importance, f, indent=2)
-                    
+                Database.set_setting("memory_inverted_index", self.inverted_index)
             except Exception as e:
-                print(f" Error saving index: {e}")
+                print(f" Error saving index to SQLite: {e}")
 
     def _load_conversation(self):
         """Load conversation history, capped to MAX_INMEM_HISTORY."""
-        print(f" [DEBUG] Checking history file: {CONVERSATION_FILE}")
-        if CONVERSATION_FILE.exists():
-            try:
-                with open(CONVERSATION_FILE, 'r', encoding='utf-8') as f:
-                    full_history = json.load(f)
+        try:
+            from sakura_assistant.core.database import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.execute(
+                "SELECT role, content, timestamp, hash FROM conversations ORDER BY id ASC"
+            )
+            rows = cursor.fetchall()
+            
+            full_history = [
+                {
+                    "role": row["role"],
+                    "content": row["content"],
+                    "timestamp": row["timestamp"],
+                    "hash": row["hash"]
+                }
+                for row in rows
+            ]
+            
+            if len(full_history) > MAX_INMEM_HISTORY:
+                self.conversation_history = full_history[-MAX_INMEM_HISTORY:]
+                print(f" Loaded last {MAX_INMEM_HISTORY} of {len(full_history)} messages from database")
+            else:
+                self.conversation_history = full_history
                 
-                # P0: Cap in-memory history to MAX_INMEM_HISTORY
-                if len(full_history) > MAX_INMEM_HISTORY:
-                    self.conversation_history = full_history[-MAX_INMEM_HISTORY:]
-                    print(f" Loaded last {MAX_INMEM_HISTORY} of {len(full_history)} messages")
-                else:
-                    self.conversation_history = full_history
-                
-                print(f" In-memory history: {len(self.conversation_history)} messages")
-            except Exception as e:
-                print(f"   Error loading conversation: {e}")
-                self.conversation_history = []
-        else:
-            print(f"   History file NOT FOUND at {CONVERSATION_FILE}")
+            print(f" In-memory history: {len(self.conversation_history)} messages")
+        except Exception as e:
+            print(f"   Error loading conversation from database: {e}")
+            self.conversation_history = []
     
     def get_full_history(self) -> List[Dict]:
-        """Load full conversation history from disk (for export/review)."""
-        if CONVERSATION_FILE.exists():
-            try:
-                with open(CONVERSATION_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except:
-                pass
-        return self.conversation_history
+        """Load full conversation history from database (for export/review)."""
+        try:
+            from sakura_assistant.core.database import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.execute(
+                "SELECT role, content, timestamp, hash FROM conversations ORDER BY id ASC"
+            )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "role": row["role"],
+                    "content": row["content"],
+                    "timestamp": row["timestamp"],
+                    "hash": row["hash"]
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            print(f" Error loading full history from database: {e}")
+            return self.conversation_history
 
     def _save_metadata(self):
         """P1: Debounced write - schedule save after 2s of no activity."""
@@ -351,8 +391,27 @@ class VectorMemoryStore:
     def _do_save_metadata(self):
         """Actually perform the save (called by timer)."""
         try:
-            write_memory_atomic(CONVERSATION_FILE, self.conversation_history)
-            logger.debug("Debounced save completed")
+            from sakura_assistant.core.database import get_db_connection
+            conn = get_db_connection()
+            with conn:
+                for msg in self.conversation_history:
+                    # Generate a unique hash if not present
+                    msg_hash = msg.get('hash')
+                    if not msg_hash:
+                        content_str = str(msg.get('content', ''))
+                        role_str = str(msg.get('role', ''))
+                        time_str = str(msg.get('timestamp', ''))
+                        msg_hash = hashlib.sha256(f"{role_str}:{content_str}:{time_str}".encode('utf-8')).hexdigest()
+                        msg['hash'] = msg_hash
+                    
+                    # Check if hash already exists
+                    cursor = conn.execute("SELECT 1 FROM conversations WHERE hash = ?", (msg_hash,))
+                    if not cursor.fetchone():
+                        conn.execute(
+                            "INSERT INTO conversations (role, content, timestamp, hash) VALUES (?, ?, ?, ?)",
+                            (msg.get('role'), msg.get('content'), msg.get('timestamp'), msg_hash)
+                        )
+            logger.debug("Debounced save to SQLite completed")
         except Exception as e:
             logger.error(f"Debounced save failed: {e}")
     
@@ -375,10 +434,15 @@ class VectorMemoryStore:
         new_score = round(current + float(boost), 4)
         self.memory_importance[key] = new_score
         log_reinforce(idx, new_score)
-        # Save immediately to persist reinforcement
+        # Save immediately to persist reinforcement to SQLite
         try:
-            with open(MEMORY_IMPORTANCE_PATH, 'w', encoding='utf-8') as f:
-                json.dump(self.memory_importance, f, indent=2)
+            from sakura_assistant.core.database import get_db_connection
+            conn = get_db_connection()
+            with conn:
+                conn.execute(
+                    "UPDATE memory_items SET importance = ? WHERE faiss_index = ?",
+                    (new_score, idx)
+                )
         except Exception as e:
             logger.warning(f"Failed to persist reinforcement: {e}")
 

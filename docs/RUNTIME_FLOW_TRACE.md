@@ -1,104 +1,79 @@
-# Sakura Runtime Flow Trace
-**Updated:** 2026-04-28 (V19 DeepSeek Integration)
+# Sakura Lite Runtime Flow Trace
+**Updated:** May 20, 2026 (V21.0 Sakura Lite Refactor)
 
-## Request Lifecycle (Post-V19-FIX)
+This document traces the request lifecycle and background tasks for Sakura Lite.
+
+---
+
+## 1. Request Lifecycle (Post-V21.0-LITE)
+
+Every request to the `/chat` endpoint proceeds in a fast, deterministic, single-turn sequence:
 
 ```
-POST /chat → server.py:840
-  ├─ Parse JSON → extract query, image_data
+POST /chat → server.py
+  ├─ Parse JSON → extract query, image_data, llm_overrides
   ├─ Create event_generator() async generator
-  │   ├─ Setup FlightRecorder callback
+  │   ├─ Set up FlightRecorder callback trace_id
   │   └─ Start run_pipeline() task
-  │       ├─ Get conversation history from FAISS store
-  │       ├─ Instantiate RequestState(query, history, ...)  ← SINGLE SOURCE OF TRUTH [Phase 2]
-  │       └─ assistant.arun(req_state, llm_overrides=data.get('llm_overrides'))  ← CORE PIPELINE [V19]
+  │       ├─ Get conversation history from SQLite (conversations table)
+  │       ├─ Instantiate RequestState(query, history, ...)
+  │       └─ assistant.arun(req_state, llm_overrides)  ← core facade in llm.py
   │
-  └─ arun() Pipeline (llm.py:169)
+  └─ arun() Pipeline (llm.py)
       │
-      ├─ 0. Contract Validation (RequestState.__post_init__)  ← [Phase 3]
+      ├─ 0. Contract Validation (RequestState.__post_init__)
       │
-      ├─ 1. Vision Short-Circuit (if image_data)
-      │    └─ Delegates to _handle_vision → Returns early
+      ├─ 1. Settings Load
+      │    └─ Query settings table in SQLite for user settings (bio, style overrides)
       │
-      ├─ 2. Settings Load (V18.3)
-      │    ├─ Load user_settings.json
-      │    ├─ Apply sakura_name, response_style, system_prompt_override
-      │    └─ Update self.responder.personality
+      ├─ 2. Reference Resolution
+      │    └─ resolve_reference(user_input) → ResolutionResult
+      │         └─ Formats active pronoun context if confidence > 0.4
       │
-      ├─ 3. Graph & Context
-      │    ├─ detect_study_mode(user_input) → bool
-      │    ├─ ★ resolve_reference(user_input) → ResolutionResult  [V19-FIX-02: NOW CAPTURED]
-      │    │    └─ Formats into reference_context string if confidence > 0.4
-      │    ├─ infer_user_intent(user_input, history)
-      │    └─ FlightRecorder.log("ReferenceResolution", ...)
+      ├─ 3. Fast Intent Classification & Routing
+      │    ├─ Local regex router check (bypasses LLM for direct matches)
+      │    └─ LLM Smart Router fallback classification → DIRECT, PLAN, or CHAT
       │
-      ├─ 4. Routing (Async)  [V19 stabilized]
-      │    ├─ ★ router.aroute(req_state, llm_override=container.get_router_llm(overrides)) [V19]
-      │    │    ├─ _is_action_command() → DIRECT (bypasses LLM)
-      │    │    └─ LLM classification → DIRECT/PLAN/CHAT
-      │    ├─ _apply_safety_checks() → Greeting/Tavily guard
-      │    └─ Capture classification/tool_hint into req_state
+      ├─ 4. Tool Execution (Hybrid Executor)
+      │    ├─ If CHAT: Skip execution, proceed to responder
+      │    ├─ If DIRECT: Run via OneShotRunner.aexecute() (fast parameter extraction)
+      │    │    └─ System tool: direct local Python execution
+      │    │    └─ Code interpreter: local restricted subprocess sandbox
+      │    ├─ If PLAN: Run via MultiStepPlanner.aexecute() (lightweight ReAct loop up to 4 turns)
+      │    │    └─ Sequentially invokes bound tools, evaluates observations, and loops
+      │    └─ Write execution record & metadata back to SQLite World Graph
       │
-      ├─ 5. Execution (V17 Executor Layer)
-      │    ├─ executor_layer.dispatch(req_state, llm_overrides) [V19]
-      │    │    ├─ Create ExecutionContext (threads ref_context) [Phase 2]
-      │    │    ├─ ONE_SHOT → OneShotRunner (fast lane)
-      │    │    └─ ITERATIVE → ReActLoop (multi-step)
-      │    │         └─ ★ planner_llm=container.get_planner_llm(overrides) [V19]
-      │    ├─ record_action() → World Graph
-      │    └─ PlanVerifier (for PLAN mode only)
-      │         └─ ★ verifier_llm=container.get_verifier_llm(overrides) [V19]
-      │
-      ├─ 6. Response Generation (Async)
+      ├─ 5. Response Synthesis (Responder)
       │    ├─ context_manager.get_context_for_llm(req_state)
-      │    │    ├─ Tiered Memory Gating (_build_episodic_block) [Phase 2]
-      │    │    │    └─ T1: Explicit, T2: PLAN, T3: DIRECT+ref, T4: CHAT
-      │    │    ├─ planner_context (identity, episodic, actions)
-      │    │    ├─ responder_context (World Graph)
-      │    │    └─ summary_context (SummaryMemory)
-      │    ├─ desire_system.get_mood_prompt() → mood string
-      │    ├─ Inject reference_context into responder_context
-      │    ├─ Build ResponseContext (Slots Hardened) [Phase 3]
-      │    └─ responder.agenerate(resp_context, llm_override=container.get_responder_llm(overrides)) [V19]
+      │    │    ├─ Load SQLite World Graph, episodic memory, and SQLite settings
+      │    │    └─ Format context blocks (identity, responder context, reference resolution context)
+      │    ├─ Load base personality + style instructions
+      │    └─ responder.agenerate() → Output text tokens
       │
-      ├─ 7. Post-Response
-      │    ├─ desire_system.on_user_message() / on_assistant_message()
-      │    ├─ summary_memory.add_turn()
-      │    ├─ memory_judger.evaluate() (fire-and-forget)
-      │    ├─ world_graph.advance_turn() + save()
-      │    └─ emitter.emit(response_text)
-      │
-      └─ Return {content, mode, tool_used, tools_used, metadata}
+      └─ 6. Post-Response Tasks
+           ├─ Write user turn & response to SQLite conversations table
+           └─ Emit streaming response to Tauri Svelte UI
 ```
 
-## Background Lifecycle (Post-V19-FIX)
+---
+
+## 2. Background Lifecycle (Post-V21.0-LITE)
+
+All heavy, CPU-draining cognitive ticks and proactive timers have been purged. The background tasks are strictly confined to database housekeeping and memory compilation:
 
 ```
-server.py:lifespan → schedule_cognitive_tasks()
+server.py:lifespan → scheduler
   │
-  ├─ ★ Import Verification  [V19-FIX-03: NEW]
-  │    ├─ from ..cognitive.desire import get_desire_system
-  │    └─ from ..cognitive.proactive import get_proactive_scheduler
-  │    └─ Logs: "Import verification passed" or "CRITICAL: imports FAILED"
+  ├─ Scheduler.schedule_interval("compile_memory", 1800s)
+  │    └─ run_reflection_engine()
+  │         ├─ Triggered only when server is idle (no active chat turns for 30 mins)
+  │         ├─ Queries SQLite for new conversation logs
+  │         └─ Compresses important facts and writes to memory_items SQLite table
   │
-  ├─ Scheduler.schedule_interval("desire_tick", 3600s)
-  │    └─ run_hourly_desire_tick()  [V19-FIX-03: FIXED IMPORT]
-  │         ├─ from ..cognitive.desire import get_desire_system
-  │         ├─ desire.on_hourly_tick()
-  │         └─ Logs battery + loneliness values
+  ├─ Wake Word background downloader (startup)
+  │    └─ Check if hey_jarvis_v0.1.onnx exists in models/openwakeword
+  │    └─ Downloads model if missing to enable local voice activation
   │
-  └─ Scheduler.schedule_interval("proactive_check", 3600s)
-       └─ _run_proactive_wrapper() → run_hourly_proactive_check()  [V19-FIX-03: FIXED IMPORT]
-            ├─ from ..cognitive.proactive import get_proactive_scheduler
-            ├─ scheduler.check_and_initiate()
-            └─ Logs initiation result
+  └─ Kokoro TTS pipeline warmup (startup)
+       └─ Loads neural Kokoro pipeline into RAM on background thread to keep it warm
 ```
-
-## Key Changes from Phase 1
-
-| Path | Before | After |
-|------|--------|-------|
-| Router call | `aroute(input, history, bool)` — POSITIONAL ❌ | `aroute(query=input, history=history)` — KEYWORD ✅ |
-| Reference resolution | Computed, discarded | Computed, formatted, injected into responder context ✅ |
-| Scheduler cognitive imports | `from .cognitive.*` — WRONG PATH | `from ..cognitive.*` — CORRECT PATH ✅ |
-| Import failures | Silently swallowed | Loud `ImportError` handler + startup verification ✅ |

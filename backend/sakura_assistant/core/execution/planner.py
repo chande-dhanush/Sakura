@@ -1,346 +1,152 @@
 """
-Planner Module - Single Responsibility Refactor
-
-Core Responsibility:
-    - Receives user request + context + tool history
-    - Decides what logical steps are needed
-    - Returns a declarative plan
-    
-NOT Responsible For:
-    - Routing (handled by Intent Router)
-    - Tool filtering (handled upstream)
-    - Execution (handled by Executor)
-    - Caching (handled by Executor or Router)
-    - UI state (handled by Executor)
-    - Retry logic (handled by Executor)
+Sakura Multi-Step Planner (ReAct Loop)
+=====================================
+A clean, lightweight planning engine that handles complex multi-step tool calls
+when the Router classifies the query as a PLAN task.
 """
 
-from typing import Dict, Any, List, Optional
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
-from ...config import PLANNER_SYSTEM_PROMPT, PLANNER_RETRY_PROMPT
+import time
+import logging
+from typing import Dict, Any, Optional, List
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
+from .context import ExecutionResult, ExecutionStatus
 
+logger = logging.getLogger(__name__)
 
-class Planner:
-    """
-    Minimal planner that decides WHAT to do, not HOW to do it.
-    
-    Input: User request, context, previous steps
-    Output: Ordered list of logical steps
-    """
-    
-    def __init__(self, llm):
-        """Initialize planner with an LLM."""
+PLANNER_SYSTEM_PROMPT = """You are Sakura's reasoning engine. Your goal is to solve the user's request using the available tools.
+Solve the request step-by-step. You can run one or more tools sequentially to gather information or perform actions.
+
+Guidelines:
+1. Be direct. Run tools as needed.
+2. Analyze the tool outputs objectively.
+3. Once you have all the necessary information, output your final conclusion.
+4. Do not narrate your thoughts to the user, keep your responses factual and direct.
+"""
+
+class MultiStepPlanner:
+    def __init__(self, tool_map: Dict[str, Any], llm: Any):
+        self.tool_map = tool_map
         self.llm = llm
-    
-    def _build_messages(
-        self, 
-        user_input: str, 
-        context: str = "",
-        tool_history: Optional[List] = None,
-        history: Optional[List[Dict]] = None,  # V17.1: Conversation history
-        hindsight: Optional[str] = None, # FIX-4: Retry feedback
-        executed_tools: Optional[List[str]] = None, # BUG-02
-        tool_hint: Optional[str] = None # VERIFICATION-03
-    ) -> List:
-        """
-        Build message chain for the LLM.
-        
-        Args:
-            user_input: The user's request
-            context: Optional graph context or reference information
-            tool_history: Previous tool calls and results (for iterative planning)
-            history: V17.1 - Conversation history for reference resolution
-            
-        Returns:
-            List of messages ready for LLM
-        """
-        #   DEBUG LOGGING FOR HISTORY INJECTION
-        print(f"  [Planner] history={history is not None}, len={len(history) if history else 0}")
 
-        # V17.1: Inject conversation context for reference resolution
-        full_context = context
-        
-        # BUG-02: Inject already executed tools
-        if executed_tools:
-            already_ran_str = ", ".join(executed_tools)
-            full_context = f"{full_context}\n\n[ALREADY RAN]: {already_ran_str}"
-            
-        if history:
-            recent_turns = history[-5:]  # VERIFICATION-03: Cap history at 5 turns
-            conv_lines = []
-            for turn in recent_turns:
-                role = turn.get("role", "unknown")
-                content = turn.get("content", "")[:200]  # Truncate
-                conv_lines.append(f"  {role.upper()}: {content}")
-            if conv_lines:
-                full_context = f"{context}\n\n[RECENT CONVERSATION CONTEXT]\n" + "\n".join(conv_lines)
-        
+    async def aexecute(self, ctx: Any, llm_overrides: Optional[Dict[str, Any]] = None) -> ExecutionResult:
+        start_time = time.time()
+        user_input = ctx.user_input
+        logger.info(f"[MultiStepPlanner] Starting planning loop for: {user_input[:80]}")
+
+        # Bind all tools to the LLM
+        tools_list = list(self.tool_map.values())
+        bound_llm = self.llm.bind_tools(tools_list)
+
+        # Initialize messages for the loop
         messages = [
-            SystemMessage(content=PLANNER_SYSTEM_PROMPT.format(context=full_context)),
-            HumanMessage(content=f"Request: {user_input}")
+            SystemMessage(content=PLANNER_SYSTEM_PROMPT),
+            HumanMessage(content=user_input)
         ]
-        
-        # Add tool history if this is an iterative planning session
-        if tool_history:
-            messages.extend(tool_history)
-            # Remind the planner of the original goal
-            messages.append(
-                HumanMessage(
-                    content=f"Original request: \"{user_input}\"\n\n"
-                            f"Based on the results above, what should happen next? "
-                            f"If the goal is complete, indicate no further steps are needed."
-                )
-            )
-        
-        # FIX-4: Inject Retry Prompt if hindsight provided
-        if hindsight:
-            messages.append(
-                SystemMessage(
-                    content=PLANNER_RETRY_PROMPT.format(
-                        hindsight=hindsight,
-                        user_input=user_input,
-                        context=context
-                    )
-                )
-            )
-        
-        return messages
-    
-    def _filter_tools(self, available_tools: List, tool_hint: str) -> List:
-        """
-        Filter tools based on hint while ensuring core capabilities are present
-        only if the filtered set is empty or invalid.
-        """
-        from ..routing.micro_toolsets import MICRO_TOOLSETS, UNIVERSAL_TOOLS, SEARCH_TOOLS, resolve_tool_hint
-        
-        target_names = set()
-        
-        # 1. Exact match on resolved hint
-        resolved_hint = resolve_tool_hint(tool_hint)
-        if resolved_hint:
-            target_names.add(resolved_hint)
-        
-        # 2. Category match
-        if tool_hint in MICRO_TOOLSETS:
-            target_names.update(MICRO_TOOLSETS[tool_hint]["primary"])
-            
-        filtered = [t for t in available_tools if t.name in target_names]
-        
-        # 3. Fallback to baseline if filtered set is empty
-        if not filtered:
-            print(f"   [Planner] Filtered toolset for hint '{tool_hint}' is empty. Falling back to baseline.")
-            baseline_categories = ["music", "search", "system"]
-            baseline_tools = set(UNIVERSAL_TOOLS)
-            for cat in baseline_categories:
-                if cat in MICRO_TOOLSETS:
-                    baseline_tools.update(MICRO_TOOLSETS[cat]["primary"])
-            baseline_tools.update(SEARCH_TOOLS)
-            
-            filtered = [t for t in available_tools if t.name in baseline_tools]
-            
-            # Absolute fallback
-            if not filtered:
-                filtered = available_tools
-                
-        return filtered
 
-    def plan(
-        self, 
-        user_input: str, 
-        context: str = "",
-        tool_history: Optional[List] = None,
-        available_tools: Optional[List] = None,
-        intent_mode: str = "action",
-        history: Optional[List[Dict]] = None,  # V17.1
-        hindsight: Optional[str] = None,  # FIX-4
-        executed_tools: Optional[List[str]] = None, # BUG-02
-        tool_hint: Optional[str] = None # VERIFICATION-03
-    ) -> Dict[str, Any]:
-        """
-        Generate a plan for the user's request.
-        """
-        # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
-        filtered_tools = available_tools
-        if tool_hint and available_tools:
-            filtered_tools = self._filter_tools(available_tools, tool_hint)
-            if len(filtered_tools) < len(available_tools):
-                print(f"  [Planner] Filtered tools: {len(available_tools)} -> {len(filtered_tools)} (Hint: {tool_hint})")
-
-        # Build conversation context (V17.1: include history)
-        messages = self._build_messages(
-            user_input, 
-            context, 
-            tool_history, 
-            history, 
-            hindsight, 
-            executed_tools, 
-            tool_hint
-        )
+        tool_messages = []
+        last_tool_used = "None"
+        last_output = ""
+        success = True
+        max_turns = 4
         
-        # Bind tools if provided
-        active_llm = self.llm
-        if filtered_tools:
-            # V10.2: Enforce tool usage on initial plan
-            force_tool = not tool_history
-            tool_choice = "any" if force_tool else "auto"
-            
+        for turn in range(max_turns):
+            logger.info(f"[MultiStepPlanner] Turn {turn + 1}/{max_turns}")
             try:
-                active_llm = self.llm.bind_tools(filtered_tools, tool_choice=tool_choice)
-                if force_tool:
-                    print("   [Planner] Enforcing tool usage (tool_choice='any')")
-            except TypeError:
-                print("   [Planner] Model doesn't support tool_choice, falling back to soft-prompt")
-                active_llm = self.llm.bind_tools(filtered_tools)
-        
-        print(f"  [Planner] Generating plan... ({len(filtered_tools) if filtered_tools else 0} tools available)")
-        
-        # V18.3 BUG-08: Use invoke directly, self.llm handles retries implicitly
-        response = active_llm.invoke(messages)
-        
-        # Process tool calls
-        if hasattr(response, 'tool_calls') and response.tool_calls:
-            steps = []
-            for i, call in enumerate(response.tool_calls):
-                steps.append({
-                    "id": i + 1,
-                    "tool": call['name'],
-                    "args": call['args']
-                })
-            
-            return {
-                "steps": steps,
-                "complete": False,
-                "message": response
-            }
-        else:
-            # V10.2 Anti-Hallucination: If tool forced but ignored
-            if filtered_tools and not tool_history:
-                print(f"   [Planner] Model ignored tool_choice='any', applying soft-retry")
-                messages.append(response)
-                
-                from langchain_core.messages import HumanMessage
-                from ...config import PLANNER_RETRY_PROMPT
-                messages.append(HumanMessage(content=PLANNER_RETRY_PROMPT))
-                
-                retry_resp = active_llm.invoke(messages)
-                
-                if hasattr(retry_resp, 'tool_calls') and retry_resp.tool_calls:
-                    print(f"  [Planner] Soft-retry successful")
-                    steps = []
-                    for i, call in enumerate(retry_resp.tool_calls):
-                        steps.append({
-                            "id": i + 1,
-                            "tool": call['name'],
-                            "args": call['args']
-                        })
-                    return {
-                        "steps": steps,
-                        "complete": False,
-                        "message": retry_resp
-                    }
-                else:
-                    print(f"   [Planner] Enforcement failed   LLM still refused tools")
-            
-        # No tool calls = either chat response or task complete
-        return {
-            "steps": [],
-            "complete": True,
-            "message": response
-        }
-    
-    async def aplan(
-        self, 
-        user_input: str, 
-        context: str = "",
-        tool_history: Optional[List] = None,
-        available_tools: Optional[List] = None,
-        intent_mode: str = "action",
-        history: Optional[List[Dict]] = None,
-        hindsight: Optional[str] = None,
-        executed_tools: Optional[List[str]] = None,
-        tool_hint: Optional[str] = None,
-        llm_override: Any = None
-    ) -> Dict[str, Any]:
-        """Async version of planning."""
-        # Use provided override or default
-        active_llm = llm_override or self.llm
-        # V18.4 VERIFICATION-03: Filter tools based on hint to save tokens
-        filtered_tools = available_tools
-        if tool_hint and available_tools:
-            filtered_tools = self._filter_tools(available_tools, tool_hint)
-            if len(filtered_tools) < len(available_tools):
-                print(f"  [Planner] Filtered tools: {len(available_tools)} -> {len(filtered_tools)} (Hint: {tool_hint})")
+                response = await bound_llm.ainvoke(messages)
+            except Exception as e:
+                logger.error(f"[MultiStepPlanner] LLM invocation failed: {e}")
+                return ExecutionResult.error(f"Planning failed: {e}")
 
-        messages = self._build_messages(
-            user_input, 
-            context, 
-            tool_history, 
-            history, 
-            hindsight, 
-            executed_tools, 
-            tool_hint
+            messages.append(response)
+
+            # If there are no tool calls, we are done
+            if not response.tool_calls:
+                logger.info("[MultiStepPlanner] Loop finished: no further tools requested.")
+                last_output = response.content
+                break
+
+            # Process tool calls
+            for tool_call in response.tool_calls:
+                tool_name = tool_call["name"]
+                tool_args = tool_call["args"]
+                logger.info(f"[MultiStepPlanner] LLM requested tool: {tool_name} with args: {tool_args}")
+
+                if tool_name not in self.tool_map:
+                    from ..routing.micro_toolsets import resolve_tool_hint
+                    resolved_name = resolve_tool_hint(tool_name)
+                    if resolved_name in self.tool_map:
+                        tool_name = resolved_name
+                    else:
+                        output = f"Error: Tool '{tool_name}' not found."
+                        t_msg = ToolMessage(content=output, name=tool_name, tool_call_id=tool_call.get("id", "plan_err"))
+                        messages.append(t_msg)
+                        tool_messages.append(t_msg)
+                        continue
+
+                tool_instance = self.tool_map[tool_name]
+                last_tool_used = tool_name
+
+                # Check security pathing for system files
+                if tool_name in ["file_read", "file_write", "open_app"]:
+                    from .oneshot_runner import _sanitize_path, SecurityError
+                    path_key = "path" if "path" in tool_args else ("app_name" if "app_name" in tool_args else "filename")
+                    if path_key in tool_args:
+                        try:
+                            tool_args[path_key] = _sanitize_path(tool_args[path_key])
+                        except SecurityError as sec_err:
+                            output = str(sec_err)
+                            t_msg = ToolMessage(content=output, name=tool_name, tool_call_id=tool_call.get("id", "plan_sec"))
+                            messages.append(t_msg)
+                            tool_messages.append(t_msg)
+                            success = False
+                            continue
+                
+                # Execute tool
+                try:
+                    import asyncio
+                    if hasattr(tool_instance, 'ainvoke'):
+                        res = await tool_instance.ainvoke(tool_args)
+                    else:
+                        res = await asyncio.to_thread(tool_instance.invoke, tool_args)
+                    output = str(res)
+                except Exception as ex:
+                    logger.error(f"[MultiStepPlanner] Tool {tool_name} failed: {ex}")
+                    output = f"Error running tool '{tool_name}': {ex}"
+                    success = False
+
+                t_msg = ToolMessage(
+                    content=output,
+                    name=tool_name,
+                    tool_call_id=tool_call.get("id", f"plan_{tool_name}_{int(time.time())}")
+                )
+                messages.append(t_msg)
+                tool_messages.append(t_msg)
+                last_output = output
+        
+        # Log to Flight Recorder
+        try:
+            from ...utils.flight_recorder import get_recorder
+            recorder = get_recorder()
+            recorder.span(
+                stage="Planner",
+                status="SUCCESS" if success else "FAILED",
+                content=f"MultiStepPlanner execution completed in {time.time() - start_time:.2f}s",
+                trace_id=recorder.trace_id,
+                tool=last_tool_used,
+                args={"max_turns": max_turns, "turns_run": len(tool_messages)},
+                result=last_output[:500]
+            )
+        except Exception as log_err:
+            logger.warning(f"[MultiStepPlanner] Logging failed: {log_err}")
+
+        return ExecutionResult(
+            outputs=last_output,
+            tool_messages=tool_messages,
+            tool_used=last_tool_used,
+            last_result={
+                "tool": last_tool_used,
+                "output": last_output,
+                "success": success
+            },
+            status=ExecutionStatus.SUCCESS if success else ExecutionStatus.FAILED
         )
-        
-        # Bind tools
-        if filtered_tools:
-            force_tool = not tool_history
-            tool_choice = "any" if force_tool else "auto"
-            try:
-                active_llm = active_llm.bind_tools(filtered_tools, tool_choice=tool_choice)
-                if force_tool:
-                    print("   [Planner] Enforcing tool usage (tool_choice='any', async)")
-            except TypeError:
-                print("   [Planner] Model doesn't support tool_choice, falling back to soft-prompt")
-                active_llm = active_llm.bind_tools(filtered_tools)
-        
-        print(f"  [Planner] Generating plan (async)... ({len(filtered_tools) if filtered_tools else 0} tools available)")
-        
-        response = await active_llm.ainvoke(messages)
-        
-        if hasattr(response, 'tool_calls') and response.tool_calls:
-            steps = []
-            for i, call in enumerate(response.tool_calls):
-                steps.append({
-                    "id": i + 1,
-                    "tool": call['name'],
-                    "args": call['args']
-                })
-            
-            return {
-                "steps": steps,
-                "complete": False,
-                "message": response
-            }
-        else:
-            if filtered_tools and not tool_history:
-                print(f"   [Planner] Model ignored tool_choice='any', applying soft-retry (async)")
-                messages.append(response)
-                
-                from langchain_core.messages import HumanMessage
-                from ...config import PLANNER_RETRY_PROMPT
-                messages.append(HumanMessage(content=PLANNER_RETRY_PROMPT))
-                
-                retry_resp = await active_llm.ainvoke(messages)
-                
-                if hasattr(retry_resp, 'tool_calls') and retry_resp.tool_calls:
-                    print(f"  [Planner] Soft-retry successful (async)")
-                    steps = []
-                    for i, call in enumerate(retry_resp.tool_calls):
-                        steps.append({
-                            "id": i + 1,
-                            "tool": call['name'],
-                            "args": call['args']
-                        })
-                    return {
-                        "steps": steps,
-                        "complete": False,
-                        "message": retry_resp
-                    }
-                else:
-                    print(f"   [Planner] Enforcement failed   LLM still refused tools (async)")
-            
-        return {
-            "steps": [],
-            "complete": True,
-            "message": response
-        }
